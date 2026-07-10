@@ -1,19 +1,24 @@
-<<<<<<< HEAD
-# Time 420s POS Web
+# Ruang Ujian
 
-Web POS restoran berbasis React + TypeScript, dibangun dari dokumen handoff pada `design_handoff_pembayaran`. Proyek ini hanya berisi aplikasi web; tidak ada implementasi Flutter.
+Website ujian sekolah berbasis React, TypeScript, dan Supabase. Implementasi dibuat dari PRD `Membuat aplikasi ujian sekolah.zip` dan hanya berfokus pada platform web—tanpa aplikasi Flutter.
 
-## Fitur
+## Cakupan web
 
-- Dashboard operasional responsif
-- Pemilihan dan status meja
-- Pembayaran tunai/nontunai, numpad, pajak dan service charge
-- Shift kasir, kas masuk/keluar, tutup shift, dan riwayat
-- Pengaturan order online, struk, pembayaran, outlet, perangkat, dan PIN
-- CRUD promo
-- Sinkronisasi Supabase dengan fallback `localStorage` untuk mode demo
+- Login Supabase Auth dan tiga peran: admin, guru, siswa
+- Dashboard aktivitas sekolah
+- Daftar ujian dan wizard pembuatan ujian
+- Bank soal pilihan ganda/essay
+- Manajemen kelas dan siswa
+- Koreksi essay per siswa
+- Laporan nilai dan analisis butir soal
+- Portal siswa dan pengerjaan ujian interaktif
+- Autosave jawaban ke browser serta sinkronisasi Supabase
+- Pencatatan event saat siswa meninggalkan tab ujian
+- Tampilan responsif desktop, tablet, dan mobile
 
-## Menjalankan lokal
+Tombol mode demo di halaman login dapat digunakan sebelum Supabase dikonfigurasi.
+
+## Menjalankan proyek
 
 Prasyarat: Node.js 20 atau lebih baru.
 
@@ -23,31 +28,33 @@ copy .env.example .env.local
 npm run dev
 ```
 
-Tanpa `.env.local`, aplikasi tetap berjalan dalam mode demo dan menyimpan perubahan di browser.
+## Konfigurasi Supabase
 
-## Menghubungkan Supabase
-
-1. Buat project di Supabase.
-2. Jalankan isi `supabase/migrations/001_initial_schema.sql` melalui SQL Editor.
-3. Salin Project URL dan anon key ke `.env.local`:
+1. Buat project Supabase.
+2. Jalankan [migration](./supabase/migrations/001_initial_schema.sql) melalui SQL Editor.
+3. Isi `.env.local`:
 
 ```env
 VITE_SUPABASE_URL=https://PROJECT.supabase.co
 VITE_SUPABASE_ANON_KEY=ANON_KEY
 ```
 
-4. Restart server pengembangan.
+4. Buat pengguna melalui Supabase Auth. Sertakan metadata berikut saat membuat akun:
 
-Migration memakai kebijakan akses anon agar instalasi POS satu outlet dapat langsung digunakan. Untuk deployment multi-outlet, tambahkan Supabase Auth, kolom `outlet_id`, dan ganti policy dengan policy berbasis user/outlet sebelum dipublikasikan.
+```json
+{
+  "full_name": "Nama Pengguna",
+  "role": "admin"
+}
+```
 
-## Perintah
+Nilai role yang didukung: `admin`, `guru`, atau `siswa`. Trigger database otomatis membuat baris profil ketika user Auth dibuat.
+
+## Verifikasi
 
 ```bash
-npm run dev      # development server
-npm run build    # type-check dan production build
-npm run lint     # lint source
-npm run preview  # preview hasil build
+npm run build
+npm run lint
 ```
-=======
-# porto-arsya
->>>>>>> b7f36c55940925328a97f4aa73183687bf99ab2a
+
+Mode web menggunakan `localStorage` sebagai antrean autosave ringan. Kebutuhan offline native berbasis SQLite/Drift dan kiosk mode Android dari PRD sengaja tidak diimplementasikan karena berada di luar cakupan website.
