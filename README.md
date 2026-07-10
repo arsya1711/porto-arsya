@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Time 420s POS Web
 
 Web POS restoran berbasis React + TypeScript, dibangun dari dokumen handoff pada `design_handoff_pembayaran`. Proyek ini hanya berisi aplikasi web; tidak ada implementasi Flutter.
@@ -47,3 +48,6 @@ npm run build    # type-check dan production build
 npm run lint     # lint source
 npm run preview  # preview hasil build
 ```
+=======
+# porto-arsya
+>>>>>>> b7f36c55940925328a97f4aa73183687bf99ab2a
