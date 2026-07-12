@@ -1,18 +1,23 @@
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react'
+import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   AlertTriangle, ArrowLeft, ArrowRight, BarChart3, Bell, BookOpen, CalendarDays, Check,
   CheckCircle2, ChevronDown, ChevronRight, CircleHelp, ClipboardCheck, Clock3, Download,
   FileQuestion, Filter, GraduationCap, LayoutDashboard, LockKeyhole, LogOut, Menu, MoreHorizontal,
-  Plus, Radio, Search, Settings, ShieldCheck, Sparkles, Star, Upload, UserRound, Users, Wifi, X,
+  Plus, Radio, Search, Settings, ShieldCheck, Sparkles, Star, Upload, UserPlus, UserRound, Users, Wifi, X,
 } from 'lucide-react'
 import { examQuestions, exams as seedExams, questions as seedQuestions, students, type Exam, type Question, type Role } from './mockData'
-import { isSupabaseConfigured, loadLocal, saveLocal, signIn, signOut, supabase } from './lib/supabase'
+import { isSupabaseConfigured, loadLocal, saveLocal, supabase } from './lib/supabase'
+import { AuthProvider, type Profile, useAuth } from './auth/AuthContext'
 
 type Toast = { text: string; error?: boolean } | null
 
 function App() {
-  const [role, setRole] = useState<Role | null>(() => loadLocal<Role | null>('role', null))
+  return <AuthProvider><Application/></AuthProvider>
+}
+
+function Application() {
+  const { profile, loading: authLoading, logout, passwordRecovery, updatePassword } = useAuth()
   const [toast, setToast] = useState<Toast>(null)
   const [examList, setExamList] = useState<Exam[]>(seedExams)
   const [questionList, setQuestionList] = useState<Question[]>(seedQuestions)
@@ -24,7 +29,7 @@ function App() {
   }, [toast])
 
   useEffect(() => {
-    if (!supabase) return
+    if (!supabase || !profile) return
     Promise.all([
       supabase.from('exams').select('id,title,subjects(name),classes(name),starts_at,duration_minutes,status,exam_questions(count),exam_assignments(count)').order('starts_at'),
       supabase.from('questions').select('id,body,type,difficulty,usage_count,question_banks(name,subjects(name))').eq('archived', false).limit(50),
@@ -45,22 +50,31 @@ function App() {
         })))
       }
     })
-  }, [])
+  }, [profile])
 
-  const notify = (text: string, error = false) => setToast({ text, error })
-  const loginAs = (nextRole: Role) => { setRole(nextRole); saveLocal('role', nextRole) }
-  const logout = async () => { await signOut(); setRole(null); localStorage.removeItem('ruang-ujian:role') }
+  const notify = useCallback((text: string, error = false) => setToast({ text, error }), [])
+  if (authLoading) return <div className="auth-loading"><span><GraduationCap/></span><p>Memuat sesi pengguna…</p></div>
+  if (passwordRecovery) return <PasswordRecovery updatePassword={updatePassword} notify={notify}/>
+  const role = profile?.role ?? null
 
   return <>
     <Routes>
-      <Route path="/" element={<Login onLogin={loginAs} notify={notify}/>} />
-      <Route path="/app/*" element={role && role !== 'siswa' ? <Portal role={role} logout={logout} exams={examList} setExams={setExamList} questions={questionList} setQuestions={setQuestionList} notify={notify}/> : <Navigate to="/"/>}/>
-      <Route path="/siswa" element={role === 'siswa' ? <StudentHome logout={logout}/> : <Navigate to="/"/>}/>
+      <Route path="/" element={profile ? <Navigate to={role === 'siswa' ? '/siswa' : '/app'}/> : <Login notify={notify}/>} />
+      <Route path="/app/*" element={profile && role !== 'siswa' ? <Portal profile={profile} logout={logout} exams={examList} setExams={setExamList} questions={questionList} setQuestions={setQuestionList} notify={notify}/> : <Navigate to="/"/>}/>
+      <Route path="/siswa" element={profile && role === 'siswa' ? <StudentHome logout={logout}/> : <Navigate to="/"/>}/>
       <Route path="/siswa/ujian/:examId" element={role === 'siswa' ? <ExamRunner notify={notify}/> : <Navigate to="/"/>}/>
       <Route path="*" element={<Navigate to="/"/>}/>
     </Routes>
     {toast && <div className={`toast ${toast.error ? 'error' : ''}`}>{toast.error ? <AlertTriangle/> : <CheckCircle2/>}{toast.text}</div>}
   </>
+}
+
+function PasswordRecovery({updatePassword,notify}:{updatePassword:(password:string)=>Promise<void>;notify:(text:string,error?:boolean)=>void}) {
+  const [password,setPassword]=useState('')
+  const [confirmation,setConfirmation]=useState('')
+  const [loading,setLoading]=useState(false)
+  const submit=async(event:FormEvent)=>{event.preventDefault();if(password.length<8){notify('Kata sandi minimal 8 karakter.',true);return}if(password!==confirmation){notify('Konfirmasi kata sandi tidak sesuai.',true);return}setLoading(true);try{await updatePassword(password);notify('Kata sandi berhasil diperbarui.')}catch(error){notify(error instanceof Error?error.message:'Gagal memperbarui kata sandi.',true)}finally{setLoading(false)}}
+  return <main className="recovery-page"><form onSubmit={submit}><span className="recovery-icon"><LockKeyhole/></span><p className="overline">KEAMANAN AKUN</p><h1>Buat kata sandi baru</h1><p>Gunakan minimal 8 karakter dan jangan gunakan kata sandi yang mudah ditebak.</p><FormField label="Kata sandi baru"><input type="password" value={password} onChange={(e)=>setPassword(e.target.value)} minLength={8} required/></FormField><FormField label="Konfirmasi kata sandi"><input type="password" value={confirmation} onChange={(e)=>setConfirmation(e.target.value)} minLength={8} required/></FormField><button className="login-button" disabled={loading}>{loading?'Menyimpan…':'Simpan kata sandi'}<ArrowRight/></button></form></main>
 }
 
 function relationName(value: unknown): string {
@@ -76,41 +90,52 @@ function relationNestedName(value: unknown): string {
 function relationCount(value: unknown): number { return Array.isArray(value) ? Number(value[0]?.count ?? 0) : 0 }
 function capitalize(value: string) { return value ? value[0].toUpperCase() + value.slice(1) : value }
 
-function Login({ onLogin, notify }: { onLogin: (role: Role) => void; notify: (text: string, error?: boolean) => void }) {
+function Login({ notify }: { notify: (text: string, error?: boolean) => void }) {
+  const { login, loginDemo, resetPassword } = useAuth()
   const navigate = useNavigate()
-  const [email, setEmail] = useState('guru@sekolah.sch.id')
-  const [password, setPassword] = useState('password')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const submit = async (e: FormEvent) => {
     e.preventDefault(); setLoading(true)
-    try { const result = await signIn(email,password); onLogin(result.role); navigate(result.role === 'siswa' ? '/siswa' : '/app') }
-    catch { notify('Email atau kata sandi tidak sesuai.',true) }
+    try { const nextProfile = await login(email,password); navigate(nextProfile.role === 'siswa' ? '/siswa' : '/app') }
+    catch (error) { notify(error instanceof Error ? error.message : 'Email atau kata sandi tidak sesuai.',true) }
     finally { setLoading(false) }
   }
-  const demo = (role: Role) => { onLogin(role); navigate(role === 'siswa' ? '/siswa' : '/app') }
+  const demo = (role: Role) => { loginDemo(role); navigate(role === 'siswa' ? '/siswa' : '/app') }
+  const forgotPassword = async () => {
+    if (!email) { notify('Masukkan email terlebih dahulu.', true); return }
+    try { await resetPassword(email); notify('Tautan reset kata sandi sudah dikirim.') }
+    catch (error) { notify(error instanceof Error ? error.message : 'Gagal mengirim tautan reset.', true) }
+  }
   return <main className="login-page">
     <section className="login-brand"><div className="school-mark"><GraduationCap/></div><div className="brand-copy"><span>RUANG UJIAN</span><h1>Ujian lebih tertib.<br/>Hasil lebih cepat.</h1><p>Satu ruang digital untuk mengelola ujian sekolah, dari penyusunan soal hingga laporan nilai.</p></div><div className="login-art"><div className="art-card"><span><BookOpen/> 1.248 soal</span><strong>Bank soal yang tumbuh<br/>bersama sekolah Anda.</strong><div className="art-bars"><i/><i/><i/><i/><i/></div></div></div><small>© 2026 SMP Negeri Harapan Bangsa</small></section>
-    <section className="login-panel"><form onSubmit={submit}><div className="mobile-logo"><GraduationCap/> Ruang Ujian</div><p className="overline">PORTAL SEKOLAH</p><h2>Selamat datang</h2><p className="subcopy">Masuk menggunakan akun yang diberikan oleh admin sekolah.</p><label><span>Email</span><div className="input-box"><UserRound/><input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} required/></div></label><label><span>Kata sandi</span><div className="input-box"><LockKeyhole/><input type="password" value={password} onChange={(e)=>setPassword(e.target.value)} required/></div></label><div className="login-help"><label><input type="checkbox"/> Ingat saya</label><button type="button">Lupa kata sandi?</button></div><button className="login-button" disabled={loading}>{loading ? 'Memeriksa…' : 'Masuk'}<ArrowRight/></button><div className="divider"><span>atau coba mode demo</span></div><div className="demo-buttons"><button type="button" onClick={()=>demo('admin')}>Admin</button><button type="button" onClick={()=>demo('guru')}>Guru</button><button type="button" onClick={()=>demo('siswa')}>Siswa</button></div><p className="connection"><i className={isSupabaseConfigured?'online':''}/>{isSupabaseConfigured ? 'Terhubung ke Supabase' : 'Mode demo lokal aktif'}</p></form>
+    <section className="login-panel"><form onSubmit={submit}><div className="mobile-logo"><GraduationCap/> Ruang Ujian</div><p className="overline">PORTAL SEKOLAH</p><h2>Selamat datang</h2><p className="subcopy">Masuk menggunakan akun yang diberikan oleh admin sekolah.</p><label><span>Email</span><div className="input-box"><UserRound/><input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} autoComplete="email" required/></div></label><label><span>Kata sandi</span><div className="input-box"><LockKeyhole/><input type="password" value={password} onChange={(e)=>setPassword(e.target.value)} autoComplete="current-password" required/></div></label><div className="login-help"><label><input type="checkbox" defaultChecked/> Ingat saya</label><button type="button" onClick={forgotPassword}>Lupa kata sandi?</button></div><button className="login-button" disabled={loading}>{loading ? 'Memeriksa…' : 'Masuk'}<ArrowRight/></button>{!isSupabaseConfigured&&<><div className="divider"><span>atau coba mode demo</span></div><div className="demo-buttons"><button type="button" onClick={()=>demo('admin')}>Admin</button><button type="button" onClick={()=>demo('guru')}>Guru</button><button type="button" onClick={()=>demo('siswa')}>Siswa</button></div></>}<p className="connection"><i className={isSupabaseConfigured?'online':''}/>{isSupabaseConfigured ? 'Autentikasi Supabase aktif' : 'Mode demo lokal aktif'}</p></form>
     </section>
   </main>
 }
 
-function Portal({ role, logout, exams, setExams, questions, setQuestions, notify }: { role: Role; logout: () => void; exams: Exam[]; setExams: (v: Exam[]) => void; questions: Question[]; setQuestions: (v: Question[]) => void; notify: (text: string, error?: boolean) => void }) {
+function Portal({ profile, logout, exams, setExams, questions, setQuestions, notify }: { profile: Profile; logout: () => void; exams: Exam[]; setExams: (v: Exam[]) => void; questions: Question[]; setQuestions: (v: Question[]) => void; notify: (text: string, error?: boolean) => void }) {
   const location = useLocation()
-  const nav = [
+  const role = profile.role
+  const nav: [string, ReactNode, string][] = [
     ['/app',<LayoutDashboard/>,'Ringkasan'],['/app/ujian',<CalendarDays/>,'Ujian'],['/app/bank-soal',<FileQuestion/>,'Bank Soal'],
     ['/app/kelas',<Users/>,'Kelas & Siswa'],['/app/koreksi',<ClipboardCheck/>,'Koreksi'],['/app/laporan',<BarChart3/>,'Laporan'],
-  ] as const
-  return <div className="portal-shell"><aside className="portal-sidebar"><Link to="/app" className="portal-logo"><span><GraduationCap/></span><b>Ruang Ujian<small>SMP Harapan Bangsa</small></b></Link><div className="workspace"><small>RUANG KERJA</small><button><span>{role === 'admin' ? 'A' : 'GP'}</span><b>{role === 'admin' ? 'Admin Sekolah' : 'Guru Pengajar'}<small>{role === 'admin' ? 'Administrator' : 'Matematika'}</small></b><ChevronDown/></button></div><nav>{nav.map(([to,icon,label])=><Link key={to} className={location.pathname===to?'active':''} to={to}>{icon}{label}{label==='Koreksi'&&<em>8</em>}</Link>)}</nav><div className="side-bottom"><Link to="/app/pengaturan"><Settings/>Pengaturan</Link><button onClick={logout}><LogOut/>Keluar</button></div></aside><main className="portal-main"><Topbar/><Routes><Route index element={<Dashboard exams={exams}/>} /><Route path="ujian" element={<ExamManagement exams={exams} setExams={setExams} notify={notify}/>} /><Route path="bank-soal" element={<QuestionBank questions={questions} setQuestions={setQuestions} notify={notify}/>} /><Route path="kelas" element={<Classes/>}/><Route path="koreksi" element={<Grading notify={notify}/>}/><Route path="laporan" element={<Reports/>}/><Route path="pengaturan" element={<SettingsPage role={role}/>}/><Route path="*" element={<Navigate to="/app"/>}/></Routes></main><MobilePortalNav/></div>
+  ]
+  if (role === 'admin') nav.splice(4, 0, ['/app/pengguna',<UserPlus/>,'Pengguna'])
+  const initials = getInitials(profile.full_name)
+  return <div className="portal-shell"><aside className="portal-sidebar"><Link to="/app" className="portal-logo"><span><GraduationCap/></span><b>Ruang Ujian<small>SMP Harapan Bangsa</small></b></Link><div className="workspace"><small>RUANG KERJA</small><button><span>{initials}</span><b>{profile.full_name}<small>{role === 'admin' ? 'Administrator' : 'Guru'}</small></b><ChevronDown/></button></div><nav>{nav.map(([to,icon,label])=><Link key={to} className={location.pathname===to?'active':''} to={to}>{icon}{label}{label==='Koreksi'&&<em>8</em>}</Link>)}</nav><div className="side-bottom"><Link to="/app/pengaturan"><Settings/>Pengaturan</Link><button onClick={logout}><LogOut/>Keluar</button></div></aside><main className="portal-main"><Topbar profile={profile}/><Routes><Route index element={<Dashboard exams={exams} profile={profile}/>} /><Route path="ujian" element={<ExamManagement exams={exams} setExams={setExams} notify={notify}/>} /><Route path="bank-soal" element={<QuestionBank questions={questions} setQuestions={setQuestions} notify={notify}/>} /><Route path="kelas" element={<Classes/>}/><Route path="pengguna" element={role === 'admin' ? <UserManagement notify={notify}/> : <Navigate to="/app"/>}/><Route path="koreksi" element={<Grading notify={notify}/>}/><Route path="laporan" element={<Reports/>}/><Route path="pengaturan" element={<SettingsPage role={role}/>}/><Route path="*" element={<Navigate to="/app"/>}/></Routes></main><MobilePortalNav/></div>
 }
 
-function Topbar() { return <header className="topbar"><button className="mobile-menu"><Menu/></button><div className="global-search"><Search/><input placeholder="Cari ujian, soal, atau siswa…"/><kbd>⌘ K</kbd></div><div className="top-actions"><button><CircleHelp/></button><button className="notification"><Bell/><i/></button><span className="avatar">GP</span></div></header> }
+function getInitials(name: string) { return name.split(' ').filter(Boolean).slice(0,2).map((part)=>part[0]).join('').toUpperCase() }
+function Topbar({profile}:{profile:Profile}) { return <header className="topbar"><button className="mobile-menu"><Menu/></button><div className="global-search"><Search/><input placeholder="Cari ujian, soal, atau siswa…"/><kbd>⌘ K</kbd></div><div className="top-actions"><button><CircleHelp/></button><button className="notification"><Bell/><i/></button><span className="avatar" title={profile.full_name}>{getInitials(profile.full_name)}</span></div></header> }
 
 function MobilePortalNav(){return <nav className="portal-mobile-nav"><Link to="/app"><LayoutDashboard/><span>Beranda</span></Link><Link to="/app/ujian"><CalendarDays/><span>Ujian</span></Link><Link to="/app/bank-soal"><FileQuestion/><span>Soal</span></Link><Link to="/app/kelas"><Users/><span>Kelas</span></Link></nav>}
 
 function PageTitle({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: ReactNode }) { return <div className="page-title"><div><p>{eyebrow}</p><h1>{title}</h1><span>{description}</span></div>{action}</div> }
 
-function Dashboard({ exams }: { exams: Exam[] }) {
+function Dashboard({ exams, profile }: { exams: Exam[]; profile: Profile }) {
+  void profile
   return <div className="portal-page"><PageTitle eyebrow="JUMAT, 10 JULI 2026" title="Selamat pagi, Ibu Rina" description="Berikut ringkasan kegiatan ujian sekolah hari ini." action={<Link className="primary" to="/app/ujian"><Plus/>Buat ujian</Link>}/><div className="stats-grid"><Stat icon={<Radio/>} tone="green" label="Ujian berlangsung" value="3" note="94 siswa sedang mengerjakan"/><Stat icon={<Clock3/>} tone="blue" label="Menunggu koreksi" value="8" note="126 jawaban essay"/><Stat icon={<ShieldCheck/>} tone="amber" label="Insiden minggu ini" value="12" note="4 perlu ditinjau"/><Stat icon={<Users/>} tone="purple" label="Siswa aktif" value="487" note="18 kelas aktif"/></div><div className="dashboard-columns"><section className="card"><CardHead title="Jadwal hari ini" link="Lihat semua"/><div className="schedule-list">{exams.slice(0,3).map((exam)=><div key={exam.id}><div className="date-tile"><strong>{exam.time}</strong><span>{exam.duration} mnt</span></div><span className="subject-dot">{exam.subject.slice(0,2).toUpperCase()}</span><div className="schedule-copy"><strong>{exam.title}</strong><small>{exam.subject} · Kelas {exam.className}</small></div><Status value={exam.status}/><button className="more"><MoreHorizontal/></button></div>)}</div></section><section className="card"><CardHead title="Aktivitas terbaru"/><div className="activity-list"><Activity icon={<Upload/>} text={<><b>Pak Dimas</b> mengimpor 48 soal IPA</>} time="8 menit lalu"/><Activity icon={<Check/>} text={<><b>Bu Sari</b> menyelesaikan koreksi</>} time="21 menit lalu"/><Activity icon={<AlertTriangle/>} text={<>3 insiden terdeteksi di <b>PAS Matematika</b></>} time="35 menit lalu"/><Activity icon={<Users/>} text={<>Admin menambahkan <b>12 siswa baru</b></>} time="1 jam lalu"/></div></section></div><section className="card insight-card"><div><p>RATA-RATA NILAI MINGGU INI</p><strong>78,4</strong><span><b>↑ 4,2%</b> dibanding minggu lalu</span></div><MiniChart/></section></div>
 }
 
@@ -144,6 +169,25 @@ function QuestionModal({close,save}:{close:()=>void;save:(q:Question)=>void}){co
 
 function FormField({label,children}:{label:string;children:ReactNode}){return <label className="form-field"><span>{label}</span>{children}</label>}
 function Modal({children,close,wide=false}:{children:ReactNode;close:()=>void;wide?:boolean}){return <div className="modal-overlay" onMouseDown={close}><div className={`modal ${wide?'wide':''}`} onMouseDown={(e)=>e.stopPropagation()}>{children}</div></div>}
+
+type ManagedUser = Profile & { created_at: string }
+
+function UserManagement({notify}:{notify:(text:string,error?:boolean)=>void}) {
+  const [users,setUsers]=useState<ManagedUser[]>([])
+  const [loading,setLoading]=useState(true)
+  const [create,setCreate]=useState(false)
+  const loadUsers=useCallback(async()=>{if(!supabase)return;setLoading(true);const {data,error}=await supabase.from('profiles').select('id,full_name,email,role,student_number,active,created_at').order('created_at',{ascending:false});if(error)notify(error.message,true);else setUsers((data??[]) as ManagedUser[]);setLoading(false)},[notify])
+  useEffect(()=>{loadUsers()},[loadUsers])
+  const invoke=async(body:Record<string,unknown>)=>{if(!supabase)throw new Error('Supabase belum dikonfigurasi.');const {data,error}=await supabase.functions.invoke('admin-users',{body});if(error)throw error;if(data?.error)throw new Error(data.error);return data}
+  const createUser=async(form:{full_name:string;email:string;password:string;role:Role;student_number:string})=>{try{await invoke({action:'create',...form,student_number:form.student_number||null});setCreate(false);notify('Akun pengguna berhasil dibuat.');await loadUsers()}catch(error){notify(error instanceof Error?error.message:'Gagal membuat akun.',true)}}
+  const toggleUser=async(user:ManagedUser)=>{try{await invoke({action:'set_active',user_id:user.id,active:!user.active});notify(user.active?'Akun dinonaktifkan.':'Akun diaktifkan.');await loadUsers()}catch(error){notify(error instanceof Error?error.message:'Gagal memperbarui akun.',true)}}
+  const resetUser=async(user:ManagedUser)=>{const password=window.prompt(`Masukkan kata sandi sementara baru untuk ${user.full_name} (minimal 8 karakter):`);if(!password)return;if(password.length<8){notify('Kata sandi minimal 8 karakter.',true);return}try{await invoke({action:'reset_password',user_id:user.id,password});notify('Kata sandi sementara berhasil diperbarui.')}catch(error){notify(error instanceof Error?error.message:'Gagal mereset kata sandi.',true)}}
+  return <div className="portal-page"><PageTitle eyebrow="ADMINISTRASI AKUN" title="Pengguna" description="Kelola akun dan hak akses admin, guru, serta siswa." action={<button className="primary" onClick={()=>setCreate(true)}><UserPlus/>Tambah pengguna</button>}/><Toolbar placeholder="Cari nama, email, atau NIS…"/><div className="table-card users-table"><table><thead><tr><th>PENGGUNA</th><th>PERAN</th><th>NIS</th><th>STATUS</th><th>DIBUAT</th><th/></tr></thead><tbody>{loading?<tr><td colSpan={6}>Memuat pengguna…</td></tr>:users.length===0?<tr><td colSpan={6}>Belum ada pengguna.</td></tr>:users.map((user)=><tr key={user.id}><td><div className="student-cell"><span>{getInitials(user.full_name)}</span><p><b>{user.full_name}</b><small>{user.email}</small></p></div></td><td><span className={`role-badge ${user.role}`}>{capitalize(user.role)}</span></td><td>{user.student_number||'—'}</td><td><span className={`user-status ${user.active?'active':''}`}><i/>{user.active?'Aktif':'Nonaktif'}</span></td><td>{new Date(user.created_at).toLocaleDateString('id-ID')}</td><td><div className="user-actions"><button onClick={()=>resetUser(user)} title="Reset kata sandi"><LockKeyhole/></button><button onClick={()=>toggleUser(user)}>{user.active?'Nonaktifkan':'Aktifkan'}</button></div></td></tr>)}</tbody></table></div>{create&&<CreateUserModal close={()=>setCreate(false)} save={createUser}/>}</div>
+}
+function CreateUserModal({close,save}:{close:()=>void;save:(form:{full_name:string;email:string;password:string;role:Role;student_number:string})=>void}) {
+  const [form,setForm]=useState({full_name:'',email:'',password:'',role:'siswa' as Role,student_number:''})
+  return <Modal close={close}><form className="simple-modal" onSubmit={(event)=>{event.preventDefault();save(form)}}><header><div><p>AKUN BARU</p><h2>Tambah pengguna</h2></div><button type="button" onClick={close}><X/></button></header><div className="modal-content"><FormField label="Nama lengkap"><input value={form.full_name} onChange={(e)=>setForm({...form,full_name:e.target.value})} required/></FormField><FormField label="Email"><input type="email" value={form.email} onChange={(e)=>setForm({...form,email:e.target.value})} required/></FormField><div className="form-grid"><FormField label="Peran"><select value={form.role} onChange={(e)=>setForm({...form,role:e.target.value as Role})}><option value="siswa">Siswa</option><option value="guru">Guru</option><option value="admin">Admin</option></select></FormField><FormField label="NIS (khusus siswa)"><input value={form.student_number} onChange={(e)=>setForm({...form,student_number:e.target.value})} disabled={form.role!=='siswa'}/></FormField></div><FormField label="Kata sandi sementara"><input type="password" minLength={8} value={form.password} onChange={(e)=>setForm({...form,password:e.target.value})} placeholder="Minimal 8 karakter" required/></FormField><p className="form-hint">Pengguna dapat mengganti kata sandi melalui fitur lupa kata sandi.</p></div><footer><button type="button" onClick={close}>Batal</button><button className="primary">Buat Akun</button></footer></form></Modal>
+}
 
 function Classes(){return <div className="portal-page"><PageTitle eyebrow="AKADEMIK" title="Kelas & Siswa" description="Tahun ajaran 2026/2027 · 18 kelas aktif." action={<button className="primary"><Plus/>Tambah siswa</button>}/><div className="class-tabs"><button className="active">IX A <span>32</span></button><button>IX B <span>31</span></button><button>VIII A <span>30</span></button><button>VIII B <span>30</span></button><button>Semua kelas</button></div><Toolbar placeholder="Cari nama atau NIS siswa…"/><div className="table-card"><table><thead><tr><th><input type="checkbox"/></th><th>NIS</th><th>NAMA SISWA</th><th>KELAS</th><th>STATUS</th><th>UJIAN SELESAI</th><th/></tr></thead><tbody>{students.map((s,i)=><tr key={s[0]}><td><input type="checkbox"/></td><td>{s[0]}</td><td><div className="student-cell"><span>{s[1].split(' ').map(x=>x[0]).slice(0,2).join('')}</span><b>{s[1]}</b></div></td><td>{s[2]}</td><td><span className={`user-status ${s[3]==='Aktif'?'active':''}`}><i/>{s[3]}</span></td><td>{[14,13,14,12,11,9][i]} dari 16</td><td><button className="more"><MoreHorizontal/></button></td></tr>)}</tbody></table></div></div>}
 

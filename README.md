@@ -4,7 +4,8 @@ Website ujian sekolah berbasis React, TypeScript, dan Supabase. Implementasi dib
 
 ## Cakupan web
 
-- Login Supabase Auth dan tiga peran: admin, guru, siswa
+- Login Supabase Auth, pemulihan session, reset password, dan route guard tiga peran
+- Manajemen akun admin: buat akun, aktif/nonaktif, dan reset kata sandi sementara
 - Dashboard aktivitas sekolah
 - Daftar ujian dan wizard pembuatan ujian
 - Bank soal pilihan ganda/essay
@@ -31,7 +32,10 @@ npm run dev
 ## Konfigurasi Supabase
 
 1. Buat project Supabase.
-2. Jalankan [migration](./supabase/migrations/001_initial_schema.sql) melalui SQL Editor.
+2. Jalankan migration melalui SQL Editor secara berurutan:
+
+   - `supabase/migrations/001_initial_schema.sql`
+   - `supabase/migrations/002_auth_user_management.sql`
 3. Isi `.env.local`:
 
 ```env
@@ -39,7 +43,7 @@ VITE_SUPABASE_URL=https://PROJECT.supabase.co
 VITE_SUPABASE_ANON_KEY=ANON_KEY
 ```
 
-4. Buat pengguna melalui Supabase Auth. Sertakan metadata berikut saat membuat akun:
+4. Buat akun admin pertama melalui Supabase Dashboard → Authentication → Users. Sertakan metadata:
 
 ```json
 {
@@ -49,6 +53,26 @@ VITE_SUPABASE_ANON_KEY=ANON_KEY
 ```
 
 Nilai role yang didukung: `admin`, `guru`, atau `siswa`. Trigger database otomatis membuat baris profil ketika user Auth dibuat.
+
+Jika akun sudah dibuat sebelum metadata role ditambahkan, jadikan akun tersebut admin satu kali melalui SQL Editor:
+
+```sql
+update public.profiles
+set role = 'admin'
+where email = 'email-admin@sekolah.sch.id';
+```
+
+5. Deploy Edge Function pengelolaan pengguna. `SUPABASE_SERVICE_ROLE_KEY` disediakan otomatis oleh runtime Supabase dan tidak boleh dimasukkan ke `.env` Vite.
+
+```bash
+npx supabase login
+npx supabase link --project-ref PROJECT_REF
+npx supabase functions deploy admin-users
+```
+
+6. Tambahkan URL website ke Authentication → URL Configuration → Redirect URLs agar tautan reset kata sandi kembali ke aplikasi dengan benar.
+
+Saat Supabase dikonfigurasi, tombol login demo otomatis disembunyikan. Seluruh role diambil dari profil pengguna terautentikasi, bukan dari `localStorage`.
 
 ## Verifikasi
 
