@@ -1,214 +1,2745 @@
-import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
-  AlertTriangle, ArrowLeft, ArrowRight, BarChart3, Bell, BookOpen, CalendarDays, Check,
-  CheckCircle2, ChevronDown, ChevronRight, CircleHelp, ClipboardCheck, Clock3, Download,
-  FileQuestion, Filter, GraduationCap, LayoutDashboard, LockKeyhole, LogOut, Menu, MoreHorizontal,
-  Plus, Radio, Search, Settings, ShieldCheck, Sparkles, Star, Upload, UserPlus, UserRound, Users, Wifi, X,
-} from 'lucide-react'
-import { examQuestions, exams as seedExams, questions as seedQuestions, students, type Exam, type Question, type Role } from './mockData'
-import { isSupabaseConfigured, loadLocal, saveLocal, supabase } from './lib/supabase'
-import { AuthProvider, type Profile, useAuth } from './auth/AuthContext'
+  FormEvent,
+  ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import {
+  Link,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  BarChart3,
+  Bell,
+  BookOpen,
+  CalendarDays,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  CircleHelp,
+  ClipboardCheck,
+  Clock3,
+  Download,
+  FileQuestion,
+  Filter,
+  GraduationCap,
+  LayoutDashboard,
+  LockKeyhole,
+  LogOut,
+  Menu,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Radio,
+  Search,
+  Settings,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  Trash2,
+  Upload,
+  UserPlus,
+  UserRound,
+  Users,
+  Wifi,
+  X,
+} from "lucide-react";
+import {
+  examQuestions,
+  exams as seedExams,
+  questions as seedQuestions,
+  students,
+  type Exam,
+  type Question,
+  type Role,
+} from "./mockData";
+import {
+  isSupabaseConfigured,
+  loadLocal,
+  saveLocal,
+  supabase,
+} from "./lib/supabase";
+import { AuthProvider, type Profile, useAuth } from "./auth/AuthContext";
 
-type Toast = { text: string; error?: boolean } | null
+type Toast = { text: string; error?: boolean } | null;
 
 function App() {
-  return <AuthProvider><Application/></AuthProvider>
+  return (
+    <AuthProvider>
+      <Application />
+    </AuthProvider>
+  );
 }
 
 function Application() {
-  const { profile, loading: authLoading, logout, passwordRecovery, updatePassword } = useAuth()
-  const [toast, setToast] = useState<Toast>(null)
-  const [examList, setExamList] = useState<Exam[]>(seedExams)
-  const [questionList, setQuestionList] = useState<Question[]>(seedQuestions)
+  const {
+    profile,
+    loading: authLoading,
+    logout,
+    passwordRecovery,
+    updatePassword,
+  } = useAuth();
+  const [toast, setToast] = useState<Toast>(null);
+  const [examList, setExamList] = useState<Exam[]>(seedExams);
+  const [questionList, setQuestionList] = useState<Question[]>(seedQuestions);
 
   useEffect(() => {
-    if (!toast) return
-    const id = window.setTimeout(() => setToast(null), 2600)
-    return () => window.clearTimeout(id)
-  }, [toast])
+    if (!toast) return;
+    const id = window.setTimeout(() => setToast(null), 2600);
+    return () => window.clearTimeout(id);
+  }, [toast]);
 
   useEffect(() => {
-    if (!supabase || !profile) return
+    if (!supabase || !profile) return;
     Promise.all([
-      supabase.from('exams').select('id,title,subjects(name),classes(name),starts_at,duration_minutes,status,exam_questions(count),exam_assignments(count)').order('starts_at'),
-      supabase.from('questions').select('id,body,type,difficulty,usage_count,question_banks(name,subjects(name))').eq('archived', false).limit(50),
+      supabase
+        .from("exams")
+        .select(
+          "id,title,subjects(name),classes(name),starts_at,duration_minutes,status,exam_questions(count),exam_assignments(count)",
+        )
+        .order("starts_at"),
+      supabase
+        .from("questions")
+        .select(
+          "id,body,type,difficulty,usage_count,question_banks(name,subjects(name))",
+        )
+        .eq("archived", false)
+        .limit(50),
     ]).then(([examResult, questionResult]) => {
       if (!examResult.error && examResult.data?.length) {
-        setExamList(examResult.data.map((row) => ({
-          id: row.id, title: row.title, subject: relationName(row.subjects), className: relationName(row.classes),
-          date: new Date(row.starts_at).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}),
-          time: new Date(row.starts_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}), duration: row.duration_minutes,
-          questions: relationCount(row.exam_questions), participants: relationCount(row.exam_assignments), status: row.status,
-        })))
+        setExamList(
+          examResult.data.map((row) => ({
+            id: row.id,
+            title: row.title,
+            subject: relationName(row.subjects),
+            className: relationName(row.classes),
+            date: new Date(row.starts_at).toLocaleDateString("id-ID", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            }),
+            time: new Date(row.starts_at).toLocaleTimeString("id-ID", {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            duration: row.duration_minutes,
+            questions: relationCount(row.exam_questions),
+            participants: relationCount(row.exam_assignments),
+            status: row.status,
+          })),
+        );
       }
       if (!questionResult.error && questionResult.data?.length) {
-        setQuestionList(questionResult.data.map((row) => ({
-          id: row.id, bank: relationName(row.question_banks), subject: relationNestedName(row.question_banks),
-          type: row.type === 'multiple_choice' ? 'Pilihan Ganda' : 'Essay', text: row.body,
-          difficulty: capitalize(row.difficulty) as Question['difficulty'], used: row.usage_count ?? 0,
-        })))
+        setQuestionList(
+          questionResult.data.map((row) => ({
+            id: row.id,
+            bank: relationName(row.question_banks),
+            subject: relationNestedName(row.question_banks),
+            type: row.type === "multiple_choice" ? "Pilihan Ganda" : "Essay",
+            text: row.body,
+            difficulty: capitalize(row.difficulty) as Question["difficulty"],
+            used: row.usage_count ?? 0,
+          })),
+        );
       }
-    })
-  }, [profile])
+    });
+  }, [profile]);
 
-  const notify = useCallback((text: string, error = false) => setToast({ text, error }), [])
-  if (authLoading) return <div className="auth-loading"><span><GraduationCap/></span><p>Memuat sesi pengguna…</p></div>
-  if (passwordRecovery) return <PasswordRecovery updatePassword={updatePassword} notify={notify}/>
-  const role = profile?.role ?? null
+  const notify = useCallback(
+    (text: string, error = false) => setToast({ text, error }),
+    [],
+  );
+  if (authLoading)
+    return (
+      <div className="auth-loading">
+        <span>
+          <GraduationCap />
+        </span>
+        <p>Memuat sesi pengguna…</p>
+      </div>
+    );
+  if (passwordRecovery)
+    return <PasswordRecovery updatePassword={updatePassword} notify={notify} />;
+  const role = profile?.role ?? null;
 
-  return <>
-    <Routes>
-      <Route path="/" element={profile ? <Navigate to={role === 'siswa' ? '/siswa' : '/app'}/> : <Login notify={notify}/>} />
-      <Route path="/app/*" element={profile && role !== 'siswa' ? <Portal profile={profile} logout={logout} exams={examList} setExams={setExamList} questions={questionList} setQuestions={setQuestionList} notify={notify}/> : <Navigate to="/"/>}/>
-      <Route path="/siswa" element={profile && role === 'siswa' ? <StudentHome logout={logout}/> : <Navigate to="/"/>}/>
-      <Route path="/siswa/ujian/:examId" element={role === 'siswa' ? <ExamRunner notify={notify}/> : <Navigate to="/"/>}/>
-      <Route path="*" element={<Navigate to="/"/>}/>
-    </Routes>
-    {toast && <div className={`toast ${toast.error ? 'error' : ''}`}>{toast.error ? <AlertTriangle/> : <CheckCircle2/>}{toast.text}</div>}
-  </>
+  return (
+    <>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            profile ? (
+              <Navigate to={role === "siswa" ? "/siswa" : "/app"} />
+            ) : (
+              <Login notify={notify} />
+            )
+          }
+        />
+        <Route
+          path="/app/*"
+          element={
+            profile && role !== "siswa" ? (
+              <Portal
+                profile={profile}
+                logout={logout}
+                exams={examList}
+                setExams={setExamList}
+                questions={questionList}
+                setQuestions={setQuestionList}
+                notify={notify}
+              />
+            ) : (
+              <Navigate to="/" />
+            )
+          }
+        />
+        <Route
+          path="/siswa"
+          element={
+            profile && role === "siswa" ? (
+              <StudentHome logout={logout} />
+            ) : (
+              <Navigate to="/" />
+            )
+          }
+        />
+        <Route
+          path="/siswa/ujian/:examId"
+          element={
+            role === "siswa" ? (
+              <ExamRunner notify={notify} />
+            ) : (
+              <Navigate to="/" />
+            )
+          }
+        />
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
+      {toast && (
+        <div className={`toast ${toast.error ? "error" : ""}`}>
+          {toast.error ? <AlertTriangle /> : <CheckCircle2 />}
+          {toast.text}
+        </div>
+      )}
+    </>
+  );
 }
 
-function PasswordRecovery({updatePassword,notify}:{updatePassword:(password:string)=>Promise<void>;notify:(text:string,error?:boolean)=>void}) {
-  const [password,setPassword]=useState('')
-  const [confirmation,setConfirmation]=useState('')
-  const [loading,setLoading]=useState(false)
-  const submit=async(event:FormEvent)=>{event.preventDefault();if(password.length<8){notify('Kata sandi minimal 8 karakter.',true);return}if(password!==confirmation){notify('Konfirmasi kata sandi tidak sesuai.',true);return}setLoading(true);try{await updatePassword(password);notify('Kata sandi berhasil diperbarui.')}catch(error){notify(error instanceof Error?error.message:'Gagal memperbarui kata sandi.',true)}finally{setLoading(false)}}
-  return <main className="recovery-page"><form onSubmit={submit}><span className="recovery-icon"><LockKeyhole/></span><p className="overline">KEAMANAN AKUN</p><h1>Buat kata sandi baru</h1><p>Gunakan minimal 8 karakter dan jangan gunakan kata sandi yang mudah ditebak.</p><FormField label="Kata sandi baru"><input type="password" value={password} onChange={(e)=>setPassword(e.target.value)} minLength={8} required/></FormField><FormField label="Konfirmasi kata sandi"><input type="password" value={confirmation} onChange={(e)=>setConfirmation(e.target.value)} minLength={8} required/></FormField><button className="login-button" disabled={loading}>{loading?'Menyimpan…':'Simpan kata sandi'}<ArrowRight/></button></form></main>
+function PasswordRecovery({
+  updatePassword,
+  notify,
+}: {
+  updatePassword: (password: string) => Promise<void>;
+  notify: (text: string, error?: boolean) => void;
+}) {
+  const [password, setPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [loading, setLoading] = useState(false);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (password.length < 8) {
+      notify("Kata sandi minimal 8 karakter.", true);
+      return;
+    }
+    if (password !== confirmation) {
+      notify("Konfirmasi kata sandi tidak sesuai.", true);
+      return;
+    }
+    setLoading(true);
+    try {
+      await updatePassword(password);
+      notify("Kata sandi berhasil diperbarui.");
+    } catch (error) {
+      notify(
+        error instanceof Error
+          ? error.message
+          : "Gagal memperbarui kata sandi.",
+        true,
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+  return (
+    <main className="recovery-page">
+      <form onSubmit={submit}>
+        <span className="recovery-icon">
+          <LockKeyhole />
+        </span>
+        <p className="overline">KEAMANAN AKUN</p>
+        <h1>Buat kata sandi baru</h1>
+        <p>
+          Gunakan minimal 8 karakter dan jangan gunakan kata sandi yang mudah
+          ditebak.
+        </p>
+        <FormField label="Kata sandi baru">
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            minLength={8}
+            required
+          />
+        </FormField>
+        <FormField label="Konfirmasi kata sandi">
+          <input
+            type="password"
+            value={confirmation}
+            onChange={(e) => setConfirmation(e.target.value)}
+            minLength={8}
+            required
+          />
+        </FormField>
+        <button className="login-button" disabled={loading}>
+          {loading ? "Menyimpan…" : "Simpan kata sandi"}
+          <ArrowRight />
+        </button>
+      </form>
+    </main>
+  );
 }
 
 function relationName(value: unknown): string {
-  if (Array.isArray(value)) return String(value[0]?.name ?? '—')
-  if (value && typeof value === 'object' && 'name' in value) return String(value.name)
-  return '—'
+  if (Array.isArray(value)) return String(value[0]?.name ?? "—");
+  if (value && typeof value === "object" && "name" in value)
+    return String(value.name);
+  return "—";
 }
 function relationNestedName(value: unknown): string {
-  const bank = Array.isArray(value) ? value[0] : value
-  if (bank && typeof bank === 'object' && 'subjects' in bank) return relationName(bank.subjects)
-  return '—'
+  const bank = Array.isArray(value) ? value[0] : value;
+  if (bank && typeof bank === "object" && "subjects" in bank)
+    return relationName(bank.subjects);
+  return "—";
 }
-function relationCount(value: unknown): number { return Array.isArray(value) ? Number(value[0]?.count ?? 0) : 0 }
-function capitalize(value: string) { return value ? value[0].toUpperCase() + value.slice(1) : value }
+function relationCount(value: unknown): number {
+  return Array.isArray(value) ? Number(value[0]?.count ?? 0) : 0;
+}
+function capitalize(value: string) {
+  return value ? value[0].toUpperCase() + value.slice(1) : value;
+}
 
-function Login({ notify }: { notify: (text: string, error?: boolean) => void }) {
-  const { login, loginDemo, resetPassword } = useAuth()
-  const navigate = useNavigate()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
+function Login({
+  notify,
+}: {
+  notify: (text: string, error?: boolean) => void;
+}) {
+  const { login, loginDemo, resetPassword } = useAuth();
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
   const submit = async (e: FormEvent) => {
-    e.preventDefault(); setLoading(true)
-    try { const nextProfile = await login(email,password); navigate(nextProfile.role === 'siswa' ? '/siswa' : '/app') }
-    catch (error) { notify(error instanceof Error ? error.message : 'Email atau kata sandi tidak sesuai.',true) }
-    finally { setLoading(false) }
-  }
-  const demo = (role: Role) => { loginDemo(role); navigate(role === 'siswa' ? '/siswa' : '/app') }
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const nextProfile = await login(email, password);
+      navigate(nextProfile.role === "siswa" ? "/siswa" : "/app");
+    } catch (error) {
+      notify(
+        error instanceof Error
+          ? error.message
+          : "Email atau kata sandi tidak sesuai.",
+        true,
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+  const demo = (role: Role) => {
+    loginDemo(role);
+    navigate(role === "siswa" ? "/siswa" : "/app");
+  };
   const forgotPassword = async () => {
-    if (!email) { notify('Masukkan email terlebih dahulu.', true); return }
-    try { await resetPassword(email); notify('Tautan reset kata sandi sudah dikirim.') }
-    catch (error) { notify(error instanceof Error ? error.message : 'Gagal mengirim tautan reset.', true) }
-  }
-  return <main className="login-page">
-    <section className="login-brand"><div className="school-mark"><GraduationCap/></div><div className="brand-copy"><span>RUANG UJIAN</span><h1>Ujian lebih tertib.<br/>Hasil lebih cepat.</h1><p>Satu ruang digital untuk mengelola ujian sekolah, dari penyusunan soal hingga laporan nilai.</p></div><div className="login-art"><div className="art-card"><span><BookOpen/> 1.248 soal</span><strong>Bank soal yang tumbuh<br/>bersama sekolah Anda.</strong><div className="art-bars"><i/><i/><i/><i/><i/></div></div></div><small>© 2026 SMP Negeri Harapan Bangsa</small></section>
-    <section className="login-panel"><form onSubmit={submit}><div className="mobile-logo"><GraduationCap/> Ruang Ujian</div><p className="overline">PORTAL SEKOLAH</p><h2>Selamat datang</h2><p className="subcopy">Masuk menggunakan akun yang diberikan oleh admin sekolah.</p><label><span>Email</span><div className="input-box"><UserRound/><input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} autoComplete="email" required/></div></label><label><span>Kata sandi</span><div className="input-box"><LockKeyhole/><input type="password" value={password} onChange={(e)=>setPassword(e.target.value)} autoComplete="current-password" required/></div></label><div className="login-help"><label><input type="checkbox" defaultChecked/> Ingat saya</label><button type="button" onClick={forgotPassword}>Lupa kata sandi?</button></div><button className="login-button" disabled={loading}>{loading ? 'Memeriksa…' : 'Masuk'}<ArrowRight/></button>{!isSupabaseConfigured&&<><div className="divider"><span>atau coba mode demo</span></div><div className="demo-buttons"><button type="button" onClick={()=>demo('admin')}>Admin</button><button type="button" onClick={()=>demo('guru')}>Guru</button><button type="button" onClick={()=>demo('siswa')}>Siswa</button></div></>}<p className="connection"><i className={isSupabaseConfigured?'online':''}/>{isSupabaseConfigured ? 'Autentikasi Supabase aktif' : 'Mode demo lokal aktif'}</p></form>
-    </section>
-  </main>
+    if (!email) {
+      notify("Masukkan email terlebih dahulu.", true);
+      return;
+    }
+    try {
+      await resetPassword(email);
+      notify("Tautan reset kata sandi sudah dikirim.");
+    } catch (error) {
+      notify(
+        error instanceof Error ? error.message : "Gagal mengirim tautan reset.",
+        true,
+      );
+    }
+  };
+  return (
+    <main className="login-page">
+      <section className="login-brand">
+        <div className="school-mark">
+          <GraduationCap />
+        </div>
+        <div className="brand-copy">
+          <span>RUANG UJIAN</span>
+          <h1>
+            Ujian lebih tertib.
+            <br />
+            Hasil lebih cepat.
+          </h1>
+          <p>
+            Satu ruang digital untuk mengelola ujian sekolah, dari penyusunan
+            soal hingga laporan nilai.
+          </p>
+        </div>
+        <div className="login-art">
+          <div className="art-card">
+            <span>
+              <BookOpen /> 1.248 soal
+            </span>
+            <strong>
+              Bank soal yang tumbuh
+              <br />
+              bersama sekolah Anda.
+            </strong>
+            <div className="art-bars">
+              <i />
+              <i />
+              <i />
+              <i />
+              <i />
+            </div>
+          </div>
+        </div>
+        <small>© 2026 SMP Negeri Harapan Bangsa</small>
+      </section>
+      <section className="login-panel">
+        <form onSubmit={submit}>
+          <div className="mobile-logo">
+            <GraduationCap /> Ruang Ujian
+          </div>
+          <p className="overline">PORTAL SEKOLAH</p>
+          <h2>Selamat datang</h2>
+          <p className="subcopy">
+            Masuk menggunakan akun yang diberikan oleh admin sekolah.
+          </p>
+          <label>
+            <span>Email</span>
+            <div className="input-box">
+              <UserRound />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+                required
+              />
+            </div>
+          </label>
+          <label>
+            <span>Kata sandi</span>
+            <div className="input-box">
+              <LockKeyhole />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                required
+              />
+            </div>
+          </label>
+          <div className="login-help">
+            <label>
+              <input type="checkbox" defaultChecked /> Ingat saya
+            </label>
+            <button type="button" onClick={forgotPassword}>
+              Lupa kata sandi?
+            </button>
+          </div>
+          <button className="login-button" disabled={loading}>
+            {loading ? "Memeriksa…" : "Masuk"}
+            <ArrowRight />
+          </button>
+          {!isSupabaseConfigured && (
+            <>
+              <div className="divider">
+                <span>atau coba mode demo</span>
+              </div>
+              <div className="demo-buttons">
+                <button type="button" onClick={() => demo("admin")}>
+                  Admin
+                </button>
+                <button type="button" onClick={() => demo("guru")}>
+                  Guru
+                </button>
+                <button type="button" onClick={() => demo("siswa")}>
+                  Siswa
+                </button>
+              </div>
+            </>
+          )}
+          <p className="connection">
+            <i className={isSupabaseConfigured ? "online" : ""} />
+            {isSupabaseConfigured
+              ? "Autentikasi Supabase aktif"
+              : "Mode demo lokal aktif"}
+          </p>
+        </form>
+      </section>
+    </main>
+  );
 }
 
-function Portal({ profile, logout, exams, setExams, questions, setQuestions, notify }: { profile: Profile; logout: () => void; exams: Exam[]; setExams: (v: Exam[]) => void; questions: Question[]; setQuestions: (v: Question[]) => void; notify: (text: string, error?: boolean) => void }) {
-  const location = useLocation()
-  const role = profile.role
+function Portal({
+  profile,
+  logout,
+  exams,
+  setExams,
+  questions,
+  setQuestions,
+  notify,
+}: {
+  profile: Profile;
+  logout: () => void;
+  exams: Exam[];
+  setExams: (v: Exam[]) => void;
+  questions: Question[];
+  setQuestions: (v: Question[]) => void;
+  notify: (text: string, error?: boolean) => void;
+}) {
+  const location = useLocation();
+  const role = profile.role;
   const nav: [string, ReactNode, string][] = [
-    ['/app',<LayoutDashboard/>,'Ringkasan'],['/app/ujian',<CalendarDays/>,'Ujian'],['/app/bank-soal',<FileQuestion/>,'Bank Soal'],
-    ['/app/kelas',<Users/>,'Kelas & Siswa'],['/app/koreksi',<ClipboardCheck/>,'Koreksi'],['/app/laporan',<BarChart3/>,'Laporan'],
-  ]
-  if (role === 'admin') nav.splice(4, 0, ['/app/pengguna',<UserPlus/>,'Pengguna'])
-  const initials = getInitials(profile.full_name)
-  return <div className="portal-shell"><aside className="portal-sidebar"><Link to="/app" className="portal-logo"><span><GraduationCap/></span><b>Ruang Ujian<small>SMP Harapan Bangsa</small></b></Link><div className="workspace"><small>RUANG KERJA</small><button><span>{initials}</span><b>{profile.full_name}<small>{role === 'admin' ? 'Administrator' : 'Guru'}</small></b><ChevronDown/></button></div><nav>{nav.map(([to,icon,label])=><Link key={to} className={location.pathname===to?'active':''} to={to}>{icon}{label}{label==='Koreksi'&&<em>8</em>}</Link>)}</nav><div className="side-bottom"><Link to="/app/pengaturan"><Settings/>Pengaturan</Link><button onClick={logout}><LogOut/>Keluar</button></div></aside><main className="portal-main"><Topbar profile={profile}/><Routes><Route index element={<Dashboard exams={exams} profile={profile}/>} /><Route path="ujian" element={<ExamManagement exams={exams} setExams={setExams} notify={notify}/>} /><Route path="bank-soal" element={<QuestionBank questions={questions} setQuestions={setQuestions} notify={notify}/>} /><Route path="kelas" element={<Classes/>}/><Route path="pengguna" element={role === 'admin' ? <UserManagement notify={notify}/> : <Navigate to="/app"/>}/><Route path="koreksi" element={<Grading notify={notify}/>}/><Route path="laporan" element={<Reports/>}/><Route path="pengaturan" element={<SettingsPage role={role}/>}/><Route path="*" element={<Navigate to="/app"/>}/></Routes></main><MobilePortalNav/></div>
+    ["/app", <LayoutDashboard />, "Ringkasan"],
+    ["/app/ujian", <CalendarDays />, "Ujian"],
+    ["/app/bank-soal", <FileQuestion />, "Bank Soal"],
+    ["/app/kelas", <Users />, "Kelas & Siswa"],
+    ["/app/koreksi", <ClipboardCheck />, "Koreksi"],
+    ["/app/laporan", <BarChart3 />, "Laporan"],
+  ];
+  if (role === "admin")
+    nav.splice(4, 0, ["/app/pengguna", <UserPlus />, "Pengguna"]);
+  const initials = getInitials(profile.full_name);
+  return (
+    <div className="portal-shell">
+      <aside className="portal-sidebar">
+        <Link to="/app" className="portal-logo">
+          <span>
+            <GraduationCap />
+          </span>
+          <b>
+            Ruang Ujian<small>SMP Harapan Bangsa</small>
+          </b>
+        </Link>
+        <div className="workspace">
+          <small>RUANG KERJA</small>
+          <button>
+            <span>{initials}</span>
+            <b>
+              {profile.full_name}
+              <small>{role === "admin" ? "Administrator" : "Guru"}</small>
+            </b>
+            <ChevronDown />
+          </button>
+        </div>
+        <nav>
+          {nav.map(([to, icon, label]) => (
+            <Link
+              key={to}
+              className={location.pathname === to ? "active" : ""}
+              to={to}
+            >
+              {icon}
+              {label}
+              {label === "Koreksi" && <em>8</em>}
+            </Link>
+          ))}
+        </nav>
+        <div className="side-bottom">
+          <Link to="/app/pengaturan">
+            <Settings />
+            Pengaturan
+          </Link>
+          <button onClick={logout}>
+            <LogOut />
+            Keluar
+          </button>
+        </div>
+      </aside>
+      <main className="portal-main">
+        <Topbar profile={profile} />
+        <Routes>
+          <Route
+            index
+            element={<Dashboard exams={exams} profile={profile} />}
+          />
+          <Route
+            path="ujian"
+            element={
+              <ExamManagement
+                exams={exams}
+                setExams={setExams}
+                notify={notify}
+              />
+            }
+          />
+          <Route
+            path="bank-soal"
+            element={
+              <QuestionBank
+                questions={questions}
+                setQuestions={setQuestions}
+                notify={notify}
+              />
+            }
+          />
+          <Route path="kelas" element={<Classes />} />
+          <Route
+            path="pengguna"
+            element={
+              role === "admin" ? (
+                <UserManagement notify={notify} />
+              ) : (
+                <Navigate to="/app" />
+              )
+            }
+          />
+          <Route path="koreksi" element={<Grading notify={notify} />} />
+          <Route path="laporan" element={<Reports />} />
+          <Route path="pengaturan" element={<SettingsPage role={role} />} />
+          <Route path="*" element={<Navigate to="/app" />} />
+        </Routes>
+      </main>
+      <MobilePortalNav />
+    </div>
+  );
 }
 
-function getInitials(name: string) { return name.split(' ').filter(Boolean).slice(0,2).map((part)=>part[0]).join('').toUpperCase() }
-function Topbar({profile}:{profile:Profile}) { return <header className="topbar"><button className="mobile-menu"><Menu/></button><div className="global-search"><Search/><input placeholder="Cari ujian, soal, atau siswa…"/><kbd>⌘ K</kbd></div><div className="top-actions"><button><CircleHelp/></button><button className="notification"><Bell/><i/></button><span className="avatar" title={profile.full_name}>{getInitials(profile.full_name)}</span></div></header> }
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
+function Topbar({ profile }: { profile: Profile }) {
+  return (
+    <header className="topbar">
+      <button className="mobile-menu">
+        <Menu />
+      </button>
+      <div className="global-search">
+        <Search />
+        <input placeholder="Cari ujian, soal, atau siswa…" />
+        <kbd>⌘ K</kbd>
+      </div>
+      <div className="top-actions">
+        <button>
+          <CircleHelp />
+        </button>
+        <button className="notification">
+          <Bell />
+          <i />
+        </button>
+        <span className="avatar" title={profile.full_name}>
+          {getInitials(profile.full_name)}
+        </span>
+      </div>
+    </header>
+  );
+}
 
-function MobilePortalNav(){return <nav className="portal-mobile-nav"><Link to="/app"><LayoutDashboard/><span>Beranda</span></Link><Link to="/app/ujian"><CalendarDays/><span>Ujian</span></Link><Link to="/app/bank-soal"><FileQuestion/><span>Soal</span></Link><Link to="/app/kelas"><Users/><span>Kelas</span></Link></nav>}
+function MobilePortalNav() {
+  return (
+    <nav className="portal-mobile-nav">
+      <Link to="/app">
+        <LayoutDashboard />
+        <span>Beranda</span>
+      </Link>
+      <Link to="/app/ujian">
+        <CalendarDays />
+        <span>Ujian</span>
+      </Link>
+      <Link to="/app/bank-soal">
+        <FileQuestion />
+        <span>Soal</span>
+      </Link>
+      <Link to="/app/kelas">
+        <Users />
+        <span>Kelas</span>
+      </Link>
+    </nav>
+  );
+}
 
-function PageTitle({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: ReactNode }) { return <div className="page-title"><div><p>{eyebrow}</p><h1>{title}</h1><span>{description}</span></div>{action}</div> }
+function PageTitle({
+  eyebrow,
+  title,
+  description,
+  action,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="page-title">
+      <div>
+        <p>{eyebrow}</p>
+        <h1>{title}</h1>
+        <span>{description}</span>
+      </div>
+      {action}
+    </div>
+  );
+}
 
 function Dashboard({ exams, profile }: { exams: Exam[]; profile: Profile }) {
-  void profile
-  return <div className="portal-page"><PageTitle eyebrow="JUMAT, 10 JULI 2026" title="Selamat pagi, Ibu Rina" description="Berikut ringkasan kegiatan ujian sekolah hari ini." action={<Link className="primary" to="/app/ujian"><Plus/>Buat ujian</Link>}/><div className="stats-grid"><Stat icon={<Radio/>} tone="green" label="Ujian berlangsung" value="3" note="94 siswa sedang mengerjakan"/><Stat icon={<Clock3/>} tone="blue" label="Menunggu koreksi" value="8" note="126 jawaban essay"/><Stat icon={<ShieldCheck/>} tone="amber" label="Insiden minggu ini" value="12" note="4 perlu ditinjau"/><Stat icon={<Users/>} tone="purple" label="Siswa aktif" value="487" note="18 kelas aktif"/></div><div className="dashboard-columns"><section className="card"><CardHead title="Jadwal hari ini" link="Lihat semua"/><div className="schedule-list">{exams.slice(0,3).map((exam)=><div key={exam.id}><div className="date-tile"><strong>{exam.time}</strong><span>{exam.duration} mnt</span></div><span className="subject-dot">{exam.subject.slice(0,2).toUpperCase()}</span><div className="schedule-copy"><strong>{exam.title}</strong><small>{exam.subject} · Kelas {exam.className}</small></div><Status value={exam.status}/><button className="more"><MoreHorizontal/></button></div>)}</div></section><section className="card"><CardHead title="Aktivitas terbaru"/><div className="activity-list"><Activity icon={<Upload/>} text={<><b>Pak Dimas</b> mengimpor 48 soal IPA</>} time="8 menit lalu"/><Activity icon={<Check/>} text={<><b>Bu Sari</b> menyelesaikan koreksi</>} time="21 menit lalu"/><Activity icon={<AlertTriangle/>} text={<>3 insiden terdeteksi di <b>PAS Matematika</b></>} time="35 menit lalu"/><Activity icon={<Users/>} text={<>Admin menambahkan <b>12 siswa baru</b></>} time="1 jam lalu"/></div></section></div><section className="card insight-card"><div><p>RATA-RATA NILAI MINGGU INI</p><strong>78,4</strong><span><b>↑ 4,2%</b> dibanding minggu lalu</span></div><MiniChart/></section></div>
+  void profile;
+  return (
+    <div className="portal-page">
+      <PageTitle
+        eyebrow="JUMAT, 10 JULI 2026"
+        title="Selamat pagi, Ibu Rina"
+        description="Berikut ringkasan kegiatan ujian sekolah hari ini."
+        action={
+          <Link className="primary" to="/app/ujian">
+            <Plus />
+            Buat ujian
+          </Link>
+        }
+      />
+      <div className="stats-grid">
+        <Stat
+          icon={<Radio />}
+          tone="green"
+          label="Ujian berlangsung"
+          value="3"
+          note="94 siswa sedang mengerjakan"
+        />
+        <Stat
+          icon={<Clock3 />}
+          tone="blue"
+          label="Menunggu koreksi"
+          value="8"
+          note="126 jawaban essay"
+        />
+        <Stat
+          icon={<ShieldCheck />}
+          tone="amber"
+          label="Insiden minggu ini"
+          value="12"
+          note="4 perlu ditinjau"
+        />
+        <Stat
+          icon={<Users />}
+          tone="purple"
+          label="Siswa aktif"
+          value="487"
+          note="18 kelas aktif"
+        />
+      </div>
+      <div className="dashboard-columns">
+        <section className="card">
+          <CardHead title="Jadwal hari ini" link="Lihat semua" />
+          <div className="schedule-list">
+            {exams.slice(0, 3).map((exam) => (
+              <div key={exam.id}>
+                <div className="date-tile">
+                  <strong>{exam.time}</strong>
+                  <span>{exam.duration} mnt</span>
+                </div>
+                <span className="subject-dot">
+                  {exam.subject.slice(0, 2).toUpperCase()}
+                </span>
+                <div className="schedule-copy">
+                  <strong>{exam.title}</strong>
+                  <small>
+                    {exam.subject} · Kelas {exam.className}
+                  </small>
+                </div>
+                <Status value={exam.status} />
+                <button className="more">
+                  <MoreHorizontal />
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="card">
+          <CardHead title="Aktivitas terbaru" />
+          <div className="activity-list">
+            <Activity
+              icon={<Upload />}
+              text={
+                <>
+                  <b>Pak Dimas</b> mengimpor 48 soal IPA
+                </>
+              }
+              time="8 menit lalu"
+            />
+            <Activity
+              icon={<Check />}
+              text={
+                <>
+                  <b>Bu Sari</b> menyelesaikan koreksi
+                </>
+              }
+              time="21 menit lalu"
+            />
+            <Activity
+              icon={<AlertTriangle />}
+              text={
+                <>
+                  3 insiden terdeteksi di <b>PAS Matematika</b>
+                </>
+              }
+              time="35 menit lalu"
+            />
+            <Activity
+              icon={<Users />}
+              text={
+                <>
+                  Admin menambahkan <b>12 siswa baru</b>
+                </>
+              }
+              time="1 jam lalu"
+            />
+          </div>
+        </section>
+      </div>
+      <section className="card insight-card">
+        <div>
+          <p>RATA-RATA NILAI MINGGU INI</p>
+          <strong>78,4</strong>
+          <span>
+            <b>↑ 4,2%</b> dibanding minggu lalu
+          </span>
+        </div>
+        <MiniChart />
+      </section>
+    </div>
+  );
 }
 
-function Stat({ icon,tone,label,value,note }:{ icon:ReactNode;tone:string;label:string;value:string;note:string }){return <div className="stat-card"><span className={tone}>{icon}</span><div><small>{label}</small><strong>{value}</strong><p>{note}</p></div></div>}
-function CardHead({title,link}:{title:string;link?:string}){return <div className="card-head"><h2>{title}</h2>{link&&<button>{link}<ChevronRight/></button>}</div>}
-function Status({value}:{value:Exam['status']}){const labels={draft:'Draft',terjadwal:'Terjadwal',berlangsung:'Berlangsung',selesai:'Selesai'};return <span className={`status ${value}`}><i/>{labels[value]}</span>}
-function Activity({icon,text,time}:{icon:ReactNode;text:ReactNode;time:string}){return <div className="activity"><span>{icon}</span><p>{text}<small>{time}</small></p></div>}
-function MiniChart(){const bars=[42,55,48,65,58,72,68,82,76,88,81,92];return <div className="mini-chart">{bars.map((v,i)=><i style={{height:`${v}%`}} className={i===bars.length-1?'last':''} key={i}/>)}</div>}
-
-function ExamManagement({ exams, setExams, notify }: { exams: Exam[]; setExams: (v: Exam[]) => void; notify: (text: string, error?: boolean) => void }) {
-  const [create,setCreate]=useState(false)
-  const addExam=async(exam:Exam)=>{try{if(supabase){const {error}=await supabase.from('exams').insert({title:exam.title,duration_minutes:exam.duration,starts_at:new Date().toISOString(),status:'draft'});if(error)throw error}setExams([exam,...exams]);setCreate(false);notify('Draft ujian berhasil dibuat')}catch{notify('Ujian gagal disimpan',true)}}
-  return <div className="portal-page"><PageTitle eyebrow="MANAJEMEN UJIAN" title="Daftar Ujian" description="Buat, jadwalkan, dan pantau seluruh ujian." action={<button className="primary" onClick={()=>setCreate(true)}><Plus/>Buat ujian</button>}/><Toolbar placeholder="Cari judul atau mata pelajaran…"/><div className="table-card"><table><thead><tr><th>UJIAN</th><th>KELAS</th><th>JADWAL</th><th>PESERTA</th><th>STATUS</th><th/></tr></thead><tbody>{exams.map((exam)=><tr key={exam.id}><td><div className="exam-cell"><span>{exam.subject.slice(0,2).toUpperCase()}</span><p><b>{exam.title}</b><small>{exam.subject} · {exam.questions} soal</small></p></div></td><td>{exam.className}</td><td><b className="table-main">{exam.date}</b><small>{exam.time} · {exam.duration} menit</small></td><td><div className="participant"><div><i/><i/><i/></div><span>{exam.participants} siswa</span></div></td><td><Status value={exam.status}/></td><td><button className="more"><MoreHorizontal/></button></td></tr>)}</tbody></table><div className="table-footer"><span>Menampilkan {exams.length} ujian</span><div><button disabled><ArrowLeft/></button><button className="active">1</button><button><ArrowRight/></button></div></div></div>{create&&<ExamModal close={()=>setCreate(false)} save={addExam}/>}</div>
+function Stat({
+  icon,
+  tone,
+  label,
+  value,
+  note,
+}: {
+  icon: ReactNode;
+  tone: string;
+  label: string;
+  value: string;
+  note: string;
+}) {
+  return (
+    <div className="stat-card">
+      <span className={tone}>{icon}</span>
+      <div>
+        <small>{label}</small>
+        <strong>{value}</strong>
+        <p>{note}</p>
+      </div>
+    </div>
+  );
+}
+function CardHead({ title, link }: { title: string; link?: string }) {
+  return (
+    <div className="card-head">
+      <h2>{title}</h2>
+      {link && (
+        <button>
+          {link}
+          <ChevronRight />
+        </button>
+      )}
+    </div>
+  );
+}
+function Status({ value }: { value: Exam["status"] }) {
+  const labels = {
+    draft: "Draft",
+    terjadwal: "Terjadwal",
+    berlangsung: "Berlangsung",
+    selesai: "Selesai",
+  };
+  return (
+    <span className={`status ${value}`}>
+      <i />
+      {labels[value]}
+    </span>
+  );
+}
+function Activity({
+  icon,
+  text,
+  time,
+}: {
+  icon: ReactNode;
+  text: ReactNode;
+  time: string;
+}) {
+  return (
+    <div className="activity">
+      <span>{icon}</span>
+      <p>
+        {text}
+        <small>{time}</small>
+      </p>
+    </div>
+  );
+}
+function MiniChart() {
+  const bars = [42, 55, 48, 65, 58, 72, 68, 82, 76, 88, 81, 92];
+  return (
+    <div className="mini-chart">
+      {bars.map((v, i) => (
+        <i
+          style={{ height: `${v}%` }}
+          className={i === bars.length - 1 ? "last" : ""}
+          key={i}
+        />
+      ))}
+    </div>
+  );
 }
 
-function Toolbar({placeholder}:{placeholder:string}){return <div className="toolbar"><div><Search/><input placeholder={placeholder}/></div><button><Filter/>Filter</button><button><Download/>Ekspor</button></div>}
-
-function ExamModal({close,save}:{close:()=>void;save:(exam:Exam)=>void}){
-  const [step,setStep]=useState(1);const [title,setTitle]=useState('');const [subject,setSubject]=useState('Matematika');const [className,setClass]=useState('IX A');const [duration,setDuration]=useState(90)
-  const finish=()=>save({id:crypto.randomUUID(),title,subject,className,date:'Belum dijadwalkan',time:'—',duration,questions:0,status:'draft',participants:32})
-  return <Modal close={close} wide><div className="wizard"><header><div><p>BUAT UJIAN BARU</p><h2>{['Informasi Dasar','Pilih Soal','Waktu & Keamanan','Review Ujian'][step-1]}</h2></div><button onClick={close}><X/></button></header><div className="stepper">{[1,2,3,4].map((s)=><span className={step>=s?'active':''} key={s}><i>{step>s?<Check/>:s}</i><b>{['Info Dasar','Soal','Pengaturan','Review'][s-1]}</b></span>)}</div><div className="wizard-body">{step===1&&<><FormField label="Judul ujian"><input value={title} onChange={(e)=>setTitle(e.target.value)} placeholder="Contoh: Penilaian Akhir Semester"/></FormField><div className="form-grid"><FormField label="Mata pelajaran"><select value={subject} onChange={(e)=>setSubject(e.target.value)}><option>Matematika</option><option>IPA</option><option>Bahasa Indonesia</option></select></FormField><FormField label="Target kelas"><select value={className} onChange={(e)=>setClass(e.target.value)}><option>IX A</option><option>IX B</option><option>VIII A</option></select></FormField></div></>}{step===2&&<div className="choice-card"><FileQuestion/><div><b>Ambil dari bank soal</b><p>Pilih soal secara manual setelah draft dibuat.</p></div><span>0 soal dipilih</span></div>}{step===3&&<><div className="form-grid"><FormField label="Durasi (menit)"><input type="number" value={duration} onChange={(e)=>setDuration(Number(e.target.value))}/></FormField><FormField label="Kode akses (opsional)"><input placeholder="Contoh: MATH26"/></FormField></div><div className="switch-list"><label><span><b>Acak urutan soal</b><small>Urutan berbeda untuk setiap siswa</small></span><input type="checkbox" defaultChecked/></label><label><span><b>Mode layar penuh</b><small>Catat saat siswa keluar dari ujian</small></span><input type="checkbox" defaultChecked/></label></div></>}{step===4&&<div className="review-box"><CheckCircle2/><h3>Ujian siap disimpan sebagai draft</h3><p><b>{title||'Tanpa judul'}</b> · {subject} · Kelas {className}</p><span>{duration} menit · Soal dapat ditambahkan setelah draft tersimpan</span></div>}</div><footer><button onClick={close}>Batal</button><div>{step>1&&<button onClick={()=>setStep(step-1)}>Kembali</button>}<button className="primary" disabled={step===1&&!title.trim()} onClick={()=>step<4?setStep(step+1):finish()}>{step<4?'Lanjut':'Simpan Draft'}<ArrowRight/></button></div></footer></div></Modal>
+function ExamManagement({
+  exams,
+  setExams,
+  notify,
+}: {
+  exams: Exam[];
+  setExams: (v: Exam[]) => void;
+  notify: (text: string, error?: boolean) => void;
+}) {
+  const [create, setCreate] = useState(false);
+  const addExam = async (exam: Exam) => {
+    try {
+      if (supabase) {
+        const { error } = await supabase
+          .from("exams")
+          .insert({
+            title: exam.title,
+            duration_minutes: exam.duration,
+            starts_at: new Date().toISOString(),
+            status: "draft",
+          });
+        if (error) throw error;
+      }
+      setExams([exam, ...exams]);
+      setCreate(false);
+      notify("Draft ujian berhasil dibuat");
+    } catch {
+      notify("Ujian gagal disimpan", true);
+    }
+  };
+  return (
+    <div className="portal-page">
+      <PageTitle
+        eyebrow="MANAJEMEN UJIAN"
+        title="Daftar Ujian"
+        description="Buat, jadwalkan, dan pantau seluruh ujian."
+        action={
+          <button className="primary" onClick={() => setCreate(true)}>
+            <Plus />
+            Buat ujian
+          </button>
+        }
+      />
+      <Toolbar placeholder="Cari judul atau mata pelajaran…" />
+      <div className="table-card">
+        <table>
+          <thead>
+            <tr>
+              <th>UJIAN</th>
+              <th>KELAS</th>
+              <th>JADWAL</th>
+              <th>PESERTA</th>
+              <th>STATUS</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {exams.map((exam) => (
+              <tr key={exam.id}>
+                <td>
+                  <div className="exam-cell">
+                    <span>{exam.subject.slice(0, 2).toUpperCase()}</span>
+                    <p>
+                      <b>{exam.title}</b>
+                      <small>
+                        {exam.subject} · {exam.questions} soal
+                      </small>
+                    </p>
+                  </div>
+                </td>
+                <td>{exam.className}</td>
+                <td>
+                  <b className="table-main">{exam.date}</b>
+                  <small>
+                    {exam.time} · {exam.duration} menit
+                  </small>
+                </td>
+                <td>
+                  <div className="participant">
+                    <div>
+                      <i />
+                      <i />
+                      <i />
+                    </div>
+                    <span>{exam.participants} siswa</span>
+                  </div>
+                </td>
+                <td>
+                  <Status value={exam.status} />
+                </td>
+                <td>
+                  <button className="more">
+                    <MoreHorizontal />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="table-footer">
+          <span>Menampilkan {exams.length} ujian</span>
+          <div>
+            <button disabled>
+              <ArrowLeft />
+            </button>
+            <button className="active">1</button>
+            <button>
+              <ArrowRight />
+            </button>
+          </div>
+        </div>
+      </div>
+      {create && <ExamModal close={() => setCreate(false)} save={addExam} />}
+    </div>
+  );
 }
 
-function QuestionBank({ questions, setQuestions, notify }: { questions: Question[]; setQuestions: (v:Question[])=>void; notify:(text:string,error?:boolean)=>void }){
-  const [create,setCreate]=useState(false)
-  const add=async(q:Question)=>{try{if(supabase){const {error}=await supabase.from('questions').insert({body:q.text,type:q.type==='Pilihan Ganda'?'multiple_choice':'essay',difficulty:q.difficulty.toLowerCase(),weight:1});if(error)throw error}setQuestions([q,...questions]);setCreate(false);notify('Soal berhasil ditambahkan')}catch{notify('Soal gagal disimpan',true)}}
-  return <div className="portal-page"><PageTitle eyebrow="KONTEN PEMBELAJARAN" title="Bank Soal" description={`${questions.length} soal aktif dari 8 mata pelajaran.`} action={<div className="title-actions"><button><Upload/>Import soal</button><button className="primary" onClick={()=>setCreate(true)}><Plus/>Tambah soal</button></div>}/><div className="bank-summary"><div><span><BookOpen/></span><p><small>TOTAL BANK</small><b>24</b></p></div><div><span><FileQuestion/></span><p><small>SOAL AKTIF</small><b>1.248</b></p></div><div><span><Sparkles/></span><p><small>DITAMBAHKAN BULAN INI</small><b>86</b></p></div></div><Toolbar placeholder="Cari isi soal, bank, atau topik…"/><div className="question-layout"><aside className="bank-list"><h3>BANK SOAL <button><Plus/></button></h3>{['Semua soal','Aljabar Kelas IX','Ekosistem','Teks Eksplanasi','Sejarah Kemerdekaan'].map((b,i)=><button className={i===0?'active':''} key={b}><span>{i===0?<FileQuestion/>:<BookOpen/>}</span><p>{b}<small>{[1248,120,86,64,92][i]} soal</small></p></button>)}</aside><div className="table-card"><table><thead><tr><th>SOAL</th><th>TIPE</th><th>TINGKAT</th><th>DIPAKAI</th><th/></tr></thead><tbody>{questions.map((q)=><tr key={q.id}><td><div className="question-cell"><small>{q.id} · {q.subject}</small><b>{q.text}</b></div></td><td><span className="type-badge">{q.type}</span></td><td><span className={`difficulty ${q.difficulty.toLowerCase()}`}>{q.difficulty}</span></td><td>{q.used} ujian</td><td><button className="more"><MoreHorizontal/></button></td></tr>)}</tbody></table></div></div>{create&&<QuestionModal close={()=>setCreate(false)} save={add}/>}</div>
+function Toolbar({
+  placeholder,
+  value,
+  onChange,
+}: {
+  placeholder: string;
+  value?: string;
+  onChange?: (value: string) => void;
+}) {
+  return (
+    <div className="toolbar">
+      <div>
+        <Search />
+        <input
+          placeholder={placeholder}
+          value={value}
+          onChange={
+            onChange ? (event) => onChange(event.target.value) : undefined
+          }
+        />
+      </div>
+      <button>
+        <Filter />
+        Filter
+      </button>
+      <button>
+        <Download />
+        Ekspor
+      </button>
+    </div>
+  );
 }
 
-function QuestionModal({close,save}:{close:()=>void;save:(q:Question)=>void}){const [type,setType]=useState<Question['type']>('Pilihan Ganda');const [text,setText]=useState('');const [difficulty,setDifficulty]=useState<Question['difficulty']>('Sedang');return <Modal close={close}><form className="simple-modal" onSubmit={(e)=>{e.preventDefault();save({id:`Q-${Date.now().toString().slice(-4)}`,bank:'Aljabar Kelas IX',subject:'Matematika',type,text,difficulty,used:0})}}><header><div><p>BANK SOAL</p><h2>Tambah soal baru</h2></div><button type="button" onClick={close}><X/></button></header><div className="modal-content"><div className="form-grid"><FormField label="Tipe soal"><select value={type} onChange={(e)=>setType(e.target.value as Question['type'])}><option>Pilihan Ganda</option><option>Essay</option></select></FormField><FormField label="Tingkat kesulitan"><select value={difficulty} onChange={(e)=>setDifficulty(e.target.value as Question['difficulty'])}><option>Mudah</option><option>Sedang</option><option>Sulit</option></select></FormField></div><FormField label="Pertanyaan"><textarea rows={4} value={text} onChange={(e)=>setText(e.target.value)} placeholder="Tulis pertanyaan di sini…"/></FormField>{type==='Pilihan Ganda'&&<div className="option-editor">{['A','B','C','D'].map((x,i)=><label key={x}><input type="radio" name="correct" defaultChecked={i===0}/><span>{x}</span><input placeholder={`Pilihan ${x}`}/></label>)}</div>}</div><footer><button type="button" onClick={close}>Batal</button><button className="primary" disabled={!text.trim()}>Simpan Soal</button></footer></form></Modal>}
-
-function FormField({label,children}:{label:string;children:ReactNode}){return <label className="form-field"><span>{label}</span>{children}</label>}
-function Modal({children,close,wide=false}:{children:ReactNode;close:()=>void;wide?:boolean}){return <div className="modal-overlay" onMouseDown={close}><div className={`modal ${wide?'wide':''}`} onMouseDown={(e)=>e.stopPropagation()}>{children}</div></div>}
-
-type ManagedUser = Profile & { created_at: string }
-
-function UserManagement({notify}:{notify:(text:string,error?:boolean)=>void}) {
-  const [users,setUsers]=useState<ManagedUser[]>([])
-  const [loading,setLoading]=useState(true)
-  const [create,setCreate]=useState(false)
-  const loadUsers=useCallback(async()=>{if(!supabase)return;setLoading(true);const {data,error}=await supabase.from('profiles').select('id,full_name,email,role,student_number,active,created_at').order('created_at',{ascending:false});if(error)notify(error.message,true);else setUsers((data??[]) as ManagedUser[]);setLoading(false)},[notify])
-  useEffect(()=>{loadUsers()},[loadUsers])
-  const invoke=async(body:Record<string,unknown>)=>{if(!supabase)throw new Error('Supabase belum dikonfigurasi.');const {data,error}=await supabase.functions.invoke('admin-users',{body});if(error)throw error;if(data?.error)throw new Error(data.error);return data}
-  const createUser=async(form:{full_name:string;email:string;password:string;role:Role;student_number:string})=>{try{await invoke({action:'create',...form,student_number:form.student_number||null});setCreate(false);notify('Akun pengguna berhasil dibuat.');await loadUsers()}catch(error){notify(error instanceof Error?error.message:'Gagal membuat akun.',true)}}
-  const toggleUser=async(user:ManagedUser)=>{try{await invoke({action:'set_active',user_id:user.id,active:!user.active});notify(user.active?'Akun dinonaktifkan.':'Akun diaktifkan.');await loadUsers()}catch(error){notify(error instanceof Error?error.message:'Gagal memperbarui akun.',true)}}
-  const resetUser=async(user:ManagedUser)=>{const password=window.prompt(`Masukkan kata sandi sementara baru untuk ${user.full_name} (minimal 8 karakter):`);if(!password)return;if(password.length<8){notify('Kata sandi minimal 8 karakter.',true);return}try{await invoke({action:'reset_password',user_id:user.id,password});notify('Kata sandi sementara berhasil diperbarui.')}catch(error){notify(error instanceof Error?error.message:'Gagal mereset kata sandi.',true)}}
-  return <div className="portal-page"><PageTitle eyebrow="ADMINISTRASI AKUN" title="Pengguna" description="Kelola akun dan hak akses admin, guru, serta siswa." action={<button className="primary" onClick={()=>setCreate(true)}><UserPlus/>Tambah pengguna</button>}/><Toolbar placeholder="Cari nama, email, atau NIS…"/><div className="table-card users-table"><table><thead><tr><th>PENGGUNA</th><th>PERAN</th><th>NIS</th><th>STATUS</th><th>DIBUAT</th><th/></tr></thead><tbody>{loading?<tr><td colSpan={6}>Memuat pengguna…</td></tr>:users.length===0?<tr><td colSpan={6}>Belum ada pengguna.</td></tr>:users.map((user)=><tr key={user.id}><td><div className="student-cell"><span>{getInitials(user.full_name)}</span><p><b>{user.full_name}</b><small>{user.email}</small></p></div></td><td><span className={`role-badge ${user.role}`}>{capitalize(user.role)}</span></td><td>{user.student_number||'—'}</td><td><span className={`user-status ${user.active?'active':''}`}><i/>{user.active?'Aktif':'Nonaktif'}</span></td><td>{new Date(user.created_at).toLocaleDateString('id-ID')}</td><td><div className="user-actions"><button onClick={()=>resetUser(user)} title="Reset kata sandi"><LockKeyhole/></button><button onClick={()=>toggleUser(user)}>{user.active?'Nonaktifkan':'Aktifkan'}</button></div></td></tr>)}</tbody></table></div>{create&&<CreateUserModal close={()=>setCreate(false)} save={createUser}/>}</div>
+function ExamModal({
+  close,
+  save,
+}: {
+  close: () => void;
+  save: (exam: Exam) => void;
+}) {
+  const [step, setStep] = useState(1);
+  const [title, setTitle] = useState("");
+  const [subject, setSubject] = useState("Matematika");
+  const [className, setClass] = useState("IX A");
+  const [duration, setDuration] = useState(90);
+  const finish = () =>
+    save({
+      id: crypto.randomUUID(),
+      title,
+      subject,
+      className,
+      date: "Belum dijadwalkan",
+      time: "—",
+      duration,
+      questions: 0,
+      status: "draft",
+      participants: 32,
+    });
+  return (
+    <Modal close={close} wide>
+      <div className="wizard">
+        <header>
+          <div>
+            <p>BUAT UJIAN BARU</p>
+            <h2>
+              {
+                [
+                  "Informasi Dasar",
+                  "Pilih Soal",
+                  "Waktu & Keamanan",
+                  "Review Ujian",
+                ][step - 1]
+              }
+            </h2>
+          </div>
+          <button onClick={close}>
+            <X />
+          </button>
+        </header>
+        <div className="stepper">
+          {[1, 2, 3, 4].map((s) => (
+            <span className={step >= s ? "active" : ""} key={s}>
+              <i>{step > s ? <Check /> : s}</i>
+              <b>{["Info Dasar", "Soal", "Pengaturan", "Review"][s - 1]}</b>
+            </span>
+          ))}
+        </div>
+        <div className="wizard-body">
+          {step === 1 && (
+            <>
+              <FormField label="Judul ujian">
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Contoh: Penilaian Akhir Semester"
+                />
+              </FormField>
+              <div className="form-grid">
+                <FormField label="Mata pelajaran">
+                  <select
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                  >
+                    <option>Matematika</option>
+                    <option>IPA</option>
+                    <option>Bahasa Indonesia</option>
+                  </select>
+                </FormField>
+                <FormField label="Target kelas">
+                  <select
+                    value={className}
+                    onChange={(e) => setClass(e.target.value)}
+                  >
+                    <option>IX A</option>
+                    <option>IX B</option>
+                    <option>VIII A</option>
+                  </select>
+                </FormField>
+              </div>
+            </>
+          )}
+          {step === 2 && (
+            <div className="choice-card">
+              <FileQuestion />
+              <div>
+                <b>Ambil dari bank soal</b>
+                <p>Pilih soal secara manual setelah draft dibuat.</p>
+              </div>
+              <span>0 soal dipilih</span>
+            </div>
+          )}
+          {step === 3 && (
+            <>
+              <div className="form-grid">
+                <FormField label="Durasi (menit)">
+                  <input
+                    type="number"
+                    value={duration}
+                    onChange={(e) => setDuration(Number(e.target.value))}
+                  />
+                </FormField>
+                <FormField label="Kode akses (opsional)">
+                  <input placeholder="Contoh: MATH26" />
+                </FormField>
+              </div>
+              <div className="switch-list">
+                <label>
+                  <span>
+                    <b>Acak urutan soal</b>
+                    <small>Urutan berbeda untuk setiap siswa</small>
+                  </span>
+                  <input type="checkbox" defaultChecked />
+                </label>
+                <label>
+                  <span>
+                    <b>Mode layar penuh</b>
+                    <small>Catat saat siswa keluar dari ujian</small>
+                  </span>
+                  <input type="checkbox" defaultChecked />
+                </label>
+              </div>
+            </>
+          )}
+          {step === 4 && (
+            <div className="review-box">
+              <CheckCircle2 />
+              <h3>Ujian siap disimpan sebagai draft</h3>
+              <p>
+                <b>{title || "Tanpa judul"}</b> · {subject} · Kelas {className}
+              </p>
+              <span>
+                {duration} menit · Soal dapat ditambahkan setelah draft
+                tersimpan
+              </span>
+            </div>
+          )}
+        </div>
+        <footer>
+          <button onClick={close}>Batal</button>
+          <div>
+            {step > 1 && (
+              <button onClick={() => setStep(step - 1)}>Kembali</button>
+            )}
+            <button
+              className="primary"
+              disabled={step === 1 && !title.trim()}
+              onClick={() => (step < 4 ? setStep(step + 1) : finish())}
+            >
+              {step < 4 ? "Lanjut" : "Simpan Draft"}
+              <ArrowRight />
+            </button>
+          </div>
+        </footer>
+      </div>
+    </Modal>
+  );
 }
-function CreateUserModal({close,save}:{close:()=>void;save:(form:{full_name:string;email:string;password:string;role:Role;student_number:string})=>void}) {
-  const [form,setForm]=useState({full_name:'',email:'',password:'',role:'siswa' as Role,student_number:''})
-  return <Modal close={close}><form className="simple-modal" onSubmit={(event)=>{event.preventDefault();save(form)}}><header><div><p>AKUN BARU</p><h2>Tambah pengguna</h2></div><button type="button" onClick={close}><X/></button></header><div className="modal-content"><FormField label="Nama lengkap"><input value={form.full_name} onChange={(e)=>setForm({...form,full_name:e.target.value})} required/></FormField><FormField label="Email"><input type="email" value={form.email} onChange={(e)=>setForm({...form,email:e.target.value})} required/></FormField><div className="form-grid"><FormField label="Peran"><select value={form.role} onChange={(e)=>setForm({...form,role:e.target.value as Role})}><option value="siswa">Siswa</option><option value="guru">Guru</option><option value="admin">Admin</option></select></FormField><FormField label="NIS (khusus siswa)"><input value={form.student_number} onChange={(e)=>setForm({...form,student_number:e.target.value})} disabled={form.role!=='siswa'}/></FormField></div><FormField label="Kata sandi sementara"><input type="password" minLength={8} value={form.password} onChange={(e)=>setForm({...form,password:e.target.value})} placeholder="Minimal 8 karakter" required/></FormField><p className="form-hint">Pengguna dapat mengganti kata sandi melalui fitur lupa kata sandi.</p></div><footer><button type="button" onClick={close}>Batal</button><button className="primary">Buat Akun</button></footer></form></Modal>
+
+function QuestionBank({
+  questions,
+  setQuestions,
+  notify,
+}: {
+  questions: Question[];
+  setQuestions: (v: Question[]) => void;
+  notify: (text: string, error?: boolean) => void;
+}) {
+  const [create, setCreate] = useState(false);
+  const add = async (q: Question) => {
+    try {
+      if (supabase) {
+        const { error } = await supabase
+          .from("questions")
+          .insert({
+            body: q.text,
+            type: q.type === "Pilihan Ganda" ? "multiple_choice" : "essay",
+            difficulty: q.difficulty.toLowerCase(),
+            weight: 1,
+          });
+        if (error) throw error;
+      }
+      setQuestions([q, ...questions]);
+      setCreate(false);
+      notify("Soal berhasil ditambahkan");
+    } catch {
+      notify("Soal gagal disimpan", true);
+    }
+  };
+  return (
+    <div className="portal-page">
+      <PageTitle
+        eyebrow="KONTEN PEMBELAJARAN"
+        title="Bank Soal"
+        description={`${questions.length} soal aktif dari 8 mata pelajaran.`}
+        action={
+          <div className="title-actions">
+            <button>
+              <Upload />
+              Import soal
+            </button>
+            <button className="primary" onClick={() => setCreate(true)}>
+              <Plus />
+              Tambah soal
+            </button>
+          </div>
+        }
+      />
+      <div className="bank-summary">
+        <div>
+          <span>
+            <BookOpen />
+          </span>
+          <p>
+            <small>TOTAL BANK</small>
+            <b>24</b>
+          </p>
+        </div>
+        <div>
+          <span>
+            <FileQuestion />
+          </span>
+          <p>
+            <small>SOAL AKTIF</small>
+            <b>1.248</b>
+          </p>
+        </div>
+        <div>
+          <span>
+            <Sparkles />
+          </span>
+          <p>
+            <small>DITAMBAHKAN BULAN INI</small>
+            <b>86</b>
+          </p>
+        </div>
+      </div>
+      <Toolbar placeholder="Cari isi soal, bank, atau topik…" />
+      <div className="question-layout">
+        <aside className="bank-list">
+          <h3>
+            BANK SOAL{" "}
+            <button>
+              <Plus />
+            </button>
+          </h3>
+          {[
+            "Semua soal",
+            "Aljabar Kelas IX",
+            "Ekosistem",
+            "Teks Eksplanasi",
+            "Sejarah Kemerdekaan",
+          ].map((b, i) => (
+            <button className={i === 0 ? "active" : ""} key={b}>
+              <span>{i === 0 ? <FileQuestion /> : <BookOpen />}</span>
+              <p>
+                {b}
+                <small>{[1248, 120, 86, 64, 92][i]} soal</small>
+              </p>
+            </button>
+          ))}
+        </aside>
+        <div className="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>SOAL</th>
+                <th>TIPE</th>
+                <th>TINGKAT</th>
+                <th>DIPAKAI</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {questions.map((q) => (
+                <tr key={q.id}>
+                  <td>
+                    <div className="question-cell">
+                      <small>
+                        {q.id} · {q.subject}
+                      </small>
+                      <b>{q.text}</b>
+                    </div>
+                  </td>
+                  <td>
+                    <span className="type-badge">{q.type}</span>
+                  </td>
+                  <td>
+                    <span
+                      className={`difficulty ${q.difficulty.toLowerCase()}`}
+                    >
+                      {q.difficulty}
+                    </span>
+                  </td>
+                  <td>{q.used} ujian</td>
+                  <td>
+                    <button className="more">
+                      <MoreHorizontal />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {create && <QuestionModal close={() => setCreate(false)} save={add} />}
+    </div>
+  );
 }
 
-function Classes(){return <div className="portal-page"><PageTitle eyebrow="AKADEMIK" title="Kelas & Siswa" description="Tahun ajaran 2026/2027 · 18 kelas aktif." action={<button className="primary"><Plus/>Tambah siswa</button>}/><div className="class-tabs"><button className="active">IX A <span>32</span></button><button>IX B <span>31</span></button><button>VIII A <span>30</span></button><button>VIII B <span>30</span></button><button>Semua kelas</button></div><Toolbar placeholder="Cari nama atau NIS siswa…"/><div className="table-card"><table><thead><tr><th><input type="checkbox"/></th><th>NIS</th><th>NAMA SISWA</th><th>KELAS</th><th>STATUS</th><th>UJIAN SELESAI</th><th/></tr></thead><tbody>{students.map((s,i)=><tr key={s[0]}><td><input type="checkbox"/></td><td>{s[0]}</td><td><div className="student-cell"><span>{s[1].split(' ').map(x=>x[0]).slice(0,2).join('')}</span><b>{s[1]}</b></div></td><td>{s[2]}</td><td><span className={`user-status ${s[3]==='Aktif'?'active':''}`}><i/>{s[3]}</span></td><td>{[14,13,14,12,11,9][i]} dari 16</td><td><button className="more"><MoreHorizontal/></button></td></tr>)}</tbody></table></div></div>}
-
-function Grading({notify}:{notify:(text:string)=>void}){const [selected,setSelected]=useState(0);const [scores,setScores]=useState<Record<number,string>>({});const names=['Alya Putri','Bima Saputra','Citra Lestari','Dian Pratama','Eka Lestari'];return <div className="portal-page"><PageTitle eyebrow="PENILAIAN" title="Koreksi Essay" description="Penilaian per soal membantu menjaga konsistensi skor."/><div className="grading-shell"><aside><div className="grading-progress"><p><b>Soal 3 dari 5</b><span>24 / 32 dinilai</span></p><i><span style={{width:'75%'}}/></i></div><div className="student-answer-list">{names.map((n,i)=><button onClick={()=>setSelected(i)} className={selected===i?'active':''} key={n}><span>{n.split(' ').map(x=>x[0]).join('')}</span><p><b>{n}</b><small>{scores[i] ? `Skor ${scores[i]}/10` : 'Belum dinilai'}</small></p>{scores[i]?<CheckCircle2/>:<ChevronRight/>}</button>)}</div></aside><main className="grading-main"><div className="question-reference"><small>SOAL ESSAY · BOBOT 10 POIN</small><h3>Jelaskan dengan bahasamu sendiri bagaimana proses fotosintesis terjadi dan faktor apa saja yang memengaruhinya.</h3><button><BookOpen/>Lihat rubrik & kunci jawaban</button></div><div className="answer-paper"><div><span className="avatar sm">{names[selected].split(' ').map(x=>x[0]).join('')}</span><p><b>{names[selected]}</b><small>Kelas IX A · Tersimpan 09.42</small></p></div><p>Fotosintesis adalah proses tumbuhan membuat makanan dengan bantuan cahaya matahari. Proses ini terjadi di daun pada bagian klorofil. Tumbuhan menggunakan air dari akar dan karbon dioksida dari udara, lalu menghasilkan glukosa dan oksigen.</p><p>Faktor yang memengaruhi yaitu intensitas cahaya, jumlah air, kadar karbon dioksida, suhu, dan banyaknya klorofil.</p></div><div className="score-panel"><FormField label="Skor (maks. 10)"><input type="number" min="0" max="10" value={scores[selected]??''} onChange={(e)=>setScores({...scores,[selected]:e.target.value})} placeholder="0"/></FormField><FormField label="Komentar untuk siswa (opsional)"><input placeholder="Berikan umpan balik singkat…"/></FormField><button className="primary" onClick={()=>{notify('Nilai berhasil disimpan');if(selected<names.length-1)setSelected(selected+1)}}>Simpan & lanjut<ArrowRight/></button></div></main></div></div>}
-
-function Reports(){const grades=[72,76,78,82,84,76,88,92,80,86,74,90];return <div className="portal-page"><PageTitle eyebrow="LAPORAN & ANALITIK" title="Hasil Ujian" description="Analisis capaian kelas dan kualitas soal." action={<button className="outline"><Download/>Ekspor laporan</button>}/><div className="report-filter"><select><option>Penilaian Akhir Semester</option></select><select><option>Kelas IX A</option></select><button>Terapkan</button></div><div className="report-stats"><div><small>RATA-RATA</small><b>82,4</b><span className="up">↑ 3,2</span></div><div><small>NILAI TERTINGGI</small><b>96</b><span>Alya Putri</span></div><div><small>NILAI TERENDAH</small><b>62</b><span>Perlu pendampingan</span></div><div><small>KETUNTASAN</small><b>87,5%</b><span>28 dari 32 siswa</span></div></div><div className="report-grid"><section className="card chart-card"><CardHead title="Distribusi nilai"/><div className="grade-chart">{grades.map((v,i)=><div key={i}><i style={{height:`${v-40}%`}}/><span>{60+i*3}</span></div>)}</div></section><section className="card"><CardHead title="Ringkasan pengerjaan"/><div className="donut-wrap"><div className="donut"><strong>32</strong><span>peserta</span></div><ul><li><i className="green"/>Lulus KKM <b>28</b></li><li><i className="amber"/>Di bawah KKM <b>4</b></li><li><i className="gray"/>Tidak hadir <b>0</b></li></ul></div></section></div><section className="card item-analysis"><CardHead title="Analisis butir soal" link="Lihat seluruh soal"/><div className="analysis-row"><span>01</span><p><b>Persamaan linear satu variabel</b><small>Q-1042 · Pilihan Ganda</small></p><div><small>DIJAWAB BENAR</small><b>91%</b></div><span className="difficulty mudah">Mudah</span></div><div className="analysis-row"><span>12</span><p><b>Sistem persamaan linear dua variabel</b><small>Q-1041 · Essay</small></p><div><small>RATA-RATA SKOR</small><b>68%</b></div><span className="difficulty sedang">Sedang</span></div></section></div>}
-
-function SettingsPage({role}:{role:Role}){return <div className="portal-page"><PageTitle eyebrow="KONFIGURASI" title="Pengaturan" description="Kelola profil dan preferensi aplikasi."/><div className="settings-grid"><aside><button className="active">Profil sekolah</button><button>Keamanan</button><button>Tahun ajaran</button><button>Notifikasi</button></aside><div className="card settings-form"><h2>Profil sekolah</h2><p>Informasi ini digunakan pada laporan dan halaman siswa.</p><div className="school-logo"><span><GraduationCap/></span><button>Ganti logo</button></div><div className="form-grid"><FormField label="Nama sekolah"><input defaultValue="SMP Negeri Harapan Bangsa"/></FormField><FormField label="NPSN"><input defaultValue="20123456"/></FormField></div><FormField label="Alamat"><textarea rows={3} defaultValue="Jl. Pendidikan No. 17, Jakarta"/></FormField><div className="settings-save"><button className="primary">Simpan perubahan</button><span>Anda masuk sebagai {role}.</span></div></div></div></div>}
-
-function StudentHome({logout}:{logout:()=>void}){return <div className="student-app"><header className="student-header"><Link to="/siswa" className="student-logo"><GraduationCap/><b>Ruang Ujian</b></Link><div><span><Wifi/>Online</span><button><Bell/></button><button className="student-profile"><span>AP</span><b>Alya Putri<small>IX A · 24001</small></b><ChevronDown/></button><button className="logout-icon" onClick={logout}><LogOut/></button></div></header><main className="student-home"><div className="student-greeting"><p>JUMAT, 10 JULI 2026</p><h1>Selamat pagi, Alya 👋</h1><span>Siapkan dirimu dan kerjakan ujian dengan jujur.</span></div><section className="available-exam"><div className="live-label"><i/>TERSEDIA SEKARANG</div><div className="exam-feature"><div className="feature-icon"><BookOpen/></div><div className="feature-copy"><span>MATEMATIKA · KELAS IX</span><h2>Penilaian Akhir Semester</h2><p><Clock3/>90 menit <i/> <FileQuestion/>40 soal <i/> Berakhir pukul 10.30</p></div><Link to="/siswa/ujian/1" className="start-button">Mulai ujian<ArrowRight/></Link></div><div className="exam-note"><ShieldCheck/><p><b>Mode ujian aman aktif</b><span>Keluar dari layar ujian akan tercatat sebagai insiden.</span></p></div></section><div className="student-columns"><section><h3>AKAN DATANG</h3><div className="upcoming-card"><span className="subject-box blue">IP</span><p><b>Ulangan Bab Ekosistem</b><small>IPA · 25 soal · 60 menit</small></p><div><b>Hari ini</b><span>11.00</span></div></div><div className="upcoming-card"><span className="subject-box orange">BI</span><p><b>Asesmen Teks Eksplanasi</b><small>Bahasa Indonesia · 30 soal</small></p><div><b>Besok</b><span>08.00</span></div></div></section><section><h3>HASIL TERBARU</h3><div className="result-card"><div><span className="subject-box purple">IP</span><p><b>Kuis Sejarah Indonesia</b><small>8 Juli 2026</small></p></div><strong>88<small>/100</small></strong><span className="passed">Tuntas</span></div><div className="result-card"><div><span className="subject-box green">EN</span><p><b>English Daily Test</b><small>5 Juli 2026</small></p></div><strong>82<small>/100</small></strong><span className="passed">Tuntas</span></div></section></div></main></div>}
-
-function ExamRunner({notify}:{notify:(text:string,error?:boolean)=>void}){
-  const {examId='1'}=useParams();const navigate=useNavigate();const [current,setCurrent]=useState(0);const [answers,setAnswers]=useState<Record<string,number>>(()=>loadLocal(`answers:${examId}`,{}));const [marked,setMarked]=useState<string[]>([]);const [remaining,setRemaining]=useState(89*60+42);const [submit,setSubmit]=useState(false);const [attemptId,setAttemptId]=useState<string|null>(null);const question=examQuestions[current]
-  useEffect(()=>{const client=supabase;if(!client)return;client.auth.getUser().then(async({data})=>{if(!data.user)return;const existing=await client.from('attempts').select('id').eq('exam_id',examId).eq('student_id',data.user.id).maybeSingle();if(existing.data){setAttemptId(existing.data.id)}else{const created=await client.from('attempts').insert({exam_id:examId,student_id:data.user.id,status:'in_progress',started_at:new Date().toISOString()}).select('id').single();if(created.data)setAttemptId(created.data.id)}})},[examId])
-  useEffect(()=>{const id=window.setInterval(()=>setRemaining((v)=>Math.max(0,v-1)),1000);return()=>clearInterval(id)},[])
-  useEffect(()=>{if(remaining===0)setSubmit(true)},[remaining])
-  useEffect(()=>{const handler=async()=>{if(document.hidden&&supabase&&attemptId){await supabase.from('integrity_events').insert({attempt_id:attemptId,event_type:'tab_hidden',metadata:{exam_id:examId}})}};document.addEventListener('visibilitychange',handler);return()=>document.removeEventListener('visibilitychange',handler)},[examId,attemptId])
-  const time=useMemo(()=>`${String(Math.floor(remaining/3600)).padStart(2,'0')}:${String(Math.floor((remaining%3600)/60)).padStart(2,'0')}:${String(remaining%60).padStart(2,'0')}`,[remaining])
-  const answer=async(option:number)=>{const next={...answers,[question.id]:option};setAnswers(next);saveLocal(`answers:${examId}`,next);if(supabase&&attemptId){await supabase.from('answers').upsert({attempt_id:attemptId,question_id:question.id,selected_option:option,answered_at:new Date().toISOString()},{onConflict:'attempt_id,question_id'})}}
-  const finish=async()=>{try{if(supabase&&attemptId){const {error}=await supabase.from('attempts').update({status:'submitted',submitted_at:new Date().toISOString()}).eq('id',attemptId);if(error)throw error}localStorage.removeItem(`ruang-ujian:answers:${examId}`);notify('Jawaban berhasil dikumpulkan');navigate('/siswa')}catch{notify('Jawaban tersimpan lokal dan akan dikirim saat online')}}
-  return <div className="runner"><header><div className="runner-brand"><GraduationCap/><span><small>MATEMATIKA · KELAS IX</small><b>Penilaian Akhir Semester</b></span></div><div className="runner-stats"><span><Wifi/>Tersimpan</span><p><small>SISA WAKTU</small><b><Clock3/>{time}</b></p><button onClick={()=>setSubmit(true)}>Kumpulkan</button></div></header><main><aside className="question-nav"><div><p><b>Daftar Soal</b><span>{Object.keys(answers).length}/{examQuestions.length} terjawab</span></p><i><span style={{width:`${Object.keys(answers).length/examQuestions.length*100}%`}}/></i></div><div className="number-grid">{examQuestions.map((q,i)=><button className={`${current===i?'current':''} ${answers[q.id]!==undefined?'answered':''} ${marked.includes(q.id)?'marked':''}`} onClick={()=>setCurrent(i)} key={q.id}>{i+1}{marked.includes(q.id)&&<Star/>}</button>)}</div><ul><li><i className="answered"/>Terjawab</li><li><i className="current"/>Sedang dibuka</li><li><i className="marked"/>Ditandai ragu</li></ul><div className="secure-note"><ShieldCheck/><p><b>Ujian aman</b><span>Aktivitas keluar layar dicatat.</span></p></div></aside><section className="question-area"><div className="question-top"><span>SOAL {current+1} DARI {examQuestions.length}</span><button className={marked.includes(question.id)?'marked':''} onClick={()=>setMarked((m)=>m.includes(question.id)?m.filter(x=>x!==question.id):[...m,question.id])}><Star/>Tandai ragu</button></div><article><h1>{question.text}</h1><p>Pilih satu jawaban yang paling tepat.</p><div className="answer-options">{question.options.map((option,i)=><button onClick={()=>answer(i)} className={answers[question.id]===i?'selected':''} key={option}><span>{String.fromCharCode(65+i)}</span><b>{option}</b>{answers[question.id]===i&&<Check/>}</button>)}</div></article><footer><button disabled={current===0} onClick={()=>setCurrent(current-1)}><ArrowLeft/>Sebelumnya</button><span>Jawaban tersimpan otomatis</span>{current<examQuestions.length-1?<button className="next" onClick={()=>setCurrent(current+1)}>Selanjutnya<ArrowRight/></button>:<button className="next" onClick={()=>setSubmit(true)}>Tinjau & kumpulkan<Check/></button>}</footer></section></main>{submit&&<Modal close={()=>setSubmit(false)}><div className="submit-modal"><span><ClipboardCheck/></span><h2>Kumpulkan jawaban?</h2><p>Pastikan semua jawaban sudah diperiksa. Jawaban tidak dapat diubah setelah dikumpulkan.</p><div><span><b>{Object.keys(answers).length}</b>Terjawab</span><span className="empty"><b>{examQuestions.length-Object.keys(answers).length}</b>Belum dijawab</span><span className="marked"><b>{marked.length}</b>Ditandai</span></div><footer><button onClick={()=>setSubmit(false)}>Periksa lagi</button><button className="primary" onClick={finish}>Ya, kumpulkan</button></footer></div></Modal>}</div>
+function QuestionModal({
+  close,
+  save,
+}: {
+  close: () => void;
+  save: (q: Question) => void;
+}) {
+  const [type, setType] = useState<Question["type"]>("Pilihan Ganda");
+  const [text, setText] = useState("");
+  const [difficulty, setDifficulty] =
+    useState<Question["difficulty"]>("Sedang");
+  return (
+    <Modal close={close}>
+      <form
+        className="simple-modal"
+        onSubmit={(e) => {
+          e.preventDefault();
+          save({
+            id: `Q-${Date.now().toString().slice(-4)}`,
+            bank: "Aljabar Kelas IX",
+            subject: "Matematika",
+            type,
+            text,
+            difficulty,
+            used: 0,
+          });
+        }}
+      >
+        <header>
+          <div>
+            <p>BANK SOAL</p>
+            <h2>Tambah soal baru</h2>
+          </div>
+          <button type="button" onClick={close}>
+            <X />
+          </button>
+        </header>
+        <div className="modal-content">
+          <div className="form-grid">
+            <FormField label="Tipe soal">
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value as Question["type"])}
+              >
+                <option>Pilihan Ganda</option>
+                <option>Essay</option>
+              </select>
+            </FormField>
+            <FormField label="Tingkat kesulitan">
+              <select
+                value={difficulty}
+                onChange={(e) =>
+                  setDifficulty(e.target.value as Question["difficulty"])
+                }
+              >
+                <option>Mudah</option>
+                <option>Sedang</option>
+                <option>Sulit</option>
+              </select>
+            </FormField>
+          </div>
+          <FormField label="Pertanyaan">
+            <textarea
+              rows={4}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Tulis pertanyaan di sini…"
+            />
+          </FormField>
+          {type === "Pilihan Ganda" && (
+            <div className="option-editor">
+              {["A", "B", "C", "D"].map((x, i) => (
+                <label key={x}>
+                  <input type="radio" name="correct" defaultChecked={i === 0} />
+                  <span>{x}</span>
+                  <input placeholder={`Pilihan ${x}`} />
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+        <footer>
+          <button type="button" onClick={close}>
+            Batal
+          </button>
+          <button className="primary" disabled={!text.trim()}>
+            Simpan Soal
+          </button>
+        </footer>
+      </form>
+    </Modal>
+  );
 }
 
-export default App
+function FormField({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className="form-field">
+      <span>{label}</span>
+      {children}
+    </label>
+  );
+}
+function Modal({
+  children,
+  close,
+  wide = false,
+}: {
+  children: ReactNode;
+  close: () => void;
+  wide?: boolean;
+}) {
+  return (
+    <div className="modal-overlay" onMouseDown={close}>
+      <div
+        className={`modal ${wide ? "wide" : ""}`}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+type ManagedUser = Profile & { created_at: string };
+
+function UserManagement({
+  notify,
+}: {
+  notify: (text: string, error?: boolean) => void;
+}) {
+  const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [create, setCreate] = useState(false);
+  const [editing, setEditing] = useState<ManagedUser | null>(null);
+  const [query, setQuery] = useState("");
+  const loadUsers = useCallback(async () => {
+    if (!supabase) return;
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id,full_name,email,role,student_number,active,created_at")
+      .order("created_at", { ascending: false });
+    if (error) notify(error.message, true);
+    else setUsers((data ?? []) as ManagedUser[]);
+    setLoading(false);
+  }, [notify]);
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
+  const invoke = async (body: Record<string, unknown>) => {
+    if (!supabase) throw new Error("Supabase belum dikonfigurasi.");
+    const { data, error } = await supabase.functions.invoke("admin-users", {
+      body,
+    });
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+    return data;
+  };
+  const createUser = async (form: {
+    full_name: string;
+    email: string;
+    password: string;
+    role: Role;
+    student_number: string;
+  }) => {
+    try {
+      await invoke({
+        action: "create",
+        ...form,
+        student_number: form.student_number || null,
+      });
+      setCreate(false);
+      notify("Akun pengguna berhasil dibuat.");
+      await loadUsers();
+    } catch (error) {
+      notify(
+        error instanceof Error ? error.message : "Gagal membuat akun.",
+        true,
+      );
+    }
+  };
+  const toggleUser = async (user: ManagedUser) => {
+    try {
+      await invoke({
+        action: "set_active",
+        user_id: user.id,
+        active: !user.active,
+      });
+      notify(user.active ? "Akun dinonaktifkan." : "Akun diaktifkan.");
+      await loadUsers();
+    } catch (error) {
+      notify(
+        error instanceof Error ? error.message : "Gagal memperbarui akun.",
+        true,
+      );
+    }
+  };
+  const resetUser = async (user: ManagedUser) => {
+    const password = window.prompt(
+      `Masukkan kata sandi sementara baru untuk ${user.full_name} (minimal 8 karakter):`,
+    );
+    if (!password) return;
+    if (password.length < 8) {
+      notify("Kata sandi minimal 8 karakter.", true);
+      return;
+    }
+    try {
+      await invoke({ action: "reset_password", user_id: user.id, password });
+      notify("Kata sandi sementara berhasil diperbarui.");
+    } catch (error) {
+      notify(
+        error instanceof Error ? error.message : "Gagal mereset kata sandi.",
+        true,
+      );
+    }
+  };
+  const updateUser = async (form: {
+    id: string;
+    full_name: string;
+    email: string;
+    role: Role;
+    student_number: string;
+  }) => {
+    try {
+      await invoke({
+        action: "update",
+        user_id: form.id,
+        full_name: form.full_name,
+        email: form.email,
+        role: form.role,
+        student_number: form.student_number || null,
+      });
+      setEditing(null);
+      notify("Data pengguna berhasil diperbarui.");
+      await loadUsers();
+    } catch (error) {
+      notify(
+        error instanceof Error ? error.message : "Gagal memperbarui pengguna.",
+        true,
+      );
+    }
+  };
+  const deleteUser = async (user: ManagedUser) => {
+    if (
+      !window.confirm(
+        `Hapus akun ${user.full_name}? Tindakan ini tidak dapat dibatalkan.`,
+      )
+    )
+      return;
+    try {
+      await invoke({ action: "delete", user_id: user.id });
+      notify("Akun pengguna berhasil dihapus.");
+      await loadUsers();
+    } catch (error) {
+      notify(
+        error instanceof Error ? error.message : "Gagal menghapus pengguna.",
+        true,
+      );
+    }
+  };
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredUsers = users.filter((user) =>
+    [user.full_name, user.email, user.student_number ?? "", user.role].some(
+      (value) => value.toLowerCase().includes(normalizedQuery),
+    ),
+  );
+  return (
+    <div className="portal-page">
+      <PageTitle
+        eyebrow="ADMINISTRASI AKUN"
+        title="Pengguna"
+        description="Kelola akun dan hak akses admin, guru, serta siswa."
+        action={
+          <button className="primary" onClick={() => setCreate(true)}>
+            <UserPlus />
+            Tambah pengguna
+          </button>
+        }
+      />
+      <Toolbar
+        placeholder="Cari nama, email, atau NIS…"
+        value={query}
+        onChange={setQuery}
+      />
+      <div className="table-card users-table">
+        <table>
+          <thead>
+            <tr>
+              <th>PENGGUNA</th>
+              <th>PERAN</th>
+              <th>NIS</th>
+              <th>STATUS</th>
+              <th>DIBUAT</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan={6}>Memuat pengguna…</td>
+              </tr>
+            ) : filteredUsers.length === 0 ? (
+              <tr>
+                <td colSpan={6}>Belum ada pengguna.</td>
+              </tr>
+            ) : (
+              filteredUsers.map((user) => (
+                <tr key={user.id}>
+                  <td>
+                    <div className="student-cell">
+                      <span>{getInitials(user.full_name)}</span>
+                      <p>
+                        <b>{user.full_name}</b>
+                        <small>{user.email}</small>
+                      </p>
+                    </div>
+                  </td>
+                  <td>
+                    <span className={`role-badge ${user.role}`}>
+                      {capitalize(user.role)}
+                    </span>
+                  </td>
+                  <td>{user.student_number || "—"}</td>
+                  <td>
+                    <span
+                      className={`user-status ${user.active ? "active" : ""}`}
+                    >
+                      <i />
+                      {user.active ? "Aktif" : "Nonaktif"}
+                    </span>
+                  </td>
+                  <td>
+                    {new Date(user.created_at).toLocaleDateString("id-ID")}
+                  </td>
+                  <td>
+                    <div className="user-actions">
+                      <button
+                        onClick={() => setEditing(user)}
+                        title="Edit pengguna"
+                      >
+                        <Pencil />
+                      </button>
+                      <button
+                        onClick={() => resetUser(user)}
+                        title="Reset kata sandi"
+                      >
+                        <LockKeyhole />
+                      </button>
+                      <button onClick={() => toggleUser(user)}>
+                        {user.active ? "Nonaktifkan" : "Aktifkan"}
+                      </button>
+                      <button
+                        className="danger"
+                        onClick={() => deleteUser(user)}
+                        title="Hapus pengguna"
+                      >
+                        <Trash2 />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+      {create && (
+        <CreateUserModal close={() => setCreate(false)} save={createUser} />
+      )}
+      {editing && (
+        <EditUserModal
+          user={editing}
+          close={() => setEditing(null)}
+          save={updateUser}
+        />
+      )}
+    </div>
+  );
+}
+function CreateUserModal({
+  close,
+  save,
+}: {
+  close: () => void;
+  save: (form: {
+    full_name: string;
+    email: string;
+    password: string;
+    role: Role;
+    student_number: string;
+  }) => void;
+}) {
+  const [form, setForm] = useState({
+    full_name: "",
+    email: "",
+    password: "",
+    role: "siswa" as Role,
+    student_number: "",
+  });
+  return (
+    <Modal close={close}>
+      <form
+        className="simple-modal"
+        onSubmit={(event) => {
+          event.preventDefault();
+          save(form);
+        }}
+      >
+        <header>
+          <div>
+            <p>AKUN BARU</p>
+            <h2>Tambah pengguna</h2>
+          </div>
+          <button type="button" onClick={close}>
+            <X />
+          </button>
+        </header>
+        <div className="modal-content">
+          <FormField label="Nama lengkap">
+            <input
+              value={form.full_name}
+              onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+              required
+            />
+          </FormField>
+          <FormField label="Email">
+            <input
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              required
+            />
+          </FormField>
+          <div className="form-grid">
+            <FormField label="Peran">
+              <select
+                value={form.role}
+                onChange={(e) =>
+                  setForm({ ...form, role: e.target.value as Role })
+                }
+              >
+                <option value="siswa">Siswa</option>
+                <option value="guru">Guru</option>
+                <option value="admin">Admin</option>
+              </select>
+            </FormField>
+            <FormField label="NIS (khusus siswa)">
+              <input
+                value={form.student_number}
+                onChange={(e) =>
+                  setForm({ ...form, student_number: e.target.value })
+                }
+                disabled={form.role !== "siswa"}
+              />
+            </FormField>
+          </div>
+          <FormField label="Kata sandi sementara">
+            <input
+              type="password"
+              minLength={8}
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              placeholder="Minimal 8 karakter"
+              required
+            />
+          </FormField>
+          <p className="form-hint">
+            Pengguna dapat mengganti kata sandi melalui fitur lupa kata sandi.
+          </p>
+        </div>
+        <footer>
+          <button type="button" onClick={close}>
+            Batal
+          </button>
+          <button className="primary">Buat Akun</button>
+        </footer>
+      </form>
+    </Modal>
+  );
+}
+
+function EditUserModal({
+  user,
+  close,
+  save,
+}: {
+  user: ManagedUser;
+  close: () => void;
+  save: (form: {
+    id: string;
+    full_name: string;
+    email: string;
+    role: Role;
+    student_number: string;
+  }) => void;
+}) {
+  const [form, setForm] = useState({
+    id: user.id,
+    full_name: user.full_name,
+    email: user.email,
+    role: user.role,
+    student_number: user.student_number ?? "",
+  });
+  return (
+    <Modal close={close}>
+      <form
+        className="simple-modal"
+        onSubmit={(event) => {
+          event.preventDefault();
+          save(form);
+        }}
+      >
+        <header>
+          <div>
+            <p>EDIT AKUN</p>
+            <h2>Ubah data pengguna</h2>
+          </div>
+          <button type="button" onClick={close}>
+            <X />
+          </button>
+        </header>
+        <div className="modal-content">
+          <FormField label="Nama lengkap">
+            <input
+              value={form.full_name}
+              onChange={(event) =>
+                setForm({ ...form, full_name: event.target.value })
+              }
+              required
+            />
+          </FormField>
+          <FormField label="Email">
+            <input
+              type="email"
+              value={form.email}
+              onChange={(event) =>
+                setForm({ ...form, email: event.target.value })
+              }
+              required
+            />
+          </FormField>
+          <div className="form-grid">
+            <FormField label="Peran">
+              <select
+                value={form.role}
+                onChange={(event) =>
+                  setForm({ ...form, role: event.target.value as Role })
+                }
+              >
+                <option value="siswa">Siswa</option>
+                <option value="guru">Guru</option>
+                <option value="admin">Admin</option>
+              </select>
+            </FormField>
+            <FormField label="NIS (khusus siswa)">
+              <input
+                value={form.student_number}
+                onChange={(event) =>
+                  setForm({ ...form, student_number: event.target.value })
+                }
+                disabled={form.role !== "siswa"}
+              />
+            </FormField>
+          </div>
+          <p className="form-hint">
+            Perubahan role langsung memengaruhi halaman dan data yang dapat
+            diakses pengguna.
+          </p>
+        </div>
+        <footer>
+          <button type="button" onClick={close}>
+            Batal
+          </button>
+          <button className="primary">Simpan Perubahan</button>
+        </footer>
+      </form>
+    </Modal>
+  );
+}
+
+function Classes() {
+  return (
+    <div className="portal-page">
+      <PageTitle
+        eyebrow="AKADEMIK"
+        title="Kelas & Siswa"
+        description="Tahun ajaran 2026/2027 · 18 kelas aktif."
+        action={
+          <button className="primary">
+            <Plus />
+            Tambah siswa
+          </button>
+        }
+      />
+      <div className="class-tabs">
+        <button className="active">
+          IX A <span>32</span>
+        </button>
+        <button>
+          IX B <span>31</span>
+        </button>
+        <button>
+          VIII A <span>30</span>
+        </button>
+        <button>
+          VIII B <span>30</span>
+        </button>
+        <button>Semua kelas</button>
+      </div>
+      <Toolbar placeholder="Cari nama atau NIS siswa…" />
+      <div className="table-card">
+        <table>
+          <thead>
+            <tr>
+              <th>
+                <input type="checkbox" />
+              </th>
+              <th>NIS</th>
+              <th>NAMA SISWA</th>
+              <th>KELAS</th>
+              <th>STATUS</th>
+              <th>UJIAN SELESAI</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {students.map((s, i) => (
+              <tr key={s[0]}>
+                <td>
+                  <input type="checkbox" />
+                </td>
+                <td>{s[0]}</td>
+                <td>
+                  <div className="student-cell">
+                    <span>
+                      {s[1]
+                        .split(" ")
+                        .map((x) => x[0])
+                        .slice(0, 2)
+                        .join("")}
+                    </span>
+                    <b>{s[1]}</b>
+                  </div>
+                </td>
+                <td>{s[2]}</td>
+                <td>
+                  <span
+                    className={`user-status ${s[3] === "Aktif" ? "active" : ""}`}
+                  >
+                    <i />
+                    {s[3]}
+                  </span>
+                </td>
+                <td>{[14, 13, 14, 12, 11, 9][i]} dari 16</td>
+                <td>
+                  <button className="more">
+                    <MoreHorizontal />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function Grading({ notify }: { notify: (text: string) => void }) {
+  const [selected, setSelected] = useState(0);
+  const [scores, setScores] = useState<Record<number, string>>({});
+  const names = [
+    "Alya Putri",
+    "Bima Saputra",
+    "Citra Lestari",
+    "Dian Pratama",
+    "Eka Lestari",
+  ];
+  return (
+    <div className="portal-page">
+      <PageTitle
+        eyebrow="PENILAIAN"
+        title="Koreksi Essay"
+        description="Penilaian per soal membantu menjaga konsistensi skor."
+      />
+      <div className="grading-shell">
+        <aside>
+          <div className="grading-progress">
+            <p>
+              <b>Soal 3 dari 5</b>
+              <span>24 / 32 dinilai</span>
+            </p>
+            <i>
+              <span style={{ width: "75%" }} />
+            </i>
+          </div>
+          <div className="student-answer-list">
+            {names.map((n, i) => (
+              <button
+                onClick={() => setSelected(i)}
+                className={selected === i ? "active" : ""}
+                key={n}
+              >
+                <span>
+                  {n
+                    .split(" ")
+                    .map((x) => x[0])
+                    .join("")}
+                </span>
+                <p>
+                  <b>{n}</b>
+                  <small>
+                    {scores[i] ? `Skor ${scores[i]}/10` : "Belum dinilai"}
+                  </small>
+                </p>
+                {scores[i] ? <CheckCircle2 /> : <ChevronRight />}
+              </button>
+            ))}
+          </div>
+        </aside>
+        <main className="grading-main">
+          <div className="question-reference">
+            <small>SOAL ESSAY · BOBOT 10 POIN</small>
+            <h3>
+              Jelaskan dengan bahasamu sendiri bagaimana proses fotosintesis
+              terjadi dan faktor apa saja yang memengaruhinya.
+            </h3>
+            <button>
+              <BookOpen />
+              Lihat rubrik & kunci jawaban
+            </button>
+          </div>
+          <div className="answer-paper">
+            <div>
+              <span className="avatar sm">
+                {names[selected]
+                  .split(" ")
+                  .map((x) => x[0])
+                  .join("")}
+              </span>
+              <p>
+                <b>{names[selected]}</b>
+                <small>Kelas IX A · Tersimpan 09.42</small>
+              </p>
+            </div>
+            <p>
+              Fotosintesis adalah proses tumbuhan membuat makanan dengan bantuan
+              cahaya matahari. Proses ini terjadi di daun pada bagian klorofil.
+              Tumbuhan menggunakan air dari akar dan karbon dioksida dari udara,
+              lalu menghasilkan glukosa dan oksigen.
+            </p>
+            <p>
+              Faktor yang memengaruhi yaitu intensitas cahaya, jumlah air, kadar
+              karbon dioksida, suhu, dan banyaknya klorofil.
+            </p>
+          </div>
+          <div className="score-panel">
+            <FormField label="Skor (maks. 10)">
+              <input
+                type="number"
+                min="0"
+                max="10"
+                value={scores[selected] ?? ""}
+                onChange={(e) =>
+                  setScores({ ...scores, [selected]: e.target.value })
+                }
+                placeholder="0"
+              />
+            </FormField>
+            <FormField label="Komentar untuk siswa (opsional)">
+              <input placeholder="Berikan umpan balik singkat…" />
+            </FormField>
+            <button
+              className="primary"
+              onClick={() => {
+                notify("Nilai berhasil disimpan");
+                if (selected < names.length - 1) setSelected(selected + 1);
+              }}
+            >
+              Simpan & lanjut
+              <ArrowRight />
+            </button>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function Reports() {
+  const grades = [72, 76, 78, 82, 84, 76, 88, 92, 80, 86, 74, 90];
+  return (
+    <div className="portal-page">
+      <PageTitle
+        eyebrow="LAPORAN & ANALITIK"
+        title="Hasil Ujian"
+        description="Analisis capaian kelas dan kualitas soal."
+        action={
+          <button className="outline">
+            <Download />
+            Ekspor laporan
+          </button>
+        }
+      />
+      <div className="report-filter">
+        <select>
+          <option>Penilaian Akhir Semester</option>
+        </select>
+        <select>
+          <option>Kelas IX A</option>
+        </select>
+        <button>Terapkan</button>
+      </div>
+      <div className="report-stats">
+        <div>
+          <small>RATA-RATA</small>
+          <b>82,4</b>
+          <span className="up">↑ 3,2</span>
+        </div>
+        <div>
+          <small>NILAI TERTINGGI</small>
+          <b>96</b>
+          <span>Alya Putri</span>
+        </div>
+        <div>
+          <small>NILAI TERENDAH</small>
+          <b>62</b>
+          <span>Perlu pendampingan</span>
+        </div>
+        <div>
+          <small>KETUNTASAN</small>
+          <b>87,5%</b>
+          <span>28 dari 32 siswa</span>
+        </div>
+      </div>
+      <div className="report-grid">
+        <section className="card chart-card">
+          <CardHead title="Distribusi nilai" />
+          <div className="grade-chart">
+            {grades.map((v, i) => (
+              <div key={i}>
+                <i style={{ height: `${v - 40}%` }} />
+                <span>{60 + i * 3}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="card">
+          <CardHead title="Ringkasan pengerjaan" />
+          <div className="donut-wrap">
+            <div className="donut">
+              <strong>32</strong>
+              <span>peserta</span>
+            </div>
+            <ul>
+              <li>
+                <i className="green" />
+                Lulus KKM <b>28</b>
+              </li>
+              <li>
+                <i className="amber" />
+                Di bawah KKM <b>4</b>
+              </li>
+              <li>
+                <i className="gray" />
+                Tidak hadir <b>0</b>
+              </li>
+            </ul>
+          </div>
+        </section>
+      </div>
+      <section className="card item-analysis">
+        <CardHead title="Analisis butir soal" link="Lihat seluruh soal" />
+        <div className="analysis-row">
+          <span>01</span>
+          <p>
+            <b>Persamaan linear satu variabel</b>
+            <small>Q-1042 · Pilihan Ganda</small>
+          </p>
+          <div>
+            <small>DIJAWAB BENAR</small>
+            <b>91%</b>
+          </div>
+          <span className="difficulty mudah">Mudah</span>
+        </div>
+        <div className="analysis-row">
+          <span>12</span>
+          <p>
+            <b>Sistem persamaan linear dua variabel</b>
+            <small>Q-1041 · Essay</small>
+          </p>
+          <div>
+            <small>RATA-RATA SKOR</small>
+            <b>68%</b>
+          </div>
+          <span className="difficulty sedang">Sedang</span>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function SettingsPage({ role }: { role: Role }) {
+  return (
+    <div className="portal-page">
+      <PageTitle
+        eyebrow="KONFIGURASI"
+        title="Pengaturan"
+        description="Kelola profil dan preferensi aplikasi."
+      />
+      <div className="settings-grid">
+        <aside>
+          <button className="active">Profil sekolah</button>
+          <button>Keamanan</button>
+          <button>Tahun ajaran</button>
+          <button>Notifikasi</button>
+        </aside>
+        <div className="card settings-form">
+          <h2>Profil sekolah</h2>
+          <p>Informasi ini digunakan pada laporan dan halaman siswa.</p>
+          <div className="school-logo">
+            <span>
+              <GraduationCap />
+            </span>
+            <button>Ganti logo</button>
+          </div>
+          <div className="form-grid">
+            <FormField label="Nama sekolah">
+              <input defaultValue="SMP Negeri Harapan Bangsa" />
+            </FormField>
+            <FormField label="NPSN">
+              <input defaultValue="20123456" />
+            </FormField>
+          </div>
+          <FormField label="Alamat">
+            <textarea rows={3} defaultValue="Jl. Pendidikan No. 17, Jakarta" />
+          </FormField>
+          <div className="settings-save">
+            <button className="primary">Simpan perubahan</button>
+            <span>Anda masuk sebagai {role}.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StudentHome({ logout }: { logout: () => void }) {
+  return (
+    <div className="student-app">
+      <header className="student-header">
+        <Link to="/siswa" className="student-logo">
+          <GraduationCap />
+          <b>Ruang Ujian</b>
+        </Link>
+        <div>
+          <span>
+            <Wifi />
+            Online
+          </span>
+          <button>
+            <Bell />
+          </button>
+          <button className="student-profile">
+            <span>AP</span>
+            <b>
+              Alya Putri<small>IX A · 24001</small>
+            </b>
+            <ChevronDown />
+          </button>
+          <button className="logout-icon" onClick={logout}>
+            <LogOut />
+          </button>
+        </div>
+      </header>
+      <main className="student-home">
+        <div className="student-greeting">
+          <p>JUMAT, 10 JULI 2026</p>
+          <h1>Selamat pagi, Alya 👋</h1>
+          <span>Siapkan dirimu dan kerjakan ujian dengan jujur.</span>
+        </div>
+        <section className="available-exam">
+          <div className="live-label">
+            <i />
+            TERSEDIA SEKARANG
+          </div>
+          <div className="exam-feature">
+            <div className="feature-icon">
+              <BookOpen />
+            </div>
+            <div className="feature-copy">
+              <span>MATEMATIKA · KELAS IX</span>
+              <h2>Penilaian Akhir Semester</h2>
+              <p>
+                <Clock3 />
+                90 menit <i /> <FileQuestion />
+                40 soal <i /> Berakhir pukul 10.30
+              </p>
+            </div>
+            <Link to="/siswa/ujian/1" className="start-button">
+              Mulai ujian
+              <ArrowRight />
+            </Link>
+          </div>
+          <div className="exam-note">
+            <ShieldCheck />
+            <p>
+              <b>Mode ujian aman aktif</b>
+              <span>
+                Keluar dari layar ujian akan tercatat sebagai insiden.
+              </span>
+            </p>
+          </div>
+        </section>
+        <div className="student-columns">
+          <section>
+            <h3>AKAN DATANG</h3>
+            <div className="upcoming-card">
+              <span className="subject-box blue">IP</span>
+              <p>
+                <b>Ulangan Bab Ekosistem</b>
+                <small>IPA · 25 soal · 60 menit</small>
+              </p>
+              <div>
+                <b>Hari ini</b>
+                <span>11.00</span>
+              </div>
+            </div>
+            <div className="upcoming-card">
+              <span className="subject-box orange">BI</span>
+              <p>
+                <b>Asesmen Teks Eksplanasi</b>
+                <small>Bahasa Indonesia · 30 soal</small>
+              </p>
+              <div>
+                <b>Besok</b>
+                <span>08.00</span>
+              </div>
+            </div>
+          </section>
+          <section>
+            <h3>HASIL TERBARU</h3>
+            <div className="result-card">
+              <div>
+                <span className="subject-box purple">IP</span>
+                <p>
+                  <b>Kuis Sejarah Indonesia</b>
+                  <small>8 Juli 2026</small>
+                </p>
+              </div>
+              <strong>
+                88<small>/100</small>
+              </strong>
+              <span className="passed">Tuntas</span>
+            </div>
+            <div className="result-card">
+              <div>
+                <span className="subject-box green">EN</span>
+                <p>
+                  <b>English Daily Test</b>
+                  <small>5 Juli 2026</small>
+                </p>
+              </div>
+              <strong>
+                82<small>/100</small>
+              </strong>
+              <span className="passed">Tuntas</span>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function ExamRunner({
+  notify,
+}: {
+  notify: (text: string, error?: boolean) => void;
+}) {
+  const { examId = "1" } = useParams();
+  const navigate = useNavigate();
+  const [current, setCurrent] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, number>>(() =>
+    loadLocal(`answers:${examId}`, {}),
+  );
+  const [marked, setMarked] = useState<string[]>([]);
+  const [remaining, setRemaining] = useState(89 * 60 + 42);
+  const [submit, setSubmit] = useState(false);
+  const [attemptId, setAttemptId] = useState<string | null>(null);
+  const question = examQuestions[current];
+  useEffect(() => {
+    const client = supabase;
+    if (!client) return;
+    client.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return;
+      const existing = await client
+        .from("attempts")
+        .select("id")
+        .eq("exam_id", examId)
+        .eq("student_id", data.user.id)
+        .maybeSingle();
+      if (existing.data) {
+        setAttemptId(existing.data.id);
+      } else {
+        const created = await client
+          .from("attempts")
+          .insert({
+            exam_id: examId,
+            student_id: data.user.id,
+            status: "in_progress",
+            started_at: new Date().toISOString(),
+          })
+          .select("id")
+          .single();
+        if (created.data) setAttemptId(created.data.id);
+      }
+    });
+  }, [examId]);
+  useEffect(() => {
+    const id = window.setInterval(
+      () => setRemaining((v) => Math.max(0, v - 1)),
+      1000,
+    );
+    return () => clearInterval(id);
+  }, []);
+  useEffect(() => {
+    if (remaining === 0) setSubmit(true);
+  }, [remaining]);
+  useEffect(() => {
+    const handler = async () => {
+      if (document.hidden && supabase && attemptId) {
+        await supabase
+          .from("integrity_events")
+          .insert({
+            attempt_id: attemptId,
+            event_type: "tab_hidden",
+            metadata: { exam_id: examId },
+          });
+      }
+    };
+    document.addEventListener("visibilitychange", handler);
+    return () => document.removeEventListener("visibilitychange", handler);
+  }, [examId, attemptId]);
+  const time = useMemo(
+    () =>
+      `${String(Math.floor(remaining / 3600)).padStart(2, "0")}:${String(Math.floor((remaining % 3600) / 60)).padStart(2, "0")}:${String(remaining % 60).padStart(2, "0")}`,
+    [remaining],
+  );
+  const answer = async (option: number) => {
+    const next = { ...answers, [question.id]: option };
+    setAnswers(next);
+    saveLocal(`answers:${examId}`, next);
+    if (supabase && attemptId) {
+      await supabase
+        .from("answers")
+        .upsert(
+          {
+            attempt_id: attemptId,
+            question_id: question.id,
+            selected_option: option,
+            answered_at: new Date().toISOString(),
+          },
+          { onConflict: "attempt_id,question_id" },
+        );
+    }
+  };
+  const finish = async () => {
+    try {
+      if (supabase && attemptId) {
+        const { error } = await supabase
+          .from("attempts")
+          .update({
+            status: "submitted",
+            submitted_at: new Date().toISOString(),
+          })
+          .eq("id", attemptId);
+        if (error) throw error;
+      }
+      localStorage.removeItem(`ruang-ujian:answers:${examId}`);
+      notify("Jawaban berhasil dikumpulkan");
+      navigate("/siswa");
+    } catch {
+      notify("Jawaban tersimpan lokal dan akan dikirim saat online");
+    }
+  };
+  return (
+    <div className="runner">
+      <header>
+        <div className="runner-brand">
+          <GraduationCap />
+          <span>
+            <small>MATEMATIKA · KELAS IX</small>
+            <b>Penilaian Akhir Semester</b>
+          </span>
+        </div>
+        <div className="runner-stats">
+          <span>
+            <Wifi />
+            Tersimpan
+          </span>
+          <p>
+            <small>SISA WAKTU</small>
+            <b>
+              <Clock3 />
+              {time}
+            </b>
+          </p>
+          <button onClick={() => setSubmit(true)}>Kumpulkan</button>
+        </div>
+      </header>
+      <main>
+        <aside className="question-nav">
+          <div>
+            <p>
+              <b>Daftar Soal</b>
+              <span>
+                {Object.keys(answers).length}/{examQuestions.length} terjawab
+              </span>
+            </p>
+            <i>
+              <span
+                style={{
+                  width: `${(Object.keys(answers).length / examQuestions.length) * 100}%`,
+                }}
+              />
+            </i>
+          </div>
+          <div className="number-grid">
+            {examQuestions.map((q, i) => (
+              <button
+                className={`${current === i ? "current" : ""} ${answers[q.id] !== undefined ? "answered" : ""} ${marked.includes(q.id) ? "marked" : ""}`}
+                onClick={() => setCurrent(i)}
+                key={q.id}
+              >
+                {i + 1}
+                {marked.includes(q.id) && <Star />}
+              </button>
+            ))}
+          </div>
+          <ul>
+            <li>
+              <i className="answered" />
+              Terjawab
+            </li>
+            <li>
+              <i className="current" />
+              Sedang dibuka
+            </li>
+            <li>
+              <i className="marked" />
+              Ditandai ragu
+            </li>
+          </ul>
+          <div className="secure-note">
+            <ShieldCheck />
+            <p>
+              <b>Ujian aman</b>
+              <span>Aktivitas keluar layar dicatat.</span>
+            </p>
+          </div>
+        </aside>
+        <section className="question-area">
+          <div className="question-top">
+            <span>
+              SOAL {current + 1} DARI {examQuestions.length}
+            </span>
+            <button
+              className={marked.includes(question.id) ? "marked" : ""}
+              onClick={() =>
+                setMarked((m) =>
+                  m.includes(question.id)
+                    ? m.filter((x) => x !== question.id)
+                    : [...m, question.id],
+                )
+              }
+            >
+              <Star />
+              Tandai ragu
+            </button>
+          </div>
+          <article>
+            <h1>{question.text}</h1>
+            <p>Pilih satu jawaban yang paling tepat.</p>
+            <div className="answer-options">
+              {question.options.map((option, i) => (
+                <button
+                  onClick={() => answer(i)}
+                  className={answers[question.id] === i ? "selected" : ""}
+                  key={option}
+                >
+                  <span>{String.fromCharCode(65 + i)}</span>
+                  <b>{option}</b>
+                  {answers[question.id] === i && <Check />}
+                </button>
+              ))}
+            </div>
+          </article>
+          <footer>
+            <button
+              disabled={current === 0}
+              onClick={() => setCurrent(current - 1)}
+            >
+              <ArrowLeft />
+              Sebelumnya
+            </button>
+            <span>Jawaban tersimpan otomatis</span>
+            {current < examQuestions.length - 1 ? (
+              <button className="next" onClick={() => setCurrent(current + 1)}>
+                Selanjutnya
+                <ArrowRight />
+              </button>
+            ) : (
+              <button className="next" onClick={() => setSubmit(true)}>
+                Tinjau & kumpulkan
+                <Check />
+              </button>
+            )}
+          </footer>
+        </section>
+      </main>
+      {submit && (
+        <Modal close={() => setSubmit(false)}>
+          <div className="submit-modal">
+            <span>
+              <ClipboardCheck />
+            </span>
+            <h2>Kumpulkan jawaban?</h2>
+            <p>
+              Pastikan semua jawaban sudah diperiksa. Jawaban tidak dapat diubah
+              setelah dikumpulkan.
+            </p>
+            <div>
+              <span>
+                <b>{Object.keys(answers).length}</b>Terjawab
+              </span>
+              <span className="empty">
+                <b>{examQuestions.length - Object.keys(answers).length}</b>Belum
+                dijawab
+              </span>
+              <span className="marked">
+                <b>{marked.length}</b>Ditandai
+              </span>
+            </div>
+            <footer>
+              <button onClick={() => setSubmit(false)}>Periksa lagi</button>
+              <button className="primary" onClick={finish}>
+                Ya, kumpulkan
+              </button>
+            </footer>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+export default App;

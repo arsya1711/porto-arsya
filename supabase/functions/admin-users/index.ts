@@ -6,7 +6,7 @@ const corsHeaders = {
 }
 
 type RequestBody = {
-  action: 'create' | 'set_active' | 'reset_password'
+  action: 'create' | 'update' | 'delete' | 'set_active' | 'reset_password'
   user_id?: string
   full_name?: string
   email?: string
@@ -56,6 +56,31 @@ Deno.serve(async (request) => {
     }
 
     if (!body.user_id) return json({ error: 'ID pengguna wajib diisi.' }, 400)
+    if (body.action === 'update') {
+      if (!body.full_name?.trim() || !body.email?.trim() || !body.role) return json({ error: 'Data akun belum lengkap.' }, 400)
+      if (body.user_id === callerData.user.id && body.role !== 'admin') return json({ error: 'Admin tidak dapat menurunkan role akunnya sendiri.' }, 400)
+      const email = body.email.trim().toLowerCase()
+      const { error: authError } = await admin.auth.admin.updateUserById(body.user_id, {
+        email, user_metadata: { full_name: body.full_name.trim(), role: body.role },
+      })
+      if (authError) return json({ error: authError.message }, 400)
+      const { error } = await admin.from('profiles').update({
+        full_name: body.full_name.trim(), email, role: body.role,
+        student_number: body.role === 'siswa' ? body.student_number || null : null,
+      }).eq('id', body.user_id)
+      if (error) return json({ error: error.message }, 400)
+      await admin.from('audit_logs').insert({ actor_id: callerData.user.id, action: 'user.updated', entity_type: 'profile', entity_id: body.user_id, metadata: { role: body.role } })
+      return json({ updated: true })
+    }
+
+    if (body.action === 'delete') {
+      if (body.user_id === callerData.user.id) return json({ error: 'Admin tidak dapat menghapus akunnya sendiri.' }, 400)
+      const { error } = await admin.auth.admin.deleteUser(body.user_id)
+      if (error) return json({ error: `Akun tidak dapat dihapus: ${error.message}. Nonaktifkan akun bila masih memiliki data terkait.` }, 400)
+      await admin.from('audit_logs').insert({ actor_id: callerData.user.id, action: 'user.deleted', entity_type: 'profile', entity_id: body.user_id })
+      return json({ deleted: true })
+    }
+
     if (body.action === 'set_active') {
       if (body.user_id === callerData.user.id && body.active === false) return json({ error: 'Admin tidak dapat menonaktifkan akunnya sendiri.' }, 400)
       const active = Boolean(body.active)

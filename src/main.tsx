@@ -8,6 +8,7 @@ import './styles-extra.css'
 import './styles-runner.css'
 import './styles-auth.css'
 import './styles-auth-recovery.css'
+import './styles-users-crud.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
