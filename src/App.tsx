@@ -59,7 +59,6 @@ import {
   examQuestions,
   exams as seedExams,
   questions as seedQuestions,
-  students,
   type Exam,
   type Question,
   type Role,
@@ -519,8 +518,10 @@ function Portal({
     ["/app/koreksi", <ClipboardCheck />, "Koreksi"],
     ["/app/laporan", <BarChart3 />, "Laporan"],
   ];
-  if (role === "admin")
-    nav.splice(4, 0, ["/app/pengguna", <UserPlus />, "Pengguna"]);
+  if (role === "admin") {
+    nav.splice(4, 0, ["/app/guru", <UserRound />, "Guru"]);
+    nav.splice(5, 0, ["/app/admin", <ShieldCheck />, "Admin"]);
+  }
   const initials = getInitials(profile.full_name);
   return (
     <div className="portal-shell">
@@ -595,12 +596,45 @@ function Portal({
               />
             }
           />
-          <Route path="kelas" element={<Classes />} />
           <Route
-            path="pengguna"
+            path="kelas"
+            element={
+              <UserManagement
+                notify={notify}
+                roleFilter="siswa"
+                title="Kelas & Siswa"
+                description="Kelola akun siswa dan data peserta didik."
+                canManage={role === "admin"}
+              />
+            }
+          />
+          <Route
+            path="guru"
             element={
               role === "admin" ? (
-                <UserManagement notify={notify} />
+                <UserManagement
+                  notify={notify}
+                  roleFilter="guru"
+                  title="Guru"
+                  description="Kelola akun dan akses tenaga pengajar."
+                  canManage
+                />
+              ) : (
+                <Navigate to="/app" />
+              )
+            }
+          />
+          <Route
+            path="admin"
+            element={
+              role === "admin" ? (
+                <UserManagement
+                  notify={notify}
+                  roleFilter="admin"
+                  title="Administrator"
+                  description="Kelola akun dengan akses administrasi penuh."
+                  canManage
+                />
               ) : (
                 <Navigate to="/app" />
               )
@@ -1508,29 +1542,60 @@ function Modal({
   );
 }
 
-type ManagedUser = Profile & { created_at: string };
+type ManagedUser = Profile & {
+  created_at: string;
+  class_id: string | null;
+  class_name: string | null;
+};
+type ClassOption = { id: string; name: string };
 
 function UserManagement({
   notify,
+  roleFilter,
+  title,
+  description,
+  canManage,
 }: {
   notify: (text: string, error?: boolean) => void;
+  roleFilter: Role;
+  title: string;
+  description: string;
+  canManage: boolean;
 }) {
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [create, setCreate] = useState(false);
   const [editing, setEditing] = useState<ManagedUser | null>(null);
   const [query, setQuery] = useState("");
+  const [classes, setClasses] = useState<ClassOption[]>([]);
+  const [classFilter, setClassFilter] = useState("");
   const loadUsers = useCallback(async () => {
     if (!supabase) return;
     setLoading(true);
-    const { data, error } = await supabase
+    const profileQuery = supabase
       .from("profiles")
-      .select("id,full_name,email,role,student_number,active,created_at")
+      .select("id,full_name,email,role,student_number,active,created_at,class_students(class_id,classes(name))")
+      .eq("role", roleFilter)
       .order("created_at", { ascending: false });
-    if (error) notify(error.message, true);
-    else setUsers((data ?? []) as ManagedUser[]);
+    const classQuery = roleFilter === "siswa"
+      ? supabase.from("classes").select("id,name").order("name")
+      : Promise.resolve({ data: [] as ClassOption[], error: null });
+    const [profileResult, classResult] = await Promise.all([profileQuery, classQuery]);
+    if (profileResult.error) notify(profileResult.error.message, true);
+    else {
+      const normalized = (profileResult.data ?? []).map((row) => {
+        const membership = Array.isArray(row.class_students) ? row.class_students[0] : undefined;
+        const relatedClass = membership?.classes as unknown;
+        const resolvedClassName = relationName(relatedClass);
+        const className = resolvedClassName === "—" ? null : resolvedClassName;
+        return { ...row, class_id: membership?.class_id ?? null, class_name: className ?? null } as ManagedUser;
+      });
+      setUsers(normalized);
+    }
+    if (classResult.error) notify(classResult.error.message, true);
+    else setClasses((classResult.data ?? []) as ClassOption[]);
     setLoading(false);
-  }, [notify]);
+  }, [notify, roleFilter]);
   useEffect(() => {
     loadUsers();
   }, [loadUsers]);
@@ -1549,12 +1614,15 @@ function UserManagement({
     password: string;
     role: Role;
     student_number: string;
+    class_id: string;
   }) => {
     try {
       await invoke({
         action: "create",
         ...form,
+        role: roleFilter,
         student_number: form.student_number || null,
+        class_id: form.class_id || null,
       });
       setCreate(false);
       notify("Akun pengguna berhasil dibuat.");
@@ -1607,6 +1675,7 @@ function UserManagement({
     email: string;
     role: Role;
     student_number: string;
+    class_id: string;
   }) => {
     try {
       await invoke({
@@ -1614,8 +1683,9 @@ function UserManagement({
         user_id: form.id,
         full_name: form.full_name,
         email: form.email,
-        role: form.role,
+        role: roleFilter,
         student_number: form.student_number || null,
+        class_id: form.class_id || null,
       });
       setEditing(null);
       notify("Data pengguna berhasil diperbarui.");
@@ -1645,25 +1715,72 @@ function UserManagement({
       );
     }
   };
+  const createClass = async () => {
+    if (!supabase) return;
+    const name = window.prompt("Nama kelas baru (contoh: IX A):")?.trim();
+    if (!name) return;
+    const { error } = await supabase.from("classes").insert({ name });
+    if (error) notify(error.message, true);
+    else {
+      notify("Kelas berhasil ditambahkan.");
+      await loadUsers();
+    }
+  };
   const normalizedQuery = query.trim().toLowerCase();
-  const filteredUsers = users.filter((user) =>
-    [user.full_name, user.email, user.student_number ?? "", user.role].some(
-      (value) => value.toLowerCase().includes(normalizedQuery),
-    ),
+  const filteredUsers = users.filter(
+    (user) =>
+      (!classFilter || user.class_id === classFilter) &&
+      [
+        user.full_name,
+        user.email,
+        user.student_number ?? "",
+        user.class_name ?? "",
+        user.role,
+      ].some((value) => value.toLowerCase().includes(normalizedQuery)),
   );
   return (
     <div className="portal-page">
       <PageTitle
         eyebrow="ADMINISTRASI AKUN"
-        title="Pengguna"
-        description="Kelola akun dan hak akses admin, guru, serta siswa."
+        title={title}
+        description={description}
         action={
-          <button className="primary" onClick={() => setCreate(true)}>
-            <UserPlus />
-            Tambah pengguna
-          </button>
+          canManage ? (
+            <div className="title-actions">
+              {roleFilter === "siswa" && (
+                <button onClick={createClass}>
+                  <Plus />
+                  Tambah kelas
+                </button>
+              )}
+              <button className="primary" onClick={() => setCreate(true)}>
+                <UserPlus />
+                Tambah {roleFilter}
+              </button>
+            </div>
+          ) : undefined
         }
       />
+      {roleFilter === "siswa" && (
+        <div className="class-tabs">
+          <button
+            className={classFilter === "" ? "active" : ""}
+            onClick={() => setClassFilter("")}
+          >
+            Semua siswa <span>{users.length}</span>
+          </button>
+          {classes.map((item) => (
+            <button
+              className={classFilter === item.id ? "active" : ""}
+              onClick={() => setClassFilter(item.id)}
+              key={item.id}
+            >
+              {item.name}{" "}
+              <span>{users.filter((user) => user.class_id === item.id).length}</span>
+            </button>
+          ))}
+        </div>
+      )}
       <Toolbar
         placeholder="Cari nama, email, atau NIS…"
         value={query}
@@ -1674,7 +1791,7 @@ function UserManagement({
           <thead>
             <tr>
               <th>PENGGUNA</th>
-              <th>PERAN</th>
+              <th>{roleFilter === "siswa" ? "KELAS" : "PERAN"}</th>
               <th>NIS</th>
               <th>STATUS</th>
               <th>DIBUAT</th>
@@ -1703,9 +1820,13 @@ function UserManagement({
                     </div>
                   </td>
                   <td>
-                    <span className={`role-badge ${user.role}`}>
-                      {capitalize(user.role)}
-                    </span>
+                    {roleFilter === "siswa" ? (
+                      user.class_name || "Belum ditempatkan"
+                    ) : (
+                      <span className={`role-badge ${user.role}`}>
+                        {capitalize(user.role)}
+                      </span>
+                    )}
                   </td>
                   <td>{user.student_number || "—"}</td>
                   <td>
@@ -1720,7 +1841,7 @@ function UserManagement({
                     {new Date(user.created_at).toLocaleDateString("id-ID")}
                   </td>
                   <td>
-                    <div className="user-actions">
+                    {canManage && <div className="user-actions">
                       <button
                         onClick={() => setEditing(user)}
                         title="Edit pengguna"
@@ -1743,7 +1864,7 @@ function UserManagement({
                       >
                         <Trash2 />
                       </button>
-                    </div>
+                    </div>}
                   </td>
                 </tr>
               ))
@@ -1752,13 +1873,20 @@ function UserManagement({
         </table>
       </div>
       {create && (
-        <CreateUserModal close={() => setCreate(false)} save={createUser} />
+        <CreateUserModal
+          close={() => setCreate(false)}
+          save={createUser}
+          lockedRole={roleFilter}
+          classes={classes}
+        />
       )}
       {editing && (
         <EditUserModal
           user={editing}
           close={() => setEditing(null)}
           save={updateUser}
+          lockedRole={roleFilter}
+          classes={classes}
         />
       )}
     </div>
@@ -1767,6 +1895,8 @@ function UserManagement({
 function CreateUserModal({
   close,
   save,
+  lockedRole,
+  classes,
 }: {
   close: () => void;
   save: (form: {
@@ -1775,14 +1905,18 @@ function CreateUserModal({
     password: string;
     role: Role;
     student_number: string;
+    class_id: string;
   }) => void;
+  lockedRole: Role;
+  classes: ClassOption[];
 }) {
   const [form, setForm] = useState({
     full_name: "",
     email: "",
     password: "",
-    role: "siswa" as Role,
+    role: lockedRole,
     student_number: "",
+    class_id: "",
   });
   return (
     <Modal close={close}>
@@ -1822,6 +1956,7 @@ function CreateUserModal({
             <FormField label="Peran">
               <select
                 value={form.role}
+                disabled
                 onChange={(e) =>
                   setForm({ ...form, role: e.target.value as Role })
                 }
@@ -1841,6 +1976,23 @@ function CreateUserModal({
               />
             </FormField>
           </div>
+          {lockedRole === "siswa" && (
+            <FormField label="Kelas">
+              <select
+                value={form.class_id}
+                onChange={(event) =>
+                  setForm({ ...form, class_id: event.target.value })
+                }
+              >
+                <option value="">Belum ditempatkan</option>
+                {classes.map((item) => (
+                  <option value={item.id} key={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+          )}
           <FormField label="Kata sandi sementara">
             <input
               type="password"
@@ -1870,6 +2022,8 @@ function EditUserModal({
   user,
   close,
   save,
+  lockedRole,
+  classes,
 }: {
   user: ManagedUser;
   close: () => void;
@@ -1879,14 +2033,18 @@ function EditUserModal({
     email: string;
     role: Role;
     student_number: string;
+    class_id: string;
   }) => void;
+  lockedRole: Role;
+  classes: ClassOption[];
 }) {
   const [form, setForm] = useState({
     id: user.id,
     full_name: user.full_name,
     email: user.email,
-    role: user.role,
+    role: lockedRole,
     student_number: user.student_number ?? "",
+    class_id: user.class_id ?? "",
   });
   return (
     <Modal close={close}>
@@ -1930,6 +2088,7 @@ function EditUserModal({
             <FormField label="Peran">
               <select
                 value={form.role}
+                disabled
                 onChange={(event) =>
                   setForm({ ...form, role: event.target.value as Role })
                 }
@@ -1949,6 +2108,23 @@ function EditUserModal({
               />
             </FormField>
           </div>
+          {lockedRole === "siswa" && (
+            <FormField label="Kelas">
+              <select
+                value={form.class_id}
+                onChange={(event) =>
+                  setForm({ ...form, class_id: event.target.value })
+                }
+              >
+                <option value="">Belum ditempatkan</option>
+                {classes.map((item) => (
+                  <option value={item.id} key={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+          )}
           <p className="form-hint">
             Perubahan role langsung memengaruhi halaman dan data yang dapat
             diakses pengguna.
@@ -1962,94 +2138,6 @@ function EditUserModal({
         </footer>
       </form>
     </Modal>
-  );
-}
-
-function Classes() {
-  return (
-    <div className="portal-page">
-      <PageTitle
-        eyebrow="AKADEMIK"
-        title="Kelas & Siswa"
-        description="Tahun ajaran 2026/2027 · 18 kelas aktif."
-        action={
-          <button className="primary">
-            <Plus />
-            Tambah siswa
-          </button>
-        }
-      />
-      <div className="class-tabs">
-        <button className="active">
-          IX A <span>32</span>
-        </button>
-        <button>
-          IX B <span>31</span>
-        </button>
-        <button>
-          VIII A <span>30</span>
-        </button>
-        <button>
-          VIII B <span>30</span>
-        </button>
-        <button>Semua kelas</button>
-      </div>
-      <Toolbar placeholder="Cari nama atau NIS siswa…" />
-      <div className="table-card">
-        <table>
-          <thead>
-            <tr>
-              <th>
-                <input type="checkbox" />
-              </th>
-              <th>NIS</th>
-              <th>NAMA SISWA</th>
-              <th>KELAS</th>
-              <th>STATUS</th>
-              <th>UJIAN SELESAI</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {students.map((s, i) => (
-              <tr key={s[0]}>
-                <td>
-                  <input type="checkbox" />
-                </td>
-                <td>{s[0]}</td>
-                <td>
-                  <div className="student-cell">
-                    <span>
-                      {s[1]
-                        .split(" ")
-                        .map((x) => x[0])
-                        .slice(0, 2)
-                        .join("")}
-                    </span>
-                    <b>{s[1]}</b>
-                  </div>
-                </td>
-                <td>{s[2]}</td>
-                <td>
-                  <span
-                    className={`user-status ${s[3] === "Aktif" ? "active" : ""}`}
-                  >
-                    <i />
-                    {s[3]}
-                  </span>
-                </td>
-                <td>{[14, 13, 14, 12, 11, 9][i]} dari 16</td>
-                <td>
-                  <button className="more">
-                    <MoreHorizontal />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
   );
 }
 

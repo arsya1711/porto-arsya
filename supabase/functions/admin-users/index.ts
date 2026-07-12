@@ -13,6 +13,7 @@ type RequestBody = {
   password?: string
   role?: 'admin' | 'guru' | 'siswa'
   student_number?: string | null
+  class_id?: string | null
   active?: boolean
 }
 
@@ -51,6 +52,10 @@ Deno.serve(async (request) => {
         student_number: body.role === 'siswa' ? body.student_number || null : null, active: true,
       }).eq('id', data.user.id)
       if (profileError) { await admin.auth.admin.deleteUser(data.user.id); return json({ error: profileError.message }, 400) }
+      if (body.role === 'siswa' && body.class_id) {
+        const { error: classError } = await admin.from('class_students').insert({ class_id: body.class_id, student_id: data.user.id })
+        if (classError) { await admin.auth.admin.deleteUser(data.user.id); return json({ error: classError.message }, 400) }
+      }
       await admin.from('audit_logs').insert({ actor_id: callerData.user.id, action: 'user.created', entity_type: 'profile', entity_id: data.user.id, metadata: { role: body.role } })
       return json({ user_id: data.user.id }, 201)
     }
@@ -69,6 +74,12 @@ Deno.serve(async (request) => {
         student_number: body.role === 'siswa' ? body.student_number || null : null,
       }).eq('id', body.user_id)
       if (error) return json({ error: error.message }, 400)
+      const { error: clearClassError } = await admin.from('class_students').delete().eq('student_id', body.user_id)
+      if (clearClassError) return json({ error: clearClassError.message }, 400)
+      if (body.role === 'siswa' && body.class_id) {
+        const { error: classError } = await admin.from('class_students').insert({ class_id: body.class_id, student_id: body.user_id })
+        if (classError) return json({ error: classError.message }, 400)
+      }
       await admin.from('audit_logs').insert({ actor_id: callerData.user.id, action: 'user.updated', entity_type: 'profile', entity_id: body.user_id, metadata: { role: body.role } })
       return json({ updated: true })
     }
