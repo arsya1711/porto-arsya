@@ -1,4 +1,5 @@
 import {
+  ComponentProps,
   FormEvent,
   ReactNode,
   useCallback,
@@ -31,6 +32,8 @@ import {
   ClipboardCheck,
   Clock3,
   Download,
+  Eye,
+  EyeOff,
   FileQuestion,
   Filter,
   GraduationCap,
@@ -283,8 +286,7 @@ function PasswordRecovery({
           ditebak.
         </p>
         <FormField label="Kata sandi baru">
-          <input
-            type="password"
+          <PasswordInput
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             minLength={8}
@@ -292,8 +294,7 @@ function PasswordRecovery({
           />
         </FormField>
         <FormField label="Konfirmasi kata sandi">
-          <input
-            type="password"
+          <PasswordInput
             value={confirmation}
             onChange={(e) => setConfirmation(e.target.value)}
             minLength={8}
@@ -440,8 +441,7 @@ function Login({
             <span>Kata sandi</span>
             <div className="input-box">
               <LockKeyhole />
-              <input
-                type="password"
+              <PasswordInput
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="current-password"
@@ -1521,6 +1521,24 @@ function FormField({
     </label>
   );
 }
+
+function PasswordInput(props: Omit<ComponentProps<"input">, "type">) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="password-control">
+      <input {...props} type={visible ? "text" : "password"} />
+      <button
+        type="button"
+        onClick={() => setVisible((current) => !current)}
+        aria-label={visible ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+        title={visible ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+      >
+        {visible ? <EyeOff /> : <Eye />}
+      </button>
+    </div>
+  );
+}
+
 function Modal({
   children,
   close,
@@ -1566,6 +1584,7 @@ function UserManagement({
   const [loading, setLoading] = useState(true);
   const [create, setCreate] = useState(false);
   const [editing, setEditing] = useState<ManagedUser | null>(null);
+  const [resetting, setResetting] = useState<ManagedUser | null>(null);
   const [query, setQuery] = useState("");
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [classFilter, setClassFilter] = useState("");
@@ -1650,17 +1669,10 @@ function UserManagement({
       );
     }
   };
-  const resetUser = async (user: ManagedUser) => {
-    const password = window.prompt(
-      `Masukkan kata sandi sementara baru untuk ${user.full_name} (minimal 8 karakter):`,
-    );
-    if (!password) return;
-    if (password.length < 8) {
-      notify("Kata sandi minimal 8 karakter.", true);
-      return;
-    }
+  const resetUser = async (user: ManagedUser, password: string) => {
     try {
       await invoke({ action: "reset_password", user_id: user.id, password });
+      setResetting(null);
       notify("Kata sandi sementara berhasil diperbarui.");
     } catch (error) {
       notify(
@@ -1849,7 +1861,7 @@ function UserManagement({
                         <Pencil />
                       </button>
                       <button
-                        onClick={() => resetUser(user)}
+                        onClick={() => setResetting(user)}
                         title="Reset kata sandi"
                       >
                         <LockKeyhole />
@@ -1887,6 +1899,13 @@ function UserManagement({
           save={updateUser}
           lockedRole={roleFilter}
           classes={classes}
+        />
+      )}
+      {resetting && (
+        <ResetUserPasswordModal
+          user={resetting}
+          close={() => setResetting(null)}
+          save={(password) => resetUser(resetting, password)}
         />
       )}
     </div>
@@ -1994,8 +2013,7 @@ function CreateUserModal({
             </FormField>
           )}
           <FormField label="Kata sandi sementara">
-            <input
-              type="password"
+            <PasswordInput
               minLength={8}
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
@@ -2135,6 +2153,78 @@ function EditUserModal({
             Batal
           </button>
           <button className="primary">Simpan Perubahan</button>
+        </footer>
+      </form>
+    </Modal>
+  );
+}
+
+function ResetUserPasswordModal({
+  user,
+  close,
+  save,
+}: {
+  user: ManagedUser;
+  close: () => void;
+  save: (password: string) => void;
+}) {
+  const [password, setPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (password.length < 8) return;
+    if (password !== confirmation) return;
+    save(password);
+  };
+  const mismatch = confirmation.length > 0 && password !== confirmation;
+  return (
+    <Modal close={close}>
+      <form className="simple-modal" onSubmit={submit}>
+        <header>
+          <div>
+            <p>KEAMANAN AKUN</p>
+            <h2>Reset kata sandi</h2>
+          </div>
+          <button type="button" onClick={close}>
+            <X />
+          </button>
+        </header>
+        <div className="modal-content">
+          <p className="auth-security-note">
+            Atur kata sandi sementara baru untuk <b>{user.full_name}</b>.
+          </p>
+          <FormField label="Kata sandi sementara">
+            <PasswordInput
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              minLength={8}
+              autoComplete="new-password"
+              required
+            />
+          </FormField>
+          <FormField label="Konfirmasi kata sandi">
+            <PasswordInput
+              value={confirmation}
+              onChange={(event) => setConfirmation(event.target.value)}
+              minLength={8}
+              autoComplete="new-password"
+              required
+            />
+          </FormField>
+          {mismatch && (
+            <p className="form-error">Konfirmasi kata sandi tidak sesuai.</p>
+          )}
+        </div>
+        <footer>
+          <button type="button" onClick={close}>
+            Batal
+          </button>
+          <button
+            className="primary"
+            disabled={password.length < 8 || mismatch}
+          >
+            Simpan Kata Sandi
+          </button>
         </footer>
       </form>
     </Modal>
