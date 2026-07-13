@@ -10,6 +10,7 @@ import './styles-auth.css'
 import './styles-auth-recovery.css'
 import './styles-users-crud.css'
 import './styles-password.css'
+import './styles-question-bank.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

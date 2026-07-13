@@ -48,7 +48,6 @@ import {
   Search,
   Settings,
   ShieldCheck,
-  Sparkles,
   Star,
   Trash2,
   Upload,
@@ -61,9 +60,7 @@ import {
 import {
   examQuestions,
   exams as seedExams,
-  questions as seedQuestions,
   type Exam,
-  type Question,
   type Role,
 } from "./mockData";
 import {
@@ -73,6 +70,7 @@ import {
   supabase,
 } from "./lib/supabase";
 import { AuthProvider, type Profile, useAuth } from "./auth/AuthContext";
+import { QuestionBank } from "./components/QuestionBank";
 
 type Toast = { text: string; error?: boolean } | null;
 
@@ -94,7 +92,6 @@ function Application() {
   } = useAuth();
   const [toast, setToast] = useState<Toast>(null);
   const [examList, setExamList] = useState<Exam[]>(seedExams);
-  const [questionList, setQuestionList] = useState<Question[]>(seedQuestions);
 
   useEffect(() => {
     if (!toast) return;
@@ -104,58 +101,37 @@ function Application() {
 
   useEffect(() => {
     if (!supabase || !profile) return;
-    Promise.all([
-      supabase
-        .from("exams")
-        .select(
-          "id,title,subjects(name),classes(name),starts_at,duration_minutes,status,exam_questions(count),exam_assignments(count)",
-        )
-        .order("starts_at"),
-      supabase
-        .from("questions")
-        .select(
-          "id,body,type,difficulty,usage_count,question_banks(name,subjects(name))",
-        )
-        .eq("archived", false)
-        .limit(50),
-    ]).then(([examResult, questionResult]) => {
-      if (!examResult.error && examResult.data?.length) {
-        setExamList(
-          examResult.data.map((row) => ({
-            id: row.id,
-            title: row.title,
-            subject: relationName(row.subjects),
-            className: relationName(row.classes),
-            date: new Date(row.starts_at).toLocaleDateString("id-ID", {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            }),
-            time: new Date(row.starts_at).toLocaleTimeString("id-ID", {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-            duration: row.duration_minutes,
-            questions: relationCount(row.exam_questions),
-            participants: relationCount(row.exam_assignments),
-            status: row.status,
-          })),
-        );
-      }
-      if (!questionResult.error && questionResult.data?.length) {
-        setQuestionList(
-          questionResult.data.map((row) => ({
-            id: row.id,
-            bank: relationName(row.question_banks),
-            subject: relationNestedName(row.question_banks),
-            type: row.type === "multiple_choice" ? "Pilihan Ganda" : "Essay",
-            text: row.body,
-            difficulty: capitalize(row.difficulty) as Question["difficulty"],
-            used: row.usage_count ?? 0,
-          })),
-        );
-      }
-    });
+    supabase
+      .from("exams")
+      .select(
+        "id,title,subjects(name),classes(name),starts_at,duration_minutes,status,exam_questions(count),exam_assignments(count)",
+      )
+      .order("starts_at")
+      .then((examResult) => {
+        if (!examResult.error && examResult.data?.length) {
+          setExamList(
+            examResult.data.map((row) => ({
+              id: row.id,
+              title: row.title,
+              subject: relationName(row.subjects),
+              className: relationName(row.classes),
+              date: new Date(row.starts_at).toLocaleDateString("id-ID", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              }),
+              time: new Date(row.starts_at).toLocaleTimeString("id-ID", {
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
+              duration: row.duration_minutes,
+              questions: relationCount(row.exam_questions),
+              participants: relationCount(row.exam_assignments),
+              status: row.status,
+            })),
+          );
+        }
+      });
   }, [profile]);
 
   const notify = useCallback(
@@ -197,8 +173,6 @@ function Application() {
                 logout={logout}
                 exams={examList}
                 setExams={setExamList}
-                questions={questionList}
-                setQuestions={setQuestionList}
                 notify={notify}
               />
             ) : (
@@ -314,12 +288,6 @@ function relationName(value: unknown): string {
   if (Array.isArray(value)) return String(value[0]?.name ?? "—");
   if (value && typeof value === "object" && "name" in value)
     return String(value.name);
-  return "—";
-}
-function relationNestedName(value: unknown): string {
-  const bank = Array.isArray(value) ? value[0] : value;
-  if (bank && typeof bank === "object" && "subjects" in bank)
-    return relationName(bank.subjects);
   return "—";
 }
 function relationCount(value: unknown): number {
@@ -496,16 +464,12 @@ function Portal({
   logout,
   exams,
   setExams,
-  questions,
-  setQuestions,
   notify,
 }: {
   profile: Profile;
   logout: () => void;
   exams: Exam[];
   setExams: (v: Exam[]) => void;
-  questions: Question[];
-  setQuestions: (v: Question[]) => void;
   notify: (text: string, error?: boolean) => void;
 }) {
   const location = useLocation();
@@ -586,16 +550,7 @@ function Portal({
               />
             }
           />
-          <Route
-            path="bank-soal"
-            element={
-              <QuestionBank
-                questions={questions}
-                setQuestions={setQuestions}
-                notify={notify}
-              />
-            }
-          />
+          <Route path="bank-soal" element={<QuestionBank notify={notify} />} />
           <Route
             path="kelas"
             element={
@@ -959,14 +914,12 @@ function ExamManagement({
   const addExam = async (exam: Exam) => {
     try {
       if (supabase) {
-        const { error } = await supabase
-          .from("exams")
-          .insert({
-            title: exam.title,
-            duration_minutes: exam.duration,
-            starts_at: new Date().toISOString(),
-            status: "draft",
-          });
+        const { error } = await supabase.from("exams").insert({
+          title: exam.title,
+          duration_minutes: exam.duration,
+          starts_at: new Date().toISOString(),
+          status: "draft",
+        });
         if (error) throw error;
       }
       setExams([exam, ...exams]);
@@ -1261,252 +1214,6 @@ function ExamModal({
   );
 }
 
-function QuestionBank({
-  questions,
-  setQuestions,
-  notify,
-}: {
-  questions: Question[];
-  setQuestions: (v: Question[]) => void;
-  notify: (text: string, error?: boolean) => void;
-}) {
-  const [create, setCreate] = useState(false);
-  const add = async (q: Question) => {
-    try {
-      if (supabase) {
-        const { error } = await supabase
-          .from("questions")
-          .insert({
-            body: q.text,
-            type: q.type === "Pilihan Ganda" ? "multiple_choice" : "essay",
-            difficulty: q.difficulty.toLowerCase(),
-            weight: 1,
-          });
-        if (error) throw error;
-      }
-      setQuestions([q, ...questions]);
-      setCreate(false);
-      notify("Soal berhasil ditambahkan");
-    } catch {
-      notify("Soal gagal disimpan", true);
-    }
-  };
-  return (
-    <div className="portal-page">
-      <PageTitle
-        eyebrow="KONTEN PEMBELAJARAN"
-        title="Bank Soal"
-        description={`${questions.length} soal aktif dari 8 mata pelajaran.`}
-        action={
-          <div className="title-actions">
-            <button>
-              <Upload />
-              Import soal
-            </button>
-            <button className="primary" onClick={() => setCreate(true)}>
-              <Plus />
-              Tambah soal
-            </button>
-          </div>
-        }
-      />
-      <div className="bank-summary">
-        <div>
-          <span>
-            <BookOpen />
-          </span>
-          <p>
-            <small>TOTAL BANK</small>
-            <b>24</b>
-          </p>
-        </div>
-        <div>
-          <span>
-            <FileQuestion />
-          </span>
-          <p>
-            <small>SOAL AKTIF</small>
-            <b>1.248</b>
-          </p>
-        </div>
-        <div>
-          <span>
-            <Sparkles />
-          </span>
-          <p>
-            <small>DITAMBAHKAN BULAN INI</small>
-            <b>86</b>
-          </p>
-        </div>
-      </div>
-      <Toolbar placeholder="Cari isi soal, bank, atau topik…" />
-      <div className="question-layout">
-        <aside className="bank-list">
-          <h3>
-            BANK SOAL{" "}
-            <button>
-              <Plus />
-            </button>
-          </h3>
-          {[
-            "Semua soal",
-            "Aljabar Kelas IX",
-            "Ekosistem",
-            "Teks Eksplanasi",
-            "Sejarah Kemerdekaan",
-          ].map((b, i) => (
-            <button className={i === 0 ? "active" : ""} key={b}>
-              <span>{i === 0 ? <FileQuestion /> : <BookOpen />}</span>
-              <p>
-                {b}
-                <small>{[1248, 120, 86, 64, 92][i]} soal</small>
-              </p>
-            </button>
-          ))}
-        </aside>
-        <div className="table-card">
-          <table>
-            <thead>
-              <tr>
-                <th>SOAL</th>
-                <th>TIPE</th>
-                <th>TINGKAT</th>
-                <th>DIPAKAI</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {questions.map((q) => (
-                <tr key={q.id}>
-                  <td>
-                    <div className="question-cell">
-                      <small>
-                        {q.id} · {q.subject}
-                      </small>
-                      <b>{q.text}</b>
-                    </div>
-                  </td>
-                  <td>
-                    <span className="type-badge">{q.type}</span>
-                  </td>
-                  <td>
-                    <span
-                      className={`difficulty ${q.difficulty.toLowerCase()}`}
-                    >
-                      {q.difficulty}
-                    </span>
-                  </td>
-                  <td>{q.used} ujian</td>
-                  <td>
-                    <button className="more">
-                      <MoreHorizontal />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      {create && <QuestionModal close={() => setCreate(false)} save={add} />}
-    </div>
-  );
-}
-
-function QuestionModal({
-  close,
-  save,
-}: {
-  close: () => void;
-  save: (q: Question) => void;
-}) {
-  const [type, setType] = useState<Question["type"]>("Pilihan Ganda");
-  const [text, setText] = useState("");
-  const [difficulty, setDifficulty] =
-    useState<Question["difficulty"]>("Sedang");
-  return (
-    <Modal close={close}>
-      <form
-        className="simple-modal"
-        onSubmit={(e) => {
-          e.preventDefault();
-          save({
-            id: `Q-${Date.now().toString().slice(-4)}`,
-            bank: "Aljabar Kelas IX",
-            subject: "Matematika",
-            type,
-            text,
-            difficulty,
-            used: 0,
-          });
-        }}
-      >
-        <header>
-          <div>
-            <p>BANK SOAL</p>
-            <h2>Tambah soal baru</h2>
-          </div>
-          <button type="button" onClick={close}>
-            <X />
-          </button>
-        </header>
-        <div className="modal-content">
-          <div className="form-grid">
-            <FormField label="Tipe soal">
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value as Question["type"])}
-              >
-                <option>Pilihan Ganda</option>
-                <option>Essay</option>
-              </select>
-            </FormField>
-            <FormField label="Tingkat kesulitan">
-              <select
-                value={difficulty}
-                onChange={(e) =>
-                  setDifficulty(e.target.value as Question["difficulty"])
-                }
-              >
-                <option>Mudah</option>
-                <option>Sedang</option>
-                <option>Sulit</option>
-              </select>
-            </FormField>
-          </div>
-          <FormField label="Pertanyaan">
-            <textarea
-              rows={4}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="Tulis pertanyaan di sini…"
-            />
-          </FormField>
-          {type === "Pilihan Ganda" && (
-            <div className="option-editor">
-              {["A", "B", "C", "D"].map((x, i) => (
-                <label key={x}>
-                  <input type="radio" name="correct" defaultChecked={i === 0} />
-                  <span>{x}</span>
-                  <input placeholder={`Pilihan ${x}`} />
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
-        <footer>
-          <button type="button" onClick={close}>
-            Batal
-          </button>
-          <button className="primary" disabled={!text.trim()}>
-            Simpan Soal
-          </button>
-        </footer>
-      </form>
-    </Modal>
-  );
-}
-
 function FormField({
   label,
   children,
@@ -1593,21 +1300,33 @@ function UserManagement({
     setLoading(true);
     const profileQuery = supabase
       .from("profiles")
-      .select("id,full_name,email,role,student_number,active,created_at,class_students(class_id,classes(name))")
+      .select(
+        "id,full_name,email,role,student_number,active,created_at,class_students(class_id,classes(name))",
+      )
       .eq("role", roleFilter)
       .order("created_at", { ascending: false });
-    const classQuery = roleFilter === "siswa"
-      ? supabase.from("classes").select("id,name").order("name")
-      : Promise.resolve({ data: [] as ClassOption[], error: null });
-    const [profileResult, classResult] = await Promise.all([profileQuery, classQuery]);
+    const classQuery =
+      roleFilter === "siswa"
+        ? supabase.from("classes").select("id,name").order("name")
+        : Promise.resolve({ data: [] as ClassOption[], error: null });
+    const [profileResult, classResult] = await Promise.all([
+      profileQuery,
+      classQuery,
+    ]);
     if (profileResult.error) notify(profileResult.error.message, true);
     else {
       const normalized = (profileResult.data ?? []).map((row) => {
-        const membership = Array.isArray(row.class_students) ? row.class_students[0] : undefined;
+        const membership = Array.isArray(row.class_students)
+          ? row.class_students[0]
+          : undefined;
         const relatedClass = membership?.classes as unknown;
         const resolvedClassName = relationName(relatedClass);
         const className = resolvedClassName === "—" ? null : resolvedClassName;
-        return { ...row, class_id: membership?.class_id ?? null, class_name: className ?? null } as ManagedUser;
+        return {
+          ...row,
+          class_id: membership?.class_id ?? null,
+          class_name: className ?? null,
+        } as ManagedUser;
       });
       setUsers(normalized);
     }
@@ -1788,7 +1507,9 @@ function UserManagement({
               key={item.id}
             >
               {item.name}{" "}
-              <span>{users.filter((user) => user.class_id === item.id).length}</span>
+              <span>
+                {users.filter((user) => user.class_id === item.id).length}
+              </span>
             </button>
           ))}
         </div>
@@ -1853,30 +1574,32 @@ function UserManagement({
                     {new Date(user.created_at).toLocaleDateString("id-ID")}
                   </td>
                   <td>
-                    {canManage && <div className="user-actions">
-                      <button
-                        onClick={() => setEditing(user)}
-                        title="Edit pengguna"
-                      >
-                        <Pencil />
-                      </button>
-                      <button
-                        onClick={() => setResetting(user)}
-                        title="Reset kata sandi"
-                      >
-                        <LockKeyhole />
-                      </button>
-                      <button onClick={() => toggleUser(user)}>
-                        {user.active ? "Nonaktifkan" : "Aktifkan"}
-                      </button>
-                      <button
-                        className="danger"
-                        onClick={() => deleteUser(user)}
-                        title="Hapus pengguna"
-                      >
-                        <Trash2 />
-                      </button>
-                    </div>}
+                    {canManage && (
+                      <div className="user-actions">
+                        <button
+                          onClick={() => setEditing(user)}
+                          title="Edit pengguna"
+                        >
+                          <Pencil />
+                        </button>
+                        <button
+                          onClick={() => setResetting(user)}
+                          title="Reset kata sandi"
+                        >
+                          <LockKeyhole />
+                        </button>
+                        <button onClick={() => toggleUser(user)}>
+                          {user.active ? "Nonaktifkan" : "Aktifkan"}
+                        </button>
+                        <button
+                          className="danger"
+                          onClick={() => deleteUser(user)}
+                          title="Hapus pengguna"
+                        >
+                          <Trash2 />
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))
@@ -2695,13 +2418,11 @@ function ExamRunner({
   useEffect(() => {
     const handler = async () => {
       if (document.hidden && supabase && attemptId) {
-        await supabase
-          .from("integrity_events")
-          .insert({
-            attempt_id: attemptId,
-            event_type: "tab_hidden",
-            metadata: { exam_id: examId },
-          });
+        await supabase.from("integrity_events").insert({
+          attempt_id: attemptId,
+          event_type: "tab_hidden",
+          metadata: { exam_id: examId },
+        });
       }
     };
     document.addEventListener("visibilitychange", handler);
@@ -2717,17 +2438,15 @@ function ExamRunner({
     setAnswers(next);
     saveLocal(`answers:${examId}`, next);
     if (supabase && attemptId) {
-      await supabase
-        .from("answers")
-        .upsert(
-          {
-            attempt_id: attemptId,
-            question_id: question.id,
-            selected_option: option,
-            answered_at: new Date().toISOString(),
-          },
-          { onConflict: "attempt_id,question_id" },
-        );
+      await supabase.from("answers").upsert(
+        {
+          attempt_id: attemptId,
+          question_id: question.id,
+          selected_option: option,
+          answered_at: new Date().toISOString(),
+        },
+        { onConflict: "attempt_id,question_id" },
+      );
     }
   };
   const finish = async () => {

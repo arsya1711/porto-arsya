@@ -8,7 +8,9 @@ export type Exam = {
 
 export type Question = {
   id: string; bank: string; subject: string; type: 'Pilihan Ganda' | 'Essay';
-  text: string; difficulty: 'Mudah' | 'Sedang' | 'Sulit'; used: number
+  text: string; difficulty: 'Mudah' | 'Sedang' | 'Sulit'; used: number;
+  bankId?: string; subjectId?: string; options?: string[]; correctOption?: number | null;
+  answerKey?: string | null; weight?: number; createdAt?: string
 }
 
 export const exams: Exam[] = [
