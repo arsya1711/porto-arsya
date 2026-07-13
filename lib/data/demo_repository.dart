@@ -1,0 +1,112 @@
+import '../models/models.dart';
+
+class DemoRepository {
+  final profile = const StudentProfile(
+    name: 'Alya Putri',
+    studentNumber: '24001',
+    className: 'IX A',
+    school: 'SMP Nusantara',
+  );
+
+  late final List<Exam> exams = [
+    Exam(
+      id: 'exam-1',
+      title: 'Penilaian Akhir Semester',
+      subject: 'Matematika',
+      subjectCode: 'MTK',
+      teacher: 'Ibu Rina Kusuma, S.Pd.',
+      schedule: DateTime(2026, 7, 13, 9),
+      durationMinutes: 90,
+      questionCount: 5,
+      state: ExamState.available,
+      requiresCode: true,
+      instructions: const [
+        'Pastikan perangkat memiliki daya yang cukup dan koneksi stabil saat memulai.',
+        'Kerjakan setiap soal dengan teliti. Jawaban tersimpan otomatis di perangkat.',
+        'Keluar dari aplikasi selama ujian akan dicatat sebagai aktivitas integritas.',
+        'Periksa kembali jawaban sebelum menekan tombol kumpulkan.',
+      ],
+    ),
+    Exam(
+      id: 'exam-2',
+      title: 'Ulangan Bab Ekosistem',
+      subject: 'Ilmu Pengetahuan Alam',
+      subjectCode: 'IPA',
+      teacher: 'Bapak Dimas Pratama, S.Pd.',
+      schedule: DateTime(2026, 7, 14, 11),
+      durationMinutes: 60,
+      questionCount: 25,
+      state: ExamState.upcoming,
+      instructions: const [
+        'Baca seluruh pertanyaan sebelum memilih jawaban.',
+        'Tidak diperkenankan menggunakan buku catatan.',
+      ],
+    ),
+    Exam(
+      id: 'exam-3',
+      title: 'Asesmen Teks Eksplanasi',
+      subject: 'Bahasa Indonesia',
+      subjectCode: 'BIN',
+      teacher: 'Ibu Maya Lestari, S.Pd.',
+      schedule: DateTime(2026, 7, 15, 8),
+      durationMinutes: 75,
+      questionCount: 30,
+      state: ExamState.upcoming,
+      instructions: const [
+        'Jawablah dengan bahasa Indonesia yang baik dan benar.',
+      ],
+    ),
+    Exam(
+      id: 'exam-4',
+      title: 'Kuis Sejarah Indonesia',
+      subject: 'Ilmu Pengetahuan Sosial',
+      subjectCode: 'IPS',
+      teacher: 'Bapak Arif Wibowo, S.Pd.',
+      schedule: DateTime(2026, 7, 8, 10),
+      durationMinutes: 45,
+      questionCount: 20,
+      state: ExamState.completed,
+      score: 88,
+      instructions: const [],
+    ),
+  ];
+
+  final List<ExamQuestion> questions = const [
+    ExamQuestion(
+      id: 'q1',
+      type: QuestionType.multipleChoice,
+      body: 'Hasil dari 3(2x − 4) + 5 jika x = 3 adalah …',
+      options: ['5', '7', '9', '11'],
+    ),
+    ExamQuestion(
+      id: 'q2',
+      type: QuestionType.multipleChoice,
+      body: 'Bentuk sederhana dari 4a + 3b − 2a + 5b adalah …',
+      options: ['2a + 2b', '2a + 8b', '6a + 2b', '6a + 8b'],
+    ),
+    ExamQuestion(
+      id: 'q3',
+      type: QuestionType.multipleChoice,
+      body:
+          'Jika keliling persegi adalah 48 cm, luas persegi tersebut adalah …',
+      options: ['64 cm²', '100 cm²', '121 cm²', '144 cm²'],
+    ),
+    ExamQuestion(
+      id: 'q4',
+      type: QuestionType.multipleChoice,
+      body: 'Nilai dari √144 + √81 adalah …',
+      options: ['19', '20', '21', '22'],
+    ),
+    ExamQuestion(
+      id: 'q5',
+      type: QuestionType.essay,
+      body:
+          'Tuliskan langkah penyelesaian dari persamaan 2x + 5 = 17 dan jelaskan alasan pada setiap langkah.',
+    ),
+  ];
+
+  Future<bool> authenticate(String username, String password) async {
+    await Future<void>.delayed(const Duration(milliseconds: 650));
+    return username.trim().isNotEmpty && password.length >= 4;
+  }
+}
