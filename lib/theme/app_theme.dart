@@ -1,17 +1,18 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 abstract final class AppColors {
-  static const navy = Color(0xFF101B35);
-  static const navyLight = Color(0xFF1A2B52);
-  static const blue = Color(0xFF4B6BFB);
-  static const blueDark = Color(0xFF3153E7);
-  static const blueSoft = Color(0xFFEEF1FF);
-  static const background = Color(0xFFF5F7FB);
-  static const border = Color(0xFFE8EBF2);
-  static const text = Color(0xFF172033);
-  static const muted = Color(0xFF7E879B);
-  static const green = Color(0xFF16A879);
+  static const navy = Color(0xFF20213D);
+  static const navyLight = Color(0xFF343657);
+  static const blue = Color(0xFF6657E8);
+  static const blueDark = Color(0xFF5142D8);
+  static const blueSoft = Color(0xFFF0EEFF);
+  static const background = Color(0xFFF8F8FC);
+  static const border = Color(0xFFECECF3);
+  static const text = Color(0xFF22233B);
+  static const muted = Color(0xFF8B8CA3);
+  static const green = Color(0xFF00AE91);
   static const amber = Color(0xFFF0A73B);
   static const red = Color(0xFFED5C5C);
 }
@@ -115,6 +116,40 @@ abstract final class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       dividerColor: AppColors.border,
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: _AppPageTransitionBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        },
+      ),
+    );
+  }
+}
+
+class _AppPageTransitionBuilder extends PageTransitionsBuilder {
+  const _AppPageTransitionBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    final curved = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutCubic,
+    );
+    return FadeTransition(
+      opacity: curved,
+      child: SlideTransition(
+        position: Tween(
+          begin: const Offset(.035, 0),
+          end: Offset.zero,
+        ).animate(curved),
+        child: child,
+      ),
     );
   }
 }

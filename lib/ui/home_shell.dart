@@ -128,7 +128,7 @@ class ExamHome extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
             sliver: SliverToBoxAdapter(
               child: _SectionTitle(
-                title: 'Tersedia sekarang',
+                title: 'Ujian aktif',
                 count: available.length,
               ),
             ),
@@ -138,7 +138,7 @@ class ExamHome extends StatelessWidget {
             sliver: SliverList.separated(
               itemCount: available.length,
               separatorBuilder: (_, _) => const SizedBox(height: 12),
-              itemBuilder: (context, index) => ExamCard(
+              itemBuilder: (context, index) => FeaturedExamCard(
                 exam: available[index],
                 onTap: () => _openExam(context, available[index]),
               ),
@@ -148,7 +148,7 @@ class ExamHome extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 28, 20, 8),
             sliver: SliverToBoxAdapter(
               child: _SectionTitle(
-                title: 'Akan datang',
+                title: 'Agenda berikutnya',
                 count: upcoming.length,
               ),
             ),
@@ -158,7 +158,7 @@ class ExamHome extends StatelessWidget {
             sliver: SliverList.separated(
               itemCount: upcoming.length,
               separatorBuilder: (_, _) => const SizedBox(height: 12),
-              itemBuilder: (context, index) => ExamCard(
+              itemBuilder: (context, index) => ScheduleExamCard(
                 exam: upcoming[index],
                 onTap: () => _openExam(context, upcoming[index]),
               ),
@@ -180,6 +180,145 @@ class ExamHome extends StatelessWidget {
 
 class _HomeHeader extends StatelessWidget {
   const _HomeHeader({required this.controller});
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    color: Colors.white,
+    padding: EdgeInsets.fromLTRB(
+      20,
+      MediaQuery.paddingOf(context).top + 15,
+      20,
+      22,
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.blueSoft,
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Text(
+                controller.profile.name
+                    .split(' ')
+                    .map((e) => e[0])
+                    .take(2)
+                    .join(),
+                style: const TextStyle(
+                  color: AppColors.blue,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _greeting(),
+                    style: const TextStyle(fontSize: 9, color: AppColors.muted),
+                  ),
+                  Text(
+                    controller.profile.name,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.text,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: IconButton(
+                onPressed: controller.toggleConnection,
+                icon: const Icon(
+                  Icons.notifications_none_rounded,
+                  size: 20,
+                  color: AppColors.text,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 25),
+        Text(
+          'Ujian kamu',
+          style: Theme.of(
+            context,
+          ).textTheme.headlineLarge?.copyWith(fontSize: 27),
+        ),
+        const SizedBox(height: 5),
+        Row(
+          children: [
+            const Text(
+              'Senin, 13 Juli 2026',
+              style: TextStyle(fontSize: 10, color: AppColors.muted),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+              decoration: BoxDecoration(
+                color: (controller.isOnline ? AppColors.green : AppColors.amber)
+                    .withValues(alpha: .09),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    controller.isOnline
+                        ? Icons.cloud_done_outlined
+                        : Icons.cloud_off_outlined,
+                    size: 13,
+                    color: controller.isOnline
+                        ? AppColors.green
+                        : AppColors.amber,
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    controller.isOnline ? 'Tersinkron' : 'Offline',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: controller.isOnline
+                          ? AppColors.green
+                          : AppColors.amber,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+
+  String _greeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 11) return 'Selamat pagi';
+    if (hour < 15) return 'Selamat siang';
+    if (hour < 18) return 'Selamat sore';
+    return 'Selamat malam';
+  }
+}
+
+class LegacyHomeHeader extends StatelessWidget {
+  const LegacyHomeHeader({super.key, required this.controller});
   final AppController controller;
 
   @override
@@ -277,7 +416,7 @@ class _HomeHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 26),
                 Text(
-                  'Selamat pagi, ${controller.profile.name.split(' ').first}!',
+                  '${_greeting()}, ${controller.profile.name.split(' ').first}!',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 24,
@@ -327,6 +466,14 @@ class _HomeHeader extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _greeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 11) return 'Selamat pagi';
+    if (hour < 15) return 'Selamat siang';
+    if (hour < 18) return 'Selamat sore';
+    return 'Selamat malam';
   }
 }
 
@@ -388,7 +535,7 @@ class _SectionTitle extends StatelessWidget {
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: const Color(0xFFE8EDFF),
+          color: AppColors.blueSoft,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Text(
@@ -401,6 +548,284 @@ class _SectionTitle extends StatelessWidget {
         ),
       ),
     ],
+  );
+}
+
+class FeaturedExamCard extends StatelessWidget {
+  const FeaturedExamCard({super.key, required this.exam, required this.onTap});
+  final Exam exam;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF7162ED), Color(0xFF5546D8)],
+      ),
+      borderRadius: BorderRadius.circular(25),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x326657E8),
+          blurRadius: 25,
+          offset: Offset(0, 11),
+        ),
+      ],
+    ),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(25),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          child: Stack(
+            children: [
+              Positioned(
+                right: -45,
+                top: -50,
+                child: Container(
+                  width: 155,
+                  height: 155,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: .09),
+                      width: 24,
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: .14),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(
+                                Icons.bolt_rounded,
+                                color: Color(0xFFFFE38B),
+                                size: 14,
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                'BISA DIMULAI',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: .6,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          exam.subjectCode,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 26),
+                    Text(
+                      exam.subject,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      exam.title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 21,
+                        height: 1.25,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -.5,
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    Row(
+                      children: [
+                        _FeaturedMeta(
+                          icon: Icons.schedule_rounded,
+                          label:
+                              '${exam.schedule.hour.toString().padLeft(2, '0')}.${exam.schedule.minute.toString().padLeft(2, '0')} WIB',
+                        ),
+                        const SizedBox(width: 16),
+                        _FeaturedMeta(
+                          icon: Icons.timer_outlined,
+                          label: '${exam.durationMinutes} menit',
+                        ),
+                        const Spacer(),
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.arrow_forward_rounded,
+                            color: AppColors.blue,
+                            size: 20,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _FeaturedMeta extends StatelessWidget {
+  const _FeaturedMeta({required this.icon, required this.label});
+  final IconData icon;
+  final String label;
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Icon(icon, size: 15, color: Colors.white70),
+      const SizedBox(width: 5),
+      Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    ],
+  );
+}
+
+class ScheduleExamCard extends StatelessWidget {
+  const ScheduleExamCard({super.key, required this.exam, required this.onTap});
+  final Exam exam;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(19),
+      border: Border.all(color: AppColors.border),
+    ),
+    child: Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(19),
+        child: Padding(
+          padding: const EdgeInsets.all(15),
+          child: Row(
+            children: [
+              Container(
+                width: 50,
+                height: 58,
+                decoration: BoxDecoration(
+                  color: AppColors.blueSoft,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '${exam.schedule.day}',
+                      style: const TextStyle(
+                        color: AppColors.blue,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const Text(
+                      'JUL',
+                      style: TextStyle(
+                        color: AppColors.blue,
+                        fontSize: 8,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      exam.subject,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.blue,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      exam.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.text,
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.schedule_rounded,
+                          size: 13,
+                          color: AppColors.muted,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${exam.schedule.hour.toString().padLeft(2, '0')}.${exam.schedule.minute.toString().padLeft(2, '0')} • ${exam.durationMinutes} menit',
+                          style: const TextStyle(
+                            fontSize: 9,
+                            color: AppColors.muted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+            ],
+          ),
+        ),
+      ),
+    ),
   );
 }
 

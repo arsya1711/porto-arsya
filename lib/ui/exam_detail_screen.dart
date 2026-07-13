@@ -114,43 +114,58 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(17),
-              child: Column(
-                children: [
-                  InfoRow(
-                    icon: Icons.event_outlined,
-                    label: 'Jadwal',
-                    value:
-                        '${exam.schedule.day} Juli 2026 • ${exam.schedule.hour.toString().padLeft(2, '0')}.${exam.schedule.minute.toString().padLeft(2, '0')} WIB',
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 13),
-                    child: Divider(height: 1),
-                  ),
-                  InfoRow(
-                    icon: Icons.timer_outlined,
-                    label: 'Durasi',
-                    value: '${exam.durationMinutes} menit',
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 13),
-                    child: Divider(height: 1),
-                  ),
-                  InfoRow(
-                    icon: Icons.quiz_outlined,
-                    label: 'Jumlah soal',
-                    value: '${exam.questionCount} soal',
-                  ),
-                ],
+          Row(
+            children: [
+              Expanded(
+                child: _ExamMetric(
+                  icon: Icons.calendar_month_outlined,
+                  value: '${exam.schedule.day} Jul',
+                  label: 'Tanggal',
+                ),
               ),
-            ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _ExamMetric(
+                  icon: Icons.schedule_rounded,
+                  value:
+                      '${exam.schedule.hour.toString().padLeft(2, '0')}.${exam.schedule.minute.toString().padLeft(2, '0')}',
+                  label: 'Mulai',
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _ExamMetric(
+                  icon: Icons.timer_outlined,
+                  value: '${exam.durationMinutes} mnt',
+                  label: 'Durasi',
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 24),
-          Text(
-            'Petunjuk pengerjaan',
-            style: Theme.of(context).textTheme.titleMedium,
+          const SizedBox(height: 26),
+          Row(
+            children: [
+              Text(
+                'Petunjuk pengerjaan',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.blueSoft,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '${exam.questionCount} soal',
+                  style: const TextStyle(
+                    color: AppColors.blue,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 10),
           Card(
@@ -171,12 +186,12 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Container(
-                              width: 22,
-                              height: 22,
+                              width: 28,
+                              height: 28,
                               alignment: Alignment.center,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFE8EDFF),
-                                shape: BoxShape.circle,
+                              decoration: BoxDecoration(
+                                color: AppColors.blueSoft,
+                                borderRadius: BorderRadius.circular(9),
                               ),
                               child: Text(
                                 '${item.key + 1}',
@@ -187,7 +202,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 10),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: Text(
                                 item.value,
@@ -256,14 +271,23 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
           ],
           if (available) ...[
             const SizedBox(height: 14),
-            CheckboxListTile(
-              value: agreed,
-              onChanged: (value) => setState(() => agreed = value ?? false),
-              contentPadding: EdgeInsets.zero,
-              controlAffinity: ListTileControlAffinity.leading,
-              title: const Text(
-                'Saya sudah membaca petunjuk dan siap memulai.',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            Container(
+              decoration: BoxDecoration(
+                color: agreed ? AppColors.blueSoft : Colors.white,
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(
+                  color: agreed ? const Color(0xFFC9D2FF) : AppColors.border,
+                ),
+              ),
+              child: CheckboxListTile(
+                value: agreed,
+                onChanged: (value) => setState(() => agreed = value ?? false),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                controlAffinity: ListTileControlAffinity.leading,
+                title: const Text(
+                  'Saya sudah membaca petunjuk dan siap memulai.',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
               ),
             ),
           ],
@@ -306,4 +330,60 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
       ),
     );
   }
+}
+
+class _ExamMetric extends StatelessWidget {
+  const _ExamMetric({
+    required this.icon,
+    required this.value,
+    required this.label,
+  });
+  final IconData icon;
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(17),
+      border: Border.all(color: AppColors.border),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x08101B35),
+          blurRadius: 12,
+          offset: Offset(0, 5),
+        ),
+      ],
+    ),
+    child: Column(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: AppColors.blueSoft,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, size: 17, color: AppColors.blue),
+        ),
+        const SizedBox(height: 9),
+        Text(
+          value,
+          maxLines: 1,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            color: AppColors.navy,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 9, color: AppColors.muted),
+        ),
+      ],
+    ),
+  );
 }
