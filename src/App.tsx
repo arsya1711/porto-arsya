@@ -44,13 +44,11 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
-  Radio,
   Search,
   Settings,
   ShieldCheck,
   Star,
   Trash2,
-  Upload,
   UserPlus,
   UserRound,
   Users,
@@ -71,6 +69,7 @@ import {
 } from "./lib/supabase";
 import { AuthProvider, type Profile, useAuth } from "./auth/AuthContext";
 import { QuestionBank } from "./components/QuestionBank";
+import { StaffDashboard, StudentDashboard } from "./components/Dashboards";
 
 type Toast = { text: string; error?: boolean } | null;
 
@@ -184,7 +183,7 @@ function Application() {
           path="/siswa"
           element={
             profile && role === "siswa" ? (
-              <StudentHome logout={logout} />
+              <StudentDashboard profile={profile} logout={logout} />
             ) : (
               <Navigate to="/" />
             )
@@ -538,7 +537,7 @@ function Portal({
         <Routes>
           <Route
             index
-            element={<Dashboard exams={exams} profile={profile} />}
+            element={<StaffDashboard profile={profile} />}
           />
           <Route
             path="ujian"
@@ -688,158 +687,6 @@ function PageTitle({
   );
 }
 
-function Dashboard({ exams, profile }: { exams: Exam[]; profile: Profile }) {
-  void profile;
-  return (
-    <div className="portal-page">
-      <PageTitle
-        eyebrow="JUMAT, 10 JULI 2026"
-        title="Selamat pagi, Ibu Rina"
-        description="Berikut ringkasan kegiatan ujian sekolah hari ini."
-        action={
-          <Link className="primary" to="/app/ujian">
-            <Plus />
-            Buat ujian
-          </Link>
-        }
-      />
-      <div className="stats-grid">
-        <Stat
-          icon={<Radio />}
-          tone="green"
-          label="Ujian berlangsung"
-          value="3"
-          note="94 siswa sedang mengerjakan"
-        />
-        <Stat
-          icon={<Clock3 />}
-          tone="blue"
-          label="Menunggu koreksi"
-          value="8"
-          note="126 jawaban essay"
-        />
-        <Stat
-          icon={<ShieldCheck />}
-          tone="amber"
-          label="Insiden minggu ini"
-          value="12"
-          note="4 perlu ditinjau"
-        />
-        <Stat
-          icon={<Users />}
-          tone="purple"
-          label="Siswa aktif"
-          value="487"
-          note="18 kelas aktif"
-        />
-      </div>
-      <div className="dashboard-columns">
-        <section className="card">
-          <CardHead title="Jadwal hari ini" link="Lihat semua" />
-          <div className="schedule-list">
-            {exams.slice(0, 3).map((exam) => (
-              <div key={exam.id}>
-                <div className="date-tile">
-                  <strong>{exam.time}</strong>
-                  <span>{exam.duration} mnt</span>
-                </div>
-                <span className="subject-dot">
-                  {exam.subject.slice(0, 2).toUpperCase()}
-                </span>
-                <div className="schedule-copy">
-                  <strong>{exam.title}</strong>
-                  <small>
-                    {exam.subject} · Kelas {exam.className}
-                  </small>
-                </div>
-                <Status value={exam.status} />
-                <button className="more">
-                  <MoreHorizontal />
-                </button>
-              </div>
-            ))}
-          </div>
-        </section>
-        <section className="card">
-          <CardHead title="Aktivitas terbaru" />
-          <div className="activity-list">
-            <Activity
-              icon={<Upload />}
-              text={
-                <>
-                  <b>Pak Dimas</b> mengimpor 48 soal IPA
-                </>
-              }
-              time="8 menit lalu"
-            />
-            <Activity
-              icon={<Check />}
-              text={
-                <>
-                  <b>Bu Sari</b> menyelesaikan koreksi
-                </>
-              }
-              time="21 menit lalu"
-            />
-            <Activity
-              icon={<AlertTriangle />}
-              text={
-                <>
-                  3 insiden terdeteksi di <b>PAS Matematika</b>
-                </>
-              }
-              time="35 menit lalu"
-            />
-            <Activity
-              icon={<Users />}
-              text={
-                <>
-                  Admin menambahkan <b>12 siswa baru</b>
-                </>
-              }
-              time="1 jam lalu"
-            />
-          </div>
-        </section>
-      </div>
-      <section className="card insight-card">
-        <div>
-          <p>RATA-RATA NILAI MINGGU INI</p>
-          <strong>78,4</strong>
-          <span>
-            <b>↑ 4,2%</b> dibanding minggu lalu
-          </span>
-        </div>
-        <MiniChart />
-      </section>
-    </div>
-  );
-}
-
-function Stat({
-  icon,
-  tone,
-  label,
-  value,
-  note,
-}: {
-  icon: ReactNode;
-  tone: string;
-  label: string;
-  value: string;
-  note: string;
-}) {
-  return (
-    <div className="stat-card">
-      <span className={tone}>{icon}</span>
-      <div>
-        <small>{label}</small>
-        <strong>{value}</strong>
-        <p>{note}</p>
-      </div>
-    </div>
-  );
-}
 function CardHead({ title, link }: { title: string; link?: string }) {
   return (
     <div className="card-head">
@@ -867,40 +714,6 @@ function Status({ value }: { value: Exam["status"] }) {
     </span>
   );
 }
-function Activity({
-  icon,
-  text,
-  time,
-}: {
-  icon: ReactNode;
-  text: ReactNode;
-  time: string;
-}) {
-  return (
-    <div className="activity">
-      <span>{icon}</span>
-      <p>
-        {text}
-        <small>{time}</small>
-      </p>
-    </div>
-  );
-}
-function MiniChart() {
-  const bars = [42, 55, 48, 65, 58, 72, 68, 82, 76, 88, 81, 92];
-  return (
-    <div className="mini-chart">
-      {bars.map((v, i) => (
-        <i
-          style={{ height: `${v}%` }}
-          className={i === bars.length - 1 ? "last" : ""}
-          key={i}
-        />
-      ))}
-    </div>
-  );
-}
-
 function ExamManagement({
   exams,
   setExams,
@@ -2229,134 +2042,6 @@ function SettingsPage({ role }: { role: Role }) {
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function StudentHome({ logout }: { logout: () => void }) {
-  return (
-    <div className="student-app">
-      <header className="student-header">
-        <Link to="/siswa" className="student-logo">
-          <GraduationCap />
-          <b>Ruang Ujian</b>
-        </Link>
-        <div>
-          <span>
-            <Wifi />
-            Online
-          </span>
-          <button>
-            <Bell />
-          </button>
-          <button className="student-profile">
-            <span>AP</span>
-            <b>
-              Alya Putri<small>IX A · 24001</small>
-            </b>
-            <ChevronDown />
-          </button>
-          <button className="logout-icon" onClick={logout}>
-            <LogOut />
-          </button>
-        </div>
-      </header>
-      <main className="student-home">
-        <div className="student-greeting">
-          <p>JUMAT, 10 JULI 2026</p>
-          <h1>Selamat pagi, Alya 👋</h1>
-          <span>Siapkan dirimu dan kerjakan ujian dengan jujur.</span>
-        </div>
-        <section className="available-exam">
-          <div className="live-label">
-            <i />
-            TERSEDIA SEKARANG
-          </div>
-          <div className="exam-feature">
-            <div className="feature-icon">
-              <BookOpen />
-            </div>
-            <div className="feature-copy">
-              <span>MATEMATIKA · KELAS IX</span>
-              <h2>Penilaian Akhir Semester</h2>
-              <p>
-                <Clock3 />
-                90 menit <i /> <FileQuestion />
-                40 soal <i /> Berakhir pukul 10.30
-              </p>
-            </div>
-            <Link to="/siswa/ujian/1" className="start-button">
-              Mulai ujian
-              <ArrowRight />
-            </Link>
-          </div>
-          <div className="exam-note">
-            <ShieldCheck />
-            <p>
-              <b>Mode ujian aman aktif</b>
-              <span>
-                Keluar dari layar ujian akan tercatat sebagai insiden.
-              </span>
-            </p>
-          </div>
-        </section>
-        <div className="student-columns">
-          <section>
-            <h3>AKAN DATANG</h3>
-            <div className="upcoming-card">
-              <span className="subject-box blue">IP</span>
-              <p>
-                <b>Ulangan Bab Ekosistem</b>
-                <small>IPA · 25 soal · 60 menit</small>
-              </p>
-              <div>
-                <b>Hari ini</b>
-                <span>11.00</span>
-              </div>
-            </div>
-            <div className="upcoming-card">
-              <span className="subject-box orange">BI</span>
-              <p>
-                <b>Asesmen Teks Eksplanasi</b>
-                <small>Bahasa Indonesia · 30 soal</small>
-              </p>
-              <div>
-                <b>Besok</b>
-                <span>08.00</span>
-              </div>
-            </div>
-          </section>
-          <section>
-            <h3>HASIL TERBARU</h3>
-            <div className="result-card">
-              <div>
-                <span className="subject-box purple">IP</span>
-                <p>
-                  <b>Kuis Sejarah Indonesia</b>
-                  <small>8 Juli 2026</small>
-                </p>
-              </div>
-              <strong>
-                88<small>/100</small>
-              </strong>
-              <span className="passed">Tuntas</span>
-            </div>
-            <div className="result-card">
-              <div>
-                <span className="subject-box green">EN</span>
-                <p>
-                  <b>English Daily Test</b>
-                  <small>5 Juli 2026</small>
-                </p>
-              </div>
-              <strong>
-                82<small>/100</small>
-              </strong>
-              <span className="passed">Tuntas</span>
-            </div>
-          </section>
-        </div>
-      </main>
     </div>
   );
 }
