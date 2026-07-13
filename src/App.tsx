@@ -70,6 +70,11 @@ import {
 import { AuthProvider, type Profile, useAuth } from "./auth/AuthContext";
 import { QuestionBank } from "./components/QuestionBank";
 import { StaffDashboard, StudentDashboard } from "./components/Dashboards";
+import {
+  AcademicYearsPage,
+  AuditSecurityPage,
+  SubjectsPage,
+} from "./components/AdminPages";
 
 type Toast = { text: string; error?: boolean } | null;
 
@@ -473,7 +478,7 @@ function Portal({
 }) {
   const location = useLocation();
   const role = profile.role;
-  const nav: [string, ReactNode, string][] = [
+  const teacherNav: [string, ReactNode, string][] = [
     ["/app", <LayoutDashboard />, "Ringkasan"],
     ["/app/ujian", <CalendarDays />, "Ujian"],
     ["/app/bank-soal", <FileQuestion />, "Bank Soal"],
@@ -481,10 +486,17 @@ function Portal({
     ["/app/koreksi", <ClipboardCheck />, "Koreksi"],
     ["/app/laporan", <BarChart3 />, "Laporan"],
   ];
-  if (role === "admin") {
-    nav.splice(4, 0, ["/app/guru", <UserRound />, "Guru"]);
-    nav.splice(5, 0, ["/app/admin", <ShieldCheck />, "Admin"]);
-  }
+  const adminNav: [string, ReactNode, string][] = [
+    ["/app", <LayoutDashboard />, "Ringkasan"],
+    ["/app/tahun-ajaran", <CalendarDays />, "Tahun Ajaran"],
+    ["/app/mata-pelajaran", <BookOpen />, "Mata Pelajaran"],
+    ["/app/kelas", <Users />, "Kelas & Siswa"],
+    ["/app/guru", <UserRound />, "Guru"],
+    ["/app/admin", <ShieldCheck />, "Administrator"],
+    ["/app/laporan", <BarChart3 />, "Laporan Sekolah"],
+    ["/app/audit", <LockKeyhole />, "Audit & Keamanan"],
+  ];
+  const nav = role === "admin" ? adminNav : teacherNav;
   const initials = getInitials(profile.full_name);
   return (
     <div className="portal-shell">
@@ -517,7 +529,7 @@ function Portal({
             >
               {icon}
               {label}
-              {label === "Koreksi" && <em>8</em>}
+              {role === "guru" && label === "Koreksi" && <em>8</em>}
             </Link>
           ))}
         </nav>
@@ -541,15 +553,18 @@ function Portal({
           />
           <Route
             path="ujian"
-            element={
+            element={role === "guru" ? (
               <ExamManagement
                 exams={exams}
                 setExams={setExams}
                 notify={notify}
               />
-            }
+            ) : <Navigate to="/app" />}
           />
-          <Route path="bank-soal" element={<QuestionBank notify={notify} />} />
+          <Route
+            path="bank-soal"
+            element={role === "guru" ? <QuestionBank notify={notify} /> : <Navigate to="/app" />}
+          />
           <Route
             path="kelas"
             element={
@@ -594,13 +609,28 @@ function Portal({
               )
             }
           />
-          <Route path="koreksi" element={<Grading notify={notify} />} />
+          <Route
+            path="tahun-ajaran"
+            element={role === "admin" ? <AcademicYearsPage notify={notify} /> : <Navigate to="/app" />}
+          />
+          <Route
+            path="mata-pelajaran"
+            element={role === "admin" ? <SubjectsPage notify={notify} /> : <Navigate to="/app" />}
+          />
+          <Route
+            path="audit"
+            element={role === "admin" ? <AuditSecurityPage notify={notify} /> : <Navigate to="/app" />}
+          />
+          <Route
+            path="koreksi"
+            element={role === "guru" ? <Grading notify={notify} /> : <Navigate to="/app" />}
+          />
           <Route path="laporan" element={<Reports />} />
-          <Route path="pengaturan" element={<SettingsPage role={role} />} />
+          <Route path="pengaturan" element={<SettingsPage profile={profile} />} />
           <Route path="*" element={<Navigate to="/app" />} />
         </Routes>
       </main>
-      <MobilePortalNav />
+      <MobilePortalNav role={role} />
     </div>
   );
 }
@@ -622,7 +652,13 @@ function Topbar({ profile }: { profile: Profile }) {
       </button>
       <div className="global-search">
         <Search />
-        <input placeholder="Cari ujian, soal, atau siswa…" />
+        <input
+          placeholder={
+            profile.role === "admin"
+              ? "Cari pengguna, kelas, atau aktivitas…"
+              : "Cari ujian, soal, atau siswa…"
+          }
+        />
         <kbd>⌘ K</kbd>
       </div>
       <div className="top-actions">
@@ -641,25 +677,28 @@ function Topbar({ profile }: { profile: Profile }) {
   );
 }
 
-function MobilePortalNav() {
+function MobilePortalNav({ role }: { role: Role }) {
+  const items = role === "admin"
+    ? [
+        ["/app", <LayoutDashboard />, "Beranda"],
+        ["/app/kelas", <Users />, "Siswa"],
+        ["/app/guru", <UserRound />, "Guru"],
+        ["/app/audit", <ShieldCheck />, "Audit"],
+      ]
+    : [
+        ["/app", <LayoutDashboard />, "Beranda"],
+        ["/app/ujian", <CalendarDays />, "Ujian"],
+        ["/app/bank-soal", <FileQuestion />, "Soal"],
+        ["/app/kelas", <Users />, "Kelas"],
+      ];
   return (
     <nav className="portal-mobile-nav">
-      <Link to="/app">
-        <LayoutDashboard />
-        <span>Beranda</span>
-      </Link>
-      <Link to="/app/ujian">
-        <CalendarDays />
-        <span>Ujian</span>
-      </Link>
-      <Link to="/app/bank-soal">
-        <FileQuestion />
-        <span>Soal</span>
-      </Link>
-      <Link to="/app/kelas">
-        <Users />
-        <span>Kelas</span>
-      </Link>
+      {items.map(([to, icon, label]) => (
+        <Link to={to as string} key={to as string}>
+          {icon}
+          <span>{label}</span>
+        </Link>
+      ))}
     </nav>
   );
 }
@@ -1263,7 +1302,16 @@ function UserManagement({
     if (!supabase) return;
     const name = window.prompt("Nama kelas baru (contoh: IX A):")?.trim();
     if (!name) return;
-    const { error } = await supabase.from("classes").insert({ name });
+    const { data: activeYear, error: yearError } = await supabase
+      .from("academic_years")
+      .select("id")
+      .eq("active", true)
+      .maybeSingle();
+    if (yearError) return notify(yearError.message, true);
+    const { error } = await supabase.from("classes").insert({
+      name,
+      academic_year_id: activeYear?.id ?? null,
+    });
     if (error) notify(error.message, true);
     else {
       notify("Kelas berhasil ditambahkan.");
@@ -2001,7 +2049,33 @@ function Reports() {
   );
 }
 
-function SettingsPage({ role }: { role: Role }) {
+function SettingsPage({ profile }: { profile: Profile }) {
+  if (profile.role === "guru") {
+    return (
+      <div className="portal-page">
+        <PageTitle
+          eyebrow="AKUN SAYA"
+          title="Profil Guru"
+          description="Informasi akun pengajar yang terhubung ke sekolah."
+        />
+        <div className="card settings-form">
+          <h2>Informasi akun</h2>
+          <p>Hubungi Admin jika nama atau email perlu diperbarui.</p>
+          <div className="form-grid">
+            <FormField label="Nama lengkap">
+              <input value={profile.full_name} readOnly />
+            </FormField>
+            <FormField label="Email">
+              <input value={profile.email} readOnly />
+            </FormField>
+          </div>
+          <div className="settings-save">
+            <span>Hak akses: Guru · Konten dan penilaian akademik</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="portal-page">
       <PageTitle
@@ -2038,7 +2112,7 @@ function SettingsPage({ role }: { role: Role }) {
           </FormField>
           <div className="settings-save">
             <button className="primary">Simpan perubahan</button>
-            <span>Anda masuk sebagai {role}.</span>
+            <span>Anda masuk sebagai Admin.</span>
           </div>
         </div>
       </div>

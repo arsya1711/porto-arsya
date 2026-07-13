@@ -397,11 +397,11 @@ export function StaffDashboard({ profile }: { profile: Profile }) {
             note: `${liveExams.reduce((sum, exam) => sum + exam.participants, 0)} peserta terdaftar`,
           },
           {
-            icon: <Clock3 />,
+            icon: <Users />,
             tone: "blue",
-            label: "Menunggu koreksi",
-            value: metrics.pendingGrading,
-            note: "Attempt perlu ditinjau",
+            label: "Guru aktif",
+            value: metrics.teachers,
+            note: "Tenaga pengajar terdaftar",
           },
           {
             icon: <ShieldCheck />,
@@ -460,8 +460,11 @@ export function StaffDashboard({ profile }: { profile: Profile }) {
             : "Ringkasan ujian dan konten yang Anda kelola."
         }
         action={
-          <Link className="primary" to="/app/ujian">
-            <Plus /> Buat ujian
+          <Link
+            className="primary"
+            to={profile.role === "admin" ? "/app/kelas" : "/app/ujian"}
+          >
+            <Plus /> {profile.role === "admin" ? "Kelola siswa" : "Buat ujian"}
           </Link>
         }
       />
@@ -484,7 +487,10 @@ export function StaffDashboard({ profile }: { profile: Profile }) {
 
       <div className="dashboard-columns">
         <section className="card">
-          <CardHead title="Jadwal terdekat" to="/app/ujian" />
+          <CardHead
+            title="Jadwal terdekat"
+            to={profile.role === "admin" ? "/app/laporan" : "/app/ujian"}
+          />
           <div className="schedule-list">
             {loading ? (
               <DashboardEmpty text="Memuat jadwal…" />

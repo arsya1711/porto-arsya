@@ -1,0 +1,171 @@
+.admin-master-layout {
+  display: grid;
+  grid-template-columns: minmax(250px, 0.38fr) minmax(480px, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.admin-quick-form {
+  padding: 22px;
+}
+
+.admin-quick-form h2 {
+  margin: 14px 0 5px;
+  color: #1f2a40;
+  font: 750 15px "Manrope";
+}
+
+.admin-quick-form p {
+  margin: 0 0 20px;
+  color: #8b95a7;
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+.admin-quick-form label {
+  display: block;
+  margin-bottom: 12px;
+  color: #5c6678;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.admin-quick-form input {
+  width: 100%;
+  margin-top: 6px;
+  border: 1px solid #dfe3ea;
+  border-radius: 8px;
+  padding: 10px 11px;
+  outline: none;
+  color: #333e52;
+  font-size: 10px;
+}
+
+.admin-quick-form input:focus {
+  border-color: #315ce8;
+  box-shadow: 0 0 0 3px #315ce812;
+}
+
+.admin-quick-form .primary {
+  width: 100%;
+  justify-content: center;
+  margin-top: 3px;
+}
+
+.admin-quick-form .primary:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.admin-card-icon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 10px;
+}
+
+.admin-card-icon svg {
+  width: 18px;
+}
+
+.admin-card-icon.blue { color: #315ce8; background: #edf1ff; }
+.admin-card-icon.purple { color: #8457d8; background: #f2edfc; }
+.admin-card-icon.green { color: #159c6b; background: #e8f8f2; }
+.admin-card-icon.amber { color: #c38118; background: #fff4df; }
+
+.admin-master-table table,
+.audit-table table {
+  min-width: 560px;
+}
+
+.master-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #8993a5;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.master-status i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #aeb5c0;
+}
+
+.master-status.active { color: #159c6b; }
+.master-status.active i { background: #19a974; }
+
+.master-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.master-actions button {
+  min-width: 29px;
+  height: 29px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #dfe3ea;
+  border-radius: 7px;
+  background: white;
+  color: #657084;
+  padding: 0 9px;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.master-actions button:hover { border-color: #315ce8; color: #315ce8; }
+.master-actions button.danger:hover { border-color: #e35d66; color: #d74650; }
+.master-actions button:disabled { cursor: not-allowed; opacity: 0.4; }
+.master-actions svg { width: 13px; }
+
+.subject-code {
+  display: inline-block;
+  border-radius: 6px;
+  background: #f0f2f6;
+  color: #5d687a;
+  padding: 4px 7px;
+  font-size: 8px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.audit-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.audit-summary > div {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+}
+
+.audit-summary p { margin: 0; }
+.audit-summary small,
+.audit-summary b,
+.audit-summary p span { display: block; }
+.audit-summary small { color: #8993a5; font-size: 8px; font-weight: 700; }
+.audit-summary b { margin: 4px 0 2px; color: #263247; font: 800 18px "Manrope"; }
+.audit-summary p span { color: #9aa2af; font-size: 8px; }
+
+@media (max-width: 1050px) {
+  .audit-summary { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 760px) {
+  .admin-master-layout { grid-template-columns: 1fr; }
+  .audit-summary { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 520px) {
+  .audit-summary { grid-template-columns: 1fr; }
+}

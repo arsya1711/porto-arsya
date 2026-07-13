@@ -38,7 +38,7 @@
         <thead><tr><th>Versi</th><th>Tanggal</th><th>Perubahan</th><th>Status</th></tr></thead>
         <tbody>
           <tr><td>1.0</td><td>10 Juli 2026</td><td>PRD awal: web Guru/Admin dan aplikasi siswa.</td><td>Digantikan</td></tr>
-          <tr><td>1.1</td><td>13 Juli 2026</td><td>Web siswa menjadi bagian resmi MVP; pengamanan ujian web dan monitoring pengawas diperluas.</td><td>Draft Revisi</td></tr>
+          <tr><td>1.1</td><td>13 Juli 2026</td><td>Web siswa menjadi bagian resmi MVP; pengamanan ujian web dan monitoring pengawas diperluas; Admin dipersempit pada sistem, data master, audit, dan pengawasan lintas sekolah.</td><td>Draft Revisi</td></tr>
         </tbody>
       </table>
       <h3>Keputusan yang ditutup</h3>
@@ -77,7 +77,7 @@
       <div class="section-number">01</div><h2>Ringkasan Eksekutif</h2>
       <p class="lead">Ruang Ujian adalah sistem ujian digital end-to-end untuk satu sekolah yang menghubungkan administrasi, penyusunan soal, pelaksanaan ujian, koreksi, dan laporan melalui satu website React dan backend Supabase.</p>
       <div class="grid">
-        <div class="card"><div class="tag">Admin</div><h4>Operasional sekolah</h4><p>Mengelola akun, kelas, tahun ajaran, hak akses, dan monitoring lintas ujian.</p></div>
+        <div class="card"><div class="tag">Admin</div><h4>Sistem & data master</h4><p>Mengelola akun, kelas, mata pelajaran, tahun ajaran, hak akses, audit, serta pengawasan lintas sekolah tanpa mengubah konten atau nilai akademik.</p></div>
         <div class="card"><div class="tag green">Guru</div><h4>Konten & penilaian</h4><p>Membuat bank soal, menjadwalkan ujian, memantau sesi, mengoreksi essay, dan melihat laporan.</p></div>
         <div class="card"><div class="tag amber">Siswa Web</div><h4>Pengerjaan fleksibel</h4><p>Login dan mengerjakan ujian melalui PC/laptop atau browser modern dengan autosave dan pemulihan koneksi.</p></div>
         <div class="card"><div class="tag red">Integritas</div><h4>Pengamanan berlapis</h4><p>Acak soal, session lock, fullscreen, log insiden, watermark, kode akses, dan dashboard pengawas.</p></div>
@@ -112,12 +112,13 @@
       <table>
         <thead><tr><th>Peran</th><th>Kebutuhan Utama</th><th>Platform MVP</th></tr></thead>
         <tbody>
-          <tr><td><strong>Admin</strong></td><td>Kelola pengguna, kelas, tahun ajaran, konfigurasi, dan audit.</td><td>Web React</td></tr>
+          <tr><td><strong>Admin</strong></td><td>Kelola pengguna, kelas, mata pelajaran, tahun ajaran, konfigurasi, audit, dan laporan sekolah. Tidak mengelola soal, ujian, koreksi, atau finalisasi nilai.</td><td>Web React</td></tr>
           <tr><td><strong>Guru</strong></td><td>Bank soal, jadwal, monitoring, koreksi, dan laporan.</td><td>Web React</td></tr>
           <tr><td><strong>Siswa</strong></td><td>Login, melihat jadwal, mengerjakan ujian, autosave, submit, dan melihat status nilai.</td><td>Web React responsif (PC/laptop/mobile browser)</td></tr>
           <tr><td><strong>Pengawas</strong></td><td>Memantau status sesi dan insiden integritas secara real-time.</td><td>Web React (hak akses Guru/Admin)</td></tr>
         </tbody>
       </table>
+      <div class="callout"><strong>Pemisahan tanggung jawab:</strong> Admin mengelola sistem dan data master; Guru mengelola konten serta penilaian akademik; Pengawas menangani pelaksanaan ujian yang ditugaskan. Admin hanya menggunakan emergency override untuk pemulihan operasional dan seluruh tindakannya wajib diaudit.</div>
       <h3>Strategi kanal</h3>
       <ul>
         <li><strong>Web siswa adalah first-class experience</strong>, bukan sekadar fallback dengan fitur terbatas.</li>
@@ -159,7 +160,7 @@
       <div class="requirement"><code>FR-1.4</code><p>RLS membatasi siswa hanya pada ujian, attempt, jawaban, dan profil miliknya sendiri.</p></div>
 
       <h3>7.2 Bank Soal</h3>
-      <div class="requirement"><code>FR-2.1</code><p>Guru/Admin dapat membuat, membaca, mengubah, mengarsipkan, dan mengelompokkan soal dalam bank per mata pelajaran dan tingkat kelas.</p></div>
+      <div class="requirement"><code>FR-2.1</code><p>Guru dapat membuat, membaca, mengubah, mengarsipkan, dan mengelompokkan soal dalam bank miliknya per mata pelajaran dan tingkat kelas. Admin tidak mengubah konten bank soal.</p></div>
       <div class="requirement"><code>FR-2.2</code><p>Soal pilihan ganda memiliki 2–6 opsi, tepat satu kunci, bobot &gt;0, dan tingkat kesulitan. Soal essay memiliki pedoman jawaban dan bobot.</p></div>
       <div class="requirement"><code>FR-2.3</code><p>Soal yang pernah digunakan tidak dihapus permanen; statusnya diarsipkan agar histori attempt tetap konsisten.</p></div>
       <div class="requirement"><code>FR-2.4</code><p>Jumlah penggunaan soal dihitung otomatis dari relasi soal-ujian.</p></div>
@@ -193,7 +194,7 @@
       <div class="requirement"><code>FR-5.9</code><p><strong>Kode akses:</strong> guru dapat mengaktifkan kode yang dibagikan ketika pengawasan dimulai. Kode tidak disimpan dalam bentuk terbaca di client.</p></div>
       <div class="requirement"><code>FR-5.10</code><p><strong>Live heartbeat:</strong> client mengirim heartbeat periodik agar dashboard membedakan aktif, koneksi terputus, dan sesi berhenti.</p></div>
       <div class="requirement"><code>FR-5.11</code><p><strong>Dashboard pengawas:</strong> menampilkan status belum mulai/mengerjakan/submit, progres, last seen, koneksi, jumlah insiden, dan severity.</p></div>
-      <div class="requirement"><code>FR-5.12</code><p><strong>Timeline:</strong> Guru/Admin dapat membuka kronologi insiden per siswa dan menambahkan catatan tindak lanjut.</p></div>
+      <div class="requirement"><code>FR-5.12</code><p><strong>Timeline:</strong> Guru/pengawas yang ditugaskan dapat membuka kronologi insiden per siswa dan menambahkan catatan tindak lanjut. Admin memiliki akses baca lintas sekolah dan emergency override yang diaudit.</p></div>
       <div class="requirement"><code>FR-5.13</code><p><strong>Fair response:</strong> sistem tidak otomatis mendiskualifikasi. Tindakan pengawas meliputi peringatan, validasi ulang identitas, tutup sesi, atau buka kembali dengan alasan yang diaudit.</p></div>
       <div class="requirement"><code>FR-5.14</code><p><strong>Secure mode opsional:</strong> ujian berisiko tinggi dapat memakai Safe Exam Browser/mode kiosk pada fase lanjutan tanpa menghilangkan akses web standar.</p></div>
 
@@ -280,7 +281,7 @@
           <tr><td>answers</td><td>Jawaban terakhir per soal.</td><td>Upsert idempotent dan timestamp server.</td></tr>
           <tr><td>attempt_sessions</td><td>Session/device binding dan heartbeat.</td><td>Baru: status, fingerprint terbatas, IP, last_seen.</td></tr>
           <tr><td>integrity_events</td><td>Timeline fullscreen, tab, blur, copy/paste, reconnect.</td><td>Simpan event_type, duration, severity, metadata.</td></tr>
-          <tr><td>audit_logs</td><td>Perubahan sensitif oleh Guru/Admin.</td><td>Termasuk terminate/reopen/override.</td></tr>
+          <tr><td>audit_logs</td><td>Perubahan sensitif oleh Guru/Admin.</td><td>Hanya Admin dapat membaca audit lintas sekolah; termasuk terminate/reopen/override.</td></tr>
         </tbody>
       </table>
     </section>

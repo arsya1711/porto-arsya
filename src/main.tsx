@@ -12,6 +12,7 @@ import './styles-users-crud.css'
 import './styles-password.css'
 import './styles-question-bank.css'
 import './styles-dashboards.css'
+import './styles-admin.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
