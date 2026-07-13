@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 abstract final class AppColors {
-  static const navy = Color(0xFF17233C);
-  static const blue = Color(0xFF315CE8);
-  static const background = Color(0xFFF7F8FC);
-  static const border = Color(0xFFE7EAF1);
-  static const text = Color(0xFF1C2434);
-  static const muted = Color(0xFF7D8799);
-  static const green = Color(0xFF19A974);
-  static const amber = Color(0xFFE6A23C);
-  static const red = Color(0xFFE65353);
+  static const navy = Color(0xFF101B35);
+  static const navyLight = Color(0xFF1A2B52);
+  static const blue = Color(0xFF4B6BFB);
+  static const blueDark = Color(0xFF3153E7);
+  static const blueSoft = Color(0xFFEEF1FF);
+  static const background = Color(0xFFF5F7FB);
+  static const border = Color(0xFFE8EBF2);
+  static const text = Color(0xFF172033);
+  static const muted = Color(0xFF7E879B);
+  static const green = Color(0xFF16A879);
+  static const amber = Color(0xFFF0A73B);
+  static const red = Color(0xFFED5C5C);
 }
 
 abstract final class AppTheme {
@@ -20,40 +24,54 @@ abstract final class AppTheme {
       surface: Colors.white,
       error: AppColors.red,
     );
+    final baseText = GoogleFonts.dmSansTextTheme();
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: AppColors.background,
-      fontFamily: 'sans-serif',
-      textTheme: const TextTheme(
-        headlineLarge: TextStyle(
+      textTheme: baseText.copyWith(
+        headlineLarge: GoogleFonts.manrope(
           fontSize: 28,
           fontWeight: FontWeight.w800,
-          letterSpacing: -0.8,
+          letterSpacing: -1,
           color: AppColors.navy,
         ),
-        headlineMedium: TextStyle(
+        headlineMedium: GoogleFonts.manrope(
           fontSize: 22,
           fontWeight: FontWeight.w800,
-          letterSpacing: -0.5,
+          letterSpacing: -.7,
           color: AppColors.navy,
         ),
-        titleLarge: TextStyle(
+        titleLarge: GoogleFonts.manrope(
           fontSize: 18,
           fontWeight: FontWeight.w800,
           color: AppColors.navy,
         ),
-        titleMedium: TextStyle(
+        titleMedium: GoogleFonts.manrope(
           fontSize: 15,
           fontWeight: FontWeight.w700,
           color: AppColors.text,
         ),
-        bodyMedium: TextStyle(
+        bodyMedium: GoogleFonts.dmSans(
           fontSize: 14,
           height: 1.45,
           color: AppColors.text,
         ),
-        bodySmall: TextStyle(fontSize: 12, height: 1.4, color: AppColors.muted),
+        bodySmall: GoogleFonts.dmSans(
+          fontSize: 12,
+          height: 1.4,
+          color: AppColors.muted,
+        ),
+      ),
+      appBarTheme: AppBarTheme(
+        elevation: 0,
+        centerTitle: false,
+        surfaceTintColor: Colors.transparent,
+        titleTextStyle: GoogleFonts.manrope(
+          fontSize: 17,
+          fontWeight: FontWeight.w800,
+          color: AppColors.navy,
+        ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -63,15 +81,15 @@ abstract final class AppTheme {
           vertical: 15,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(15),
           borderSide: const BorderSide(color: AppColors.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(15),
           borderSide: const BorderSide(color: AppColors.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(15),
           borderSide: const BorderSide(color: AppColors.blue, width: 1.5),
         ),
       ),
@@ -79,22 +97,22 @@ abstract final class AppTheme {
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.blue,
           foregroundColor: Colors.white,
-          minimumSize: const Size(48, 52),
+          minimumSize: const Size(48, 54),
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
           ),
-          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+          textStyle: GoogleFonts.dmSans(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
       cardTheme: CardThemeData(
         elevation: 0,
         color: Colors.white,
         margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.border),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       dividerColor: AppColors.border,
     );

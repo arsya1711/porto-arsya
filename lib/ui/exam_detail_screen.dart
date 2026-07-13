@@ -47,8 +47,19 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: AppColors.navy,
-              borderRadius: BorderRadius.circular(18),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [AppColors.navy, Color(0xFF1D356C)],
+              ),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x24101B35),
+                  blurRadius: 24,
+                  offset: Offset(0, 10),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -56,12 +67,12 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                 Row(
                   children: [
                     Container(
-                      width: 44,
-                      height: 44,
+                      width: 48,
+                      height: 48,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: .1),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(14),
                       ),
                       child: Text(
                         exam.subjectCode,
@@ -81,13 +92,14 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 22),
                 Text(
                   exam.title,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 21,
+                    fontSize: 23,
                     fontWeight: FontWeight.w800,
+                    letterSpacing: -.6,
                   ),
                 ),
                 const SizedBox(height: 5),

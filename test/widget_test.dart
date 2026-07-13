@@ -5,13 +5,14 @@ void main() {
   testWidgets('student can enter the demo application', (tester) async {
     await tester.pumpWidget(const RuangUjianApp());
 
-    expect(find.text('Selamat datang!'), findsOneWidget);
-    expect(find.text('Masuk ke aplikasi'), findsOneWidget);
+    expect(find.text('Belajar jujur,\nraih hasil terbaik.'), findsOneWidget);
+    expect(find.text('Masuk sekarang'), findsOneWidget);
 
-    await tester.tap(find.text('Masuk ke aplikasi'));
+    await tester.ensureVisible(find.text('Masuk sekarang'));
+    await tester.tap(find.text('Masuk sekarang'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Halo, Alya'), findsOneWidget);
+    expect(find.textContaining('Selamat pagi, Alya'), findsOneWidget);
     expect(find.text('Tersedia sekarang'), findsOneWidget);
   });
 }

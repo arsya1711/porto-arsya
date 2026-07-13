@@ -68,8 +68,18 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
             backgroundColor: Colors.white,
             appBar: AppBar(
               automaticallyImplyLeading: false,
-              backgroundColor: AppColors.navy,
+              backgroundColor: Colors.transparent,
               foregroundColor: Colors.white,
+              toolbarHeight: 68,
+              flexibleSpace: const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppColors.navy, Color(0xFF1C3162)],
+                  ),
+                ),
+              ),
               titleSpacing: 18,
               title: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -148,13 +158,22 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
                           ],
                         ),
                         const SizedBox(height: 22),
-                        Text(
-                          question.body,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            height: 1.55,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.navy,
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            color: AppColors.background,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Text(
+                            question.body,
+                            style: const TextStyle(
+                              fontSize: 17,
+                              height: 1.55,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.navy,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 26),
@@ -321,47 +340,86 @@ class _ExamStatusBar extends StatelessWidget {
   const _ExamStatusBar({required this.controller});
   final AppController controller;
   @override
-  Widget build(BuildContext context) => Container(
-    color: const Color(0xFFF7F8FC),
-    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-    child: Row(
-      children: [
-        Icon(
-          controller.isOnline
-              ? Icons.cloud_done_outlined
-              : Icons.cloud_off_outlined,
-          size: 17,
-          color: controller.isOnline ? AppColors.green : AppColors.amber,
-        ),
-        const SizedBox(width: 7),
-        Text(
-          controller.isOnline ? 'Online' : 'Offline',
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            color: controller.isOnline ? AppColors.green : AppColors.amber,
+  Widget build(BuildContext context) {
+    final progress =
+        (controller.currentQuestion + 1) / controller.questions.length;
+    return Container(
+      color: AppColors.background,
+      padding: const EdgeInsets.fromLTRB(18, 11, 18, 10),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                decoration: BoxDecoration(
+                  color:
+                      (controller.isOnline ? AppColors.green : AppColors.amber)
+                          .withValues(alpha: .09),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      controller.isOnline
+                          ? Icons.cloud_done_outlined
+                          : Icons.cloud_off_outlined,
+                      size: 14,
+                      color: controller.isOnline
+                          ? AppColors.green
+                          : AppColors.amber,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      controller.isOnline ? 'Tersinkron' : 'Tersimpan lokal',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        color: controller.isOnline
+                            ? AppColors.green
+                            : AppColors.amber,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${controller.answeredCount}/${controller.questions.length} terjawab',
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.muted,
+                ),
+              ),
+              if (controller.integrityEvents > 0) ...[
+                const SizedBox(width: 10),
+                const Icon(
+                  Icons.shield_outlined,
+                  color: AppColors.amber,
+                  size: 15,
+                ),
+                Text(
+                  ' ${controller.integrityEvents}',
+                  style: const TextStyle(fontSize: 10, color: AppColors.amber),
+                ),
+              ],
+            ],
           ),
-        ),
-        const Spacer(),
-        Text(
-          '${controller.answeredCount}/${controller.questions.length} terjawab',
-          style: const TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            color: AppColors.muted,
-          ),
-        ),
-        if (controller.integrityEvents > 0) ...[
-          const SizedBox(width: 10),
-          const Icon(Icons.shield_outlined, color: AppColors.amber, size: 16),
-          Text(
-            ' ${controller.integrityEvents}',
-            style: const TextStyle(fontSize: 10, color: AppColors.amber),
+          const SizedBox(height: 9),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 5,
+              backgroundColor: AppColors.border,
+              valueColor: const AlwaysStoppedAnimation(AppColors.blue),
+            ),
           ),
         ],
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }
 
 class _AnswerOption extends StatelessWidget {

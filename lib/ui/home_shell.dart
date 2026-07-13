@@ -23,31 +23,80 @@ class HomeShell extends StatelessWidget {
             ProfilePage(controller: controller),
           ],
         ),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: controller.homeTab,
-          onDestinationSelected: controller.setTab,
-          backgroundColor: Colors.white,
-          indicatorColor: const Color(0xFFE8EDFF),
-          destinations: [
-            const NavigationDestination(
-              icon: Icon(Icons.assignment_outlined),
-              selectedIcon: Icon(Icons.assignment_rounded),
-              label: 'Ujian',
-            ),
-            const NavigationDestination(
-              icon: Icon(Icons.history_rounded),
-              selectedIcon: Icon(Icons.history_rounded),
-              label: 'Riwayat',
-            ),
-            NavigationDestination(
-              icon: Badge(
-                isLabelVisible: controller.unsyncedCount > 0,
-                child: const Icon(Icons.person_outline_rounded),
-              ),
-              selectedIcon: const Icon(Icons.person_rounded),
-              label: 'Profil',
-            ),
-          ],
+        bottomNavigationBar: _BottomNav(controller: controller),
+      ),
+    );
+  }
+}
+
+class _BottomNav extends StatelessWidget {
+  const _BottomNav({required this.controller});
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    const items = [
+      (Icons.assignment_outlined, Icons.assignment_rounded, 'Ujian'),
+      (Icons.history_rounded, Icons.history_rounded, 'Riwayat'),
+      (Icons.person_outline_rounded, Icons.person_rounded, 'Profil'),
+    ];
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: AppColors.border)),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x0D101B35),
+            blurRadius: 20,
+            offset: Offset(0, -6),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 9, 22, 8),
+          child: Row(
+            children: items.asMap().entries.map((entry) {
+              final selected = controller.homeTab == entry.key;
+              final item = entry.value;
+              return Expanded(
+                child: InkWell(
+                  onTap: () => controller.setTab(entry.key),
+                  borderRadius: BorderRadius.circular(16),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      color: selected ? AppColors.blueSoft : Colors.transparent,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          selected ? item.$2 : item.$1,
+                          size: 21,
+                          color: selected ? AppColors.blue : AppColors.muted,
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          item.$3,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: selected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: selected ? AppColors.blue : AppColors.muted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
         ),
       ),
     );
@@ -137,95 +186,140 @@ class _HomeHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: AppColors.navy,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.navy, Color(0xFF1C3162)],
+        ),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(34)),
       ),
-      padding: EdgeInsets.fromLTRB(
-        20,
-        MediaQuery.paddingOf(context).top + 18,
-        20,
-        24,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Row(
-            children: [
-              const BrandMark(dark: true, size: 40),
-              const SizedBox(width: 11),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          Positioned(
+            right: -55,
+            top: -45,
+            child: Container(
+              width: 190,
+              height: 190,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white10, width: 24),
+              ),
+            ),
+          ),
+          Positioned(
+            left: -30,
+            bottom: -80,
+            child: Container(
+              width: 150,
+              height: 150,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.blue.withValues(alpha: .12),
+              ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              MediaQuery.paddingOf(context).top + 15,
+              20,
+              25,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Text(
-                      'RUANG UJIAN',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 13,
-                        letterSpacing: .8,
+                    const BrandMark(dark: true, size: 39),
+                    const SizedBox(width: 11),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'RUANG UJIAN',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                          Text(
+                            'SMP Nusantara',
+                            style: TextStyle(
+                              color: Color(0xFFA9B6D0),
+                              fontSize: 9,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    Text(
-                      'SMP Nusantara',
-                      style: TextStyle(color: Color(0xFFAAB5CA), fontSize: 10),
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: .08),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        onPressed: controller.toggleConnection,
+                        icon: const Icon(
+                          Icons.notifications_none_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
                     ),
                   ],
                 ),
-              ),
-              IconButton(
-                onPressed: controller.toggleConnection,
-                icon: const Icon(
-                  Icons.notifications_none_rounded,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 28),
-          Text(
-            'Halo, ${controller.profile.name.split(' ').first} 👋',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 23,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -.4,
-            ),
-          ),
-          const SizedBox(height: 5),
-          const Text(
-            'Siap mengerjakan ujian hari ini?',
-            style: TextStyle(color: Color(0xFFAAB5CA), fontSize: 13),
-          ),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: .08),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withValues(alpha: .08)),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  controller.isOnline
-                      ? Icons.cloud_done_outlined
-                      : Icons.cloud_off_outlined,
-                  size: 19,
-                  color: controller.isOnline
-                      ? const Color(0xFF71DFBB)
-                      : const Color(0xFFFFC764),
-                ),
-                const SizedBox(width: 9),
+                const SizedBox(height: 26),
                 Text(
-                  controller.isOnline
-                      ? 'Online • Semua data tersinkron'
-                      : 'Offline • Jawaban tetap tersimpan',
+                  'Selamat pagi, ${controller.profile.name.split(' ').first}!',
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -.7,
                   ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Ada satu ujian yang bisa kamu kerjakan hari ini.',
+                  style: TextStyle(color: Color(0xFFA9B6D0), fontSize: 12),
+                ),
+                const SizedBox(height: 22),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _HeaderStat(
+                        icon: Icons.assignment_turned_in_outlined,
+                        value: '1',
+                        label: 'Ujian aktif',
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _HeaderStat(
+                        icon: Icons.verified_outlined,
+                        value: '88',
+                        label: 'Nilai terakhir',
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _HeaderStat(
+                        icon: controller.isOnline
+                            ? Icons.cloud_done_outlined
+                            : Icons.cloud_off_outlined,
+                        value: controller.isOnline ? 'Online' : 'Offline',
+                        label: 'Status data',
+                        compact: true,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -234,6 +328,51 @@ class _HomeHeader extends StatelessWidget {
       ),
     );
   }
+}
+
+class _HeaderStat extends StatelessWidget {
+  const _HeaderStat({
+    required this.icon,
+    required this.value,
+    required this.label,
+    this.compact = false,
+  });
+  final IconData icon;
+  final String value;
+  final String label;
+  final bool compact;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(11),
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: .08),
+      borderRadius: BorderRadius.circular(15),
+      border: Border.all(color: Colors.white.withValues(alpha: .07)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 17, color: const Color(0xFF9FB0FF)),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          maxLines: 1,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: compact ? 12 : 18,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: Color(0xFFA9B6D0), fontSize: 8),
+        ),
+      ],
+    ),
+  );
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -274,113 +413,230 @@ class ExamCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final available =
         exam.state == ExamState.available || exam.state == ExamState.inProgress;
-    return Card(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: available
-                          ? const Color(0xFFEAF8F3)
-                          : const Color(0xFFF0F3FF),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      exam.subjectCode,
-                      style: TextStyle(
-                        color: available ? AppColors.green : AppColors.blue,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          exam.subject,
-                          style: const TextStyle(
-                            color: AppColors.muted,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
+    final accent = available ? AppColors.green : AppColors.blue;
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(21),
+        border: Border.all(
+          color: available ? const Color(0xFFD9EEE7) : AppColors.border,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A101B35),
+            blurRadius: 18,
+            offset: Offset(0, 7),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            child: Stack(
+              children: [
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: Container(width: 4, color: accent),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 17, 16, 15),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 50,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              color: accent.withValues(alpha: .09),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  '${exam.schedule.day}',
+                                  style: TextStyle(
+                                    color: accent,
+                                    fontSize: 19,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                Text(
+                                  'JUL',
+                                  style: TextStyle(
+                                    color: accent,
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: .7,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
+                          const SizedBox(width: 13),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      exam.subjectCode,
+                                      style: TextStyle(
+                                        color: accent,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: .5,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 7),
+                                    Container(
+                                      width: 3,
+                                      height: 3,
+                                      decoration: const BoxDecoration(
+                                        color: AppColors.muted,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 7),
+                                    Expanded(
+                                      child: Text(
+                                        exam.subject,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: AppColors.muted,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 5),
+                                Text(
+                                  exam.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(height: 1.25),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Container(
+                            width: 30,
+                            height: 30,
+                            decoration: BoxDecoration(
+                              color: AppColors.background,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.arrow_outward_rounded,
+                              size: 16,
+                              color: AppColors.muted,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 11,
+                          vertical: 10,
                         ),
-                        const SizedBox(height: 3),
-                        Text(
-                          exam.title,
-                          style: Theme.of(context).textTheme.titleMedium,
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                      ],
-                    ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.schedule_rounded,
+                              size: 15,
+                              color: AppColors.muted,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '${exam.schedule.hour.toString().padLeft(2, '0')}.${exam.schedule.minute.toString().padLeft(2, '0')} WIB',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: AppColors.text,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(width: 13),
+                            const Icon(
+                              Icons.timer_outlined,
+                              size: 15,
+                              color: AppColors.muted,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              '${exam.durationMinutes} menit',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: AppColors.text,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const Spacer(),
+                            StatusPill(
+                              label: available ? 'Mulai' : 'Terjadwal',
+                              color: accent,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: Colors.grey.shade400,
-                  ),
-                ],
-              ),
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 14),
-                child: Divider(height: 1),
-              ),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.calendar_today_outlined,
-                    size: 15,
-                    color: AppColors.muted,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    _date(exam.schedule),
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.muted,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  const Icon(
-                    Icons.timer_outlined,
-                    size: 16,
-                    color: AppColors.muted,
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    '${exam.durationMinutes} menit',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.muted,
-                    ),
-                  ),
-                  const Spacer(),
-                  StatusPill(
-                    label: available ? 'Bisa dimulai' : 'Terjadwal',
-                    color: available ? AppColors.green : AppColors.blue,
-                  ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+}
 
-  String _date(DateTime value) =>
-      '${value.day} Jul • ${value.hour.toString().padLeft(2, '0')}.${value.minute.toString().padLeft(2, '0')} WIB';
+class _HistoryStat extends StatelessWidget {
+  const _HistoryStat({
+    required this.value,
+    required this.label,
+    required this.icon,
+  });
+  final String value;
+  final String label;
+  final IconData icon;
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      Icon(icon, size: 18, color: Colors.white70),
+      const SizedBox(height: 7),
+      Text(
+        value,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 20,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      const SizedBox(height: 2),
+      Text(
+        label,
+        textAlign: TextAlign.center,
+        style: const TextStyle(color: Colors.white70, fontSize: 8),
+      ),
+    ],
+  );
 }
 
 class HistoryPage extends StatelessWidget {
@@ -410,7 +666,59 @@ class HistoryPage extends StatelessWidget {
             'Nilai hanya tampil setelah difinalisasi guru.',
             style: TextStyle(color: AppColors.muted, fontSize: 12),
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [AppColors.blue, AppColors.blueDark],
+              ),
+              borderRadius: BorderRadius.circular(21),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x254B6BFB),
+                  blurRadius: 22,
+                  offset: Offset(0, 9),
+                ),
+              ],
+            ),
+            child: const Row(
+              children: [
+                Expanded(
+                  child: _HistoryStat(
+                    value: '88',
+                    label: 'Rata-rata',
+                    icon: Icons.trending_up_rounded,
+                  ),
+                ),
+                SizedBox(
+                  height: 46,
+                  child: VerticalDivider(color: Colors.white24),
+                ),
+                Expanded(
+                  child: _HistoryStat(
+                    value: '1',
+                    label: 'Ujian selesai',
+                    icon: Icons.task_alt_rounded,
+                  ),
+                ),
+                SizedBox(
+                  height: 46,
+                  child: VerticalDivider(color: Colors.white24),
+                ),
+                Expanded(
+                  child: _HistoryStat(
+                    value: 'A',
+                    label: 'Predikat',
+                    icon: Icons.workspace_premium_outlined,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text('Hasil terbaru', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 10),
           ...completed.map(
             (exam) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -506,29 +814,51 @@ class ProfilePage extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          Card(
+          Container(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [AppColors.navy, Color(0xFF213B78)],
+              ),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x1F101B35),
+                  blurRadius: 25,
+                  offset: Offset(0, 10),
+                ),
+              ],
+            ),
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
                   CircleAvatar(
                     radius: 34,
-                    backgroundColor: const Color(0xFFE8EDFF),
+                    backgroundColor: Colors.white.withValues(alpha: .12),
                     child: Text(
                       p.name.split(' ').map((e) => e[0]).take(2).join(),
                       style: const TextStyle(
                         fontWeight: FontWeight.w800,
-                        color: AppColors.blue,
+                        color: Colors.white,
                         fontSize: 20,
                       ),
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Text(p.name, style: Theme.of(context).textTheme.titleLarge),
+                  Text(
+                    p.name,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleLarge?.copyWith(color: Colors.white),
+                  ),
                   const SizedBox(height: 4),
                   Text(
                     '${p.studentNumber} • ${p.className}',
-                    style: Theme.of(context).textTheme.bodySmall,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: const Color(0xFFB6C2DC),
+                    ),
                   ),
                 ],
               ),
