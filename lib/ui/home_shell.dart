@@ -1232,129 +1232,417 @@ class ProfilePage extends StatelessWidget {
     final p = controller.profile;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profil'),
+        title: const Text('Akun saya'),
         backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 14),
+            child: IconButton.filledTonal(
+              onPressed: () {},
+              icon: const Icon(Icons.edit_outlined, size: 18),
+              style: IconButton.styleFrom(
+                backgroundColor: AppColors.blueSoft,
+                foregroundColor: AppColors.blue,
+              ),
+            ),
+          ),
+        ],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
         children: [
           Container(
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [AppColors.navy, Color(0xFF213B78)],
+                colors: [Color(0xFF7162ED), Color(0xFF5546D8)],
               ),
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(26),
               boxShadow: const [
                 BoxShadow(
-                  color: Color(0x1F101B35),
+                  color: Color(0x286657E8),
                   blurRadius: 25,
-                  offset: Offset(0, 10),
+                  offset: Offset(0, 11),
                 ),
               ],
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  CircleAvatar(
-                    radius: 34,
-                    backgroundColor: Colors.white.withValues(alpha: .12),
-                    child: Text(
-                      p.name.split(' ').map((e) => e[0]).take(2).join(),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        fontSize: 20,
+            child: Stack(
+              children: [
+                Positioned(
+                  right: -30,
+                  top: -45,
+                  child: Container(
+                    width: 125,
+                    height: 125,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: .10),
+                        width: 18,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    p.name,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.titleLarge?.copyWith(color: Colors.white),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${p.studentNumber} • ${p.className}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: const Color(0xFFB6C2DC),
+                ),
+                Column(
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 64,
+                          height: 64,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(21),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x22000000),
+                                blurRadius: 15,
+                                offset: Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            p.name.split(' ').map((e) => e[0]).take(2).join(),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.blue,
+                              fontSize: 19,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 15),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                p.name,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -.4,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                p.school,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 10,
+                                ),
+                              ),
+                              const SizedBox(height: 9),
+                              Wrap(
+                                spacing: 6,
+                                children: [
+                                  _ProfileChip(label: 'NIS ${p.studentNumber}'),
+                                  _ProfileChip(label: 'Kelas ${p.className}'),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Card(
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(
-                    Icons.school_outlined,
-                    color: AppColors.blue,
-                  ),
-                  title: const Text('Sekolah'),
-                  subtitle: Text(p.school),
-                ),
-                const Divider(height: 1, indent: 56),
-                ListTile(
-                  leading: const Icon(
-                    Icons.cloud_outlined,
-                    color: AppColors.blue,
-                  ),
-                  title: const Text('Penyimpanan lokal'),
-                  subtitle: Text(
-                    controller.unsyncedCount == 0
-                        ? 'Tidak ada data menunggu sinkronisasi'
-                        : '${controller.unsyncedCount} jawaban menunggu jaringan',
-                  ),
-                ),
-                const Divider(height: 1, indent: 56),
-                const ListTile(
-                  leading: Icon(
-                    Icons.text_fields_rounded,
-                    color: AppColors.blue,
-                  ),
-                  title: Text('Ukuran teks'),
-                  subtitle: Text('Mengikuti pengaturan perangkat'),
-                  trailing: Icon(Icons.chevron_right_rounded),
-                ),
-                const Divider(height: 1, indent: 56),
-                const ListTile(
-                  leading: Icon(
-                    Icons.lock_outline_rounded,
-                    color: AppColors.blue,
-                  ),
-                  title: Text('Ganti kata sandi'),
-                  trailing: Icon(Icons.chevron_right_rounded),
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: .11),
+                        borderRadius: BorderRadius.circular(17),
+                      ),
+                      child: const Row(
+                        children: [
+                          Expanded(
+                            child: _ProfileStat(
+                              value: '4',
+                              label: 'Total ujian',
+                            ),
+                          ),
+                          SizedBox(
+                            height: 28,
+                            child: VerticalDivider(color: Colors.white24),
+                          ),
+                          Expanded(
+                            child: _ProfileStat(
+                              value: '88',
+                              label: 'Rata-rata',
+                            ),
+                          ),
+                          SizedBox(
+                            height: 28,
+                            child: VerticalDivider(color: Colors.white24),
+                          ),
+                          Expanded(
+                            child: _ProfileStat(
+                              value: '100%',
+                              label: 'Tersinkron',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          OutlinedButton.icon(
-            onPressed: controller.logout,
-            icon: const Icon(Icons.logout_rounded),
-            label: const Text('Keluar dari akun'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.red,
-              side: const BorderSide(color: Color(0xFFF1CACA)),
-              minimumSize: const Size.fromHeight(50),
+          const SizedBox(height: 25),
+          const _ProfileSectionTitle(title: 'PREFERENSI'),
+          const SizedBox(height: 9),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              children: [
+                _ProfileMenu(
+                  icon: Icons.text_fields_rounded,
+                  iconColor: AppColors.blue,
+                  iconBackground: AppColors.blueSoft,
+                  title: 'Tampilan & ukuran teks',
+                  subtitle: 'Mengikuti pengaturan perangkat',
+                  onTap: () {},
+                ),
+                const _ProfileDivider(),
+                _ProfileMenu(
+                  icon: Icons.notifications_none_rounded,
+                  iconColor: AppColors.amber,
+                  iconBackground: Color(0xFFFFF5E5),
+                  title: 'Pengingat ujian',
+                  subtitle: 'Aktif • 15 menit sebelum ujian',
+                  onTap: () {},
+                ),
+                const _ProfileDivider(),
+                _ProfileMenu(
+                  icon: Icons.lock_outline_rounded,
+                  iconColor: AppColors.green,
+                  iconBackground: Color(0xFFE8F8F4),
+                  title: 'Keamanan akun',
+                  subtitle: 'Kata sandi dan perangkat aktif',
+                  onTap: () {},
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 21),
+          const _ProfileSectionTitle(title: 'DATA & BANTUAN'),
+          const SizedBox(height: 9),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              children: [
+                _ProfileMenu(
+                  icon: controller.unsyncedCount == 0
+                      ? Icons.cloud_done_outlined
+                      : Icons.cloud_off_outlined,
+                  iconColor: AppColors.green,
+                  iconBackground: const Color(0xFFE8F8F4),
+                  title: 'Penyimpanan & sinkronisasi',
+                  subtitle: controller.unsyncedCount == 0
+                      ? 'Semua data tersimpan aman'
+                      : '${controller.unsyncedCount} jawaban menunggu jaringan',
+                  trailing: const _SyncedBadge(),
+                  onTap: () {},
+                ),
+                const _ProfileDivider(),
+                _ProfileMenu(
+                  icon: Icons.help_outline_rounded,
+                  iconColor: const Color(0xFFEF7A56),
+                  iconBackground: const Color(0xFFFFEEE9),
+                  title: 'Pusat bantuan',
+                  subtitle: 'Panduan dan bantuan teknis',
+                  onTap: () {},
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 22),
+          TextButton.icon(
+            onPressed: controller.logout,
+            icon: const Icon(Icons.logout_rounded, size: 18),
+            label: const Text('Keluar dari akun'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.red,
+              minimumSize: const Size.fromHeight(50),
+              backgroundColor: const Color(0xFFFFF1F1),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
           const Text(
-            'Ruang Ujian Siswa • v1.0.0',
+            'RuangUjian Student  •  Versi 1.0.0',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 10, color: AppColors.muted),
+            style: TextStyle(fontSize: 9, color: AppColors.muted),
           ),
         ],
       ),
     );
   }
+}
+
+class _ProfileChip extends StatelessWidget {
+  const _ProfileChip({required this.label});
+  final String label;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: .13),
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Text(
+      label,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 8,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+  );
+}
+
+class _ProfileStat extends StatelessWidget {
+  const _ProfileStat({required this.value, required this.label});
+  final String value;
+  final String label;
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      Text(
+        value,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 16,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      const SizedBox(height: 2),
+      Text(label, style: const TextStyle(color: Colors.white60, fontSize: 8)),
+    ],
+  );
+}
+
+class _ProfileSectionTitle extends StatelessWidget {
+  const _ProfileSectionTitle({required this.title});
+  final String title;
+  @override
+  Widget build(BuildContext context) => Text(
+    title,
+    style: const TextStyle(
+      color: AppColors.muted,
+      fontSize: 9,
+      fontWeight: FontWeight.w800,
+      letterSpacing: 1.1,
+    ),
+  );
+}
+
+class _ProfileMenu extends StatelessWidget {
+  const _ProfileMenu({
+    required this.icon,
+    required this.iconColor,
+    required this.iconBackground,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.trailing,
+  });
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBackground;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: iconBackground,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: iconColor, size: 19),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.text,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 9, color: AppColors.muted),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          trailing ??
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 19,
+                color: AppColors.muted,
+              ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _ProfileDivider extends StatelessWidget {
+  const _ProfileDivider();
+  @override
+  Widget build(BuildContext context) =>
+      const Divider(height: 1, indent: 64, color: AppColors.border);
+}
+
+class _SyncedBadge extends StatelessWidget {
+  const _SyncedBadge();
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+    decoration: BoxDecoration(
+      color: const Color(0xFFE8F8F4),
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: const Text(
+      'AMAN',
+      style: TextStyle(
+        color: AppColors.green,
+        fontSize: 7,
+        fontWeight: FontWeight.w800,
+      ),
+    ),
+  );
 }

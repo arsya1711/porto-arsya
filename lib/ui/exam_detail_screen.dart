@@ -279,14 +279,18 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                   color: agreed ? const Color(0xFFC9D2FF) : AppColors.border,
                 ),
               ),
-              child: CheckboxListTile(
-                value: agreed,
-                onChanged: (value) => setState(() => agreed = value ?? false),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                controlAffinity: ListTileControlAffinity.leading,
-                title: const Text(
-                  'Saya sudah membaca petunjuk dan siap memulai.',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(15),
+                child: CheckboxListTile(
+                  value: agreed,
+                  onChanged: (value) => setState(() => agreed = value ?? false),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: const Text(
+                    'Saya sudah membaca petunjuk dan siap memulai.',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
             ),
