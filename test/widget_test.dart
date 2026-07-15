@@ -8,6 +8,9 @@ void main() {
 
     expect(find.text('Halo, selamat datang 👋'), findsOneWidget);
 
+    await tester.enterText(find.byType(TextField).at(0), '24001');
+    await tester.enterText(find.byType(TextField).at(1), 'siswa123');
+
     await tester.scrollUntilVisible(
       find.text('Masuk ke aplikasi'),
       300,

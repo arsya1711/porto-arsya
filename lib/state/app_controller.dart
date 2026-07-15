@@ -2,13 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import '../data/demo_repository.dart';
+import '../data/exam_repository.dart';
 import '../models/models.dart';
 
 class AppController extends ChangeNotifier {
   AppController(this.repository);
 
-  final DemoRepository repository;
+  final ExamRepository repository;
+  String? authenticationError;
   bool isLoggedIn = false;
   bool isAuthenticating = false;
   bool isOnline = true;
@@ -31,17 +32,34 @@ class AppController extends ChangeNotifier {
 
   Future<bool> login(String username, String password) async {
     isAuthenticating = true;
+    authenticationError = null;
     notifyListeners();
-    final success = await repository.authenticate(username, password);
-    isAuthenticating = false;
-    isLoggedIn = success;
-    notifyListeners();
-    return success;
+    try {
+      await repository.authenticate(username, password);
+      isLoggedIn = true;
+      return true;
+    } on AuthenticationException catch (error) {
+      authenticationError = error.message;
+      return false;
+    } catch (_) {
+      authenticationError =
+          'Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.';
+      return false;
+    } finally {
+      isAuthenticating = false;
+      notifyListeners();
+    }
   }
 
-  void logout() {
+  Future<void> logout() async {
+    await repository.signOut();
     isLoggedIn = false;
     homeTab = 0;
+    notifyListeners();
+  }
+
+  Future<void> refreshExams() async {
+    await repository.refreshExams();
     notifyListeners();
   }
 

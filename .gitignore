@@ -33,6 +33,9 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Local Supabase configuration. Keep the template in version control.
+.env
+
 # Symbolication related
 app.*.symbols
 

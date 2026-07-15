@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 
 import 'data/demo_repository.dart';
+import 'data/exam_repository.dart';
 import 'state/app_controller.dart';
 import 'theme/app_theme.dart';
 import 'ui/home_shell.dart';
 import 'ui/login_screen.dart';
 
 class RuangUjianApp extends StatefulWidget {
-  const RuangUjianApp({super.key});
+  const RuangUjianApp({super.key, this.repository});
+
+  final ExamRepository? repository;
 
   @override
   State<RuangUjianApp> createState() => _RuangUjianAppState();
@@ -19,7 +22,7 @@ class _RuangUjianAppState extends State<RuangUjianApp> {
   @override
   void initState() {
     super.initState();
-    controller = AppController(DemoRepository());
+    controller = AppController(widget.repository ?? DemoRepository());
   }
 
   @override

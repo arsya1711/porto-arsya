@@ -12,8 +12,8 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final username = TextEditingController(text: '24001');
-  final password = TextEditingController(text: 'siswa123');
+  final username = TextEditingController();
+  final password = TextEditingController();
   bool obscure = true;
   String? error;
 
@@ -26,9 +26,19 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> submit() async {
     FocusScope.of(context).unfocus();
+    final studentNumber = username.text.trim();
+    if (studentNumber.length < 3) {
+      setState(() => error = 'NIS wajib diisi minimal 3 karakter.');
+      return;
+    }
+    if (password.text.length < 8) {
+      setState(() => error = 'Kata sandi minimal 8 karakter.');
+      return;
+    }
+    setState(() => error = null);
     final success = await widget.controller.login(username.text, password.text);
     if (mounted && !success) {
-      setState(() => error = 'NIS atau kata sandi salah.');
+      setState(() => error = widget.controller.authenticationError);
     }
   }
 

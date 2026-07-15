@@ -1,6 +1,8 @@
 import '../models/models.dart';
+import 'exam_repository.dart';
 
-class DemoRepository {
+class DemoRepository implements ExamRepository {
+  @override
   final profile = const StudentProfile(
     name: 'Alya Putri',
     studentNumber: '24001',
@@ -8,6 +10,7 @@ class DemoRepository {
     school: 'SMP Nusantara',
   );
 
+  @override
   late final List<Exam> exams = [
     Exam(
       id: 'exam-1',
@@ -71,6 +74,7 @@ class DemoRepository {
     ),
   ];
 
+  @override
   final List<ExamQuestion> questions = const [
     ExamQuestion(
       id: 'q1',
@@ -105,8 +109,17 @@ class DemoRepository {
     ),
   ];
 
-  Future<bool> authenticate(String username, String password) async {
+  @override
+  Future<void> authenticate(String username, String password) async {
     await Future<void>.delayed(const Duration(milliseconds: 650));
-    return username.trim().isNotEmpty && password.length >= 4;
+    if (username != '24001' || password != 'siswa123') {
+      throw const AuthenticationException('NIS atau kata sandi salah.');
+    }
   }
+
+  @override
+  Future<void> refreshExams() async {}
+
+  @override
+  Future<void> signOut() async {}
 }

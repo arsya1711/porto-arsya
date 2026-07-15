@@ -119,8 +119,7 @@ class ExamHome extends StatelessWidget {
         .where((e) => e.state == ExamState.upcoming)
         .toList();
     return RefreshIndicator(
-      onRefresh: () async =>
-          Future<void>.delayed(const Duration(milliseconds: 500)),
+      onRefresh: controller.refreshExams,
       child: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(child: _HomeHeader(controller: controller)),
@@ -135,14 +134,16 @@ class ExamHome extends StatelessWidget {
           ),
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            sliver: SliverList.separated(
-              itemCount: available.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 12),
-              itemBuilder: (context, index) => FeaturedExamCard(
-                exam: available[index],
-                onTap: () => _openExam(context, available[index]),
-              ),
-            ),
+            sliver: available.isEmpty && upcoming.isEmpty
+                ? const SliverToBoxAdapter(child: _EmptyExamState())
+                : SliverList.separated(
+                    itemCount: available.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) => FeaturedExamCard(
+                      exam: available[index],
+                      onTap: () => _openExam(context, available[index]),
+                    ),
+                  ),
           ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(20, 28, 20, 8),
@@ -176,6 +177,36 @@ class ExamHome extends StatelessWidget {
       ),
     );
   }
+}
+
+class _EmptyExamState extends StatelessWidget {
+  const _EmptyExamState();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(24),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      border: Border.all(color: AppColors.border),
+      borderRadius: BorderRadius.circular(18),
+    ),
+    child: const Column(
+      children: [
+        Icon(Icons.event_available_outlined, size: 38, color: AppColors.muted),
+        SizedBox(height: 12),
+        Text(
+          'Belum ada ujian untukmu',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+        ),
+        SizedBox(height: 5),
+        Text(
+          'Ujian akan muncul setelah guru menugaskannya ke akun siswa ini.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 11, color: AppColors.muted),
+        ),
+      ],
+    ),
+  );
 }
 
 class _HomeHeader extends StatelessWidget {
