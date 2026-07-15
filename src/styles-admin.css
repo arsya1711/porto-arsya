@@ -18,7 +18,7 @@
 .admin-quick-form p {
   margin: 0 0 20px;
   color: #8b95a7;
-  font-size: 9px;
+  font-size: 16px;
   line-height: 1.55;
 }
 
@@ -26,7 +26,7 @@
   display: block;
   margin-bottom: 12px;
   color: #5c6678;
-  font-size: 9px;
+  font-size: 16px;
   font-weight: 700;
 }
 
@@ -38,7 +38,7 @@
   padding: 10px 11px;
   outline: none;
   color: #333e52;
-  font-size: 10px;
+  font-size: 13px;
 }
 
 .admin-quick-form input:focus {
@@ -85,7 +85,7 @@
   align-items: center;
   gap: 6px;
   color: #8993a5;
-  font-size: 8px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -115,7 +115,7 @@
   background: white;
   color: #657084;
   padding: 0 9px;
-  font-size: 8px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -130,7 +130,7 @@
   background: #f0f2f6;
   color: #5d687a;
   padding: 4px 7px;
-  font-size: 8px;
+  font-size: 14px;
   font-weight: 750;
   text-transform: uppercase;
 }
@@ -153,9 +153,9 @@
 .audit-summary small,
 .audit-summary b,
 .audit-summary p span { display: block; }
-.audit-summary small { color: #8993a5; font-size: 8px; font-weight: 700; }
+.audit-summary small { color: #8993a5; font-size: 14px; font-weight: 700; }
 .audit-summary b { margin: 4px 0 2px; color: #263247; font: 800 18px "Manrope"; }
-.audit-summary p span { color: #9aa2af; font-size: 8px; }
+.audit-summary p span { color: #9aa2af; font-size: 14px; }
 
 @media (max-width: 1050px) {
   .audit-summary { grid-template-columns: repeat(2, 1fr); }
