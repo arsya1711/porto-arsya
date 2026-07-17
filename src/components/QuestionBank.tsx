@@ -963,11 +963,16 @@ function BankModal({
               </select>
             </FormField>
             <FormField label="Tingkat kelas">
-              <input
+              <select
                 value={gradeLevel}
                 onChange={(event) => setGradeLevel(event.target.value)}
-                placeholder="Contoh: IX"
-              />
+                required
+              >
+                <option value="">Pilih tingkat kelas</option>
+                <option value="VII">VII</option>
+                <option value="VIII">VIII</option>
+                <option value="IX">IX</option>
+              </select>
             </FormField>
           </div>
         </div>
@@ -977,7 +982,7 @@ function BankModal({
           </button>
           <button
             className="primary"
-            disabled={saving || !name.trim() || !subjectId}
+            disabled={saving || !name.trim() || !subjectId || !gradeLevel}
           >
             {saving ? "Menyimpan…" : "Simpan Bank"}
           </button>
