@@ -25,7 +25,6 @@ import {
   CalendarDays,
   Check,
   CheckCircle2,
-  ChevronDown,
   ChevronRight,
   ClipboardCheck,
   Clock3,
@@ -491,7 +490,6 @@ function Portal({
     ["/app/audit", <LockKeyhole />, "Audit & Keamanan"],
   ];
   const nav = role === "admin" ? adminNav : teacherNav;
-  const initials = getInitials(profile.full_name);
   useEffect(() => {
     let animation: { kill: () => void } | undefined;
     let cancelled = false;
@@ -513,17 +511,6 @@ function Portal({
             Ruang Ujian<small>{schoolBrand.name}</small>
           </b>
         </Link>
-        <div className="workspace">
-          <small>RUANG KERJA</small>
-          <button>
-            <span>{initials}</span>
-            <b>
-              {profile.full_name}
-              <small>{role === "admin" ? "Administrator" : "Guru"}</small>
-            </b>
-            <ChevronDown />
-          </button>
-        </div>
         <nav>
           {nav.map(([to, icon, label]) => (
             <Link
