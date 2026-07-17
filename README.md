@@ -44,6 +44,8 @@ npm run dev
    - `supabase/migrations/008_exam_scoring.sql`
    - `supabase/migrations/009_exam_access_hardening.sql`
    - `supabase/migrations/010_atomic_exam_creation.sql`
+   - `supabase/migrations/011_real_assessment_workflow.sql`
+   - `supabase/migrations/012_admin_experience_settings.sql`
 3. Isi `.env.local`:
 
 ```env

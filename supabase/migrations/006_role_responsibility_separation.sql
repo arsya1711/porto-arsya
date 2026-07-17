@@ -135,6 +135,7 @@ after insert or update or delete on public.class_students
 for each row execute function public.audit_master_data_change();
 
 drop policy if exists "staff manages classes" on public.classes;
+drop policy if exists "admin manages classes" on public.classes;
 create policy "admin manages classes"
 on public.classes for all
 using(public.current_role() = 'admin')
@@ -142,6 +143,8 @@ with check(public.current_role() = 'admin');
 
 drop policy if exists "authenticated reads class students" on public.class_students;
 drop policy if exists "staff manages class students" on public.class_students;
+drop policy if exists "scoped reads class students" on public.class_students;
+drop policy if exists "admin manages class students" on public.class_students;
 create policy "scoped reads class students"
 on public.class_students for select
 using(
@@ -154,12 +157,15 @@ using(public.current_role() = 'admin')
 with check(public.current_role() = 'admin');
 
 drop policy if exists "staff manages subjects" on public.subjects;
+drop policy if exists "admin manages subjects" on public.subjects;
 create policy "admin manages subjects"
 on public.subjects for all
 using(public.current_role() = 'admin')
 with check(public.current_role() = 'admin');
 
 drop policy if exists "staff manages assignments" on public.teacher_subjects;
+drop policy if exists "teachers read own assignments" on public.teacher_subjects;
+drop policy if exists "admin manages teacher assignments" on public.teacher_subjects;
 create policy "teachers read own assignments"
 on public.teacher_subjects for select
 using(
@@ -172,12 +178,14 @@ using(public.current_role() = 'admin')
 with check(public.current_role() = 'admin');
 
 drop policy if exists "staff manages banks" on public.question_banks;
+drop policy if exists "teachers manage own banks" on public.question_banks;
 create policy "teachers manage own banks"
 on public.question_banks for all
 using(public.current_role() = 'guru' and owner_id = auth.uid())
 with check(public.current_role() = 'guru' and owner_id = auth.uid());
 
 drop policy if exists "staff manages questions" on public.questions;
+drop policy if exists "teachers manage questions in own banks" on public.questions;
 create policy "teachers manage questions in own banks"
 on public.questions for all
 using(
@@ -191,6 +199,8 @@ with check(
 );
 
 drop policy if exists "staff manages exams" on public.exams;
+drop policy if exists "teachers manage own exams" on public.exams;
+drop policy if exists "admin reads all exams" on public.exams;
 create policy "teachers manage own exams"
 on public.exams for all
 using(public.current_role() = 'guru' and created_by = auth.uid())
@@ -200,6 +210,8 @@ on public.exams for select
 using(public.current_role() = 'admin');
 
 drop policy if exists "staff manages exam questions" on public.exam_questions;
+drop policy if exists "teachers manage own exam questions" on public.exam_questions;
+drop policy if exists "admin reads all exam questions" on public.exam_questions;
 create policy "teachers manage own exam questions"
 on public.exam_questions for all
 using(
@@ -215,6 +227,8 @@ on public.exam_questions for select
 using(public.current_role() = 'admin');
 
 drop policy if exists "staff manages exam assignments" on public.exam_assignments;
+drop policy if exists "teachers manage own exam assignments" on public.exam_assignments;
+drop policy if exists "admin reads all exam assignments" on public.exam_assignments;
 create policy "teachers manage own exam assignments"
 on public.exam_assignments for all
 using(
@@ -230,6 +244,8 @@ on public.exam_assignments for select
 using(public.current_role() = 'admin');
 
 drop policy if exists "staff reads attempts" on public.attempts;
+drop policy if exists "teachers read attempts for own exams" on public.attempts;
+drop policy if exists "admin reads all attempts" on public.attempts;
 create policy "teachers read attempts for own exams"
 on public.attempts for select
 using(
@@ -241,6 +257,8 @@ on public.attempts for select
 using(public.current_role() = 'admin');
 
 drop policy if exists "staff grades answers" on public.answers;
+drop policy if exists "teachers grade answers for own exams" on public.answers;
+drop policy if exists "admin reads all answers" on public.answers;
 create policy "teachers grade answers for own exams"
 on public.answers for all
 using(
@@ -256,6 +274,8 @@ on public.answers for select
 using(public.current_role() = 'admin');
 
 drop policy if exists "staff reads integrity" on public.integrity_events;
+drop policy if exists "teachers read integrity for own exams" on public.integrity_events;
+drop policy if exists "admin reads all integrity events" on public.integrity_events;
 create policy "teachers read integrity for own exams"
 on public.integrity_events for select
 using(
@@ -267,6 +287,7 @@ on public.integrity_events for select
 using(public.current_role() = 'admin');
 
 drop policy if exists "staff reads audit logs" on public.audit_logs;
+drop policy if exists "admin reads audit logs" on public.audit_logs;
 create policy "admin reads audit logs"
 on public.audit_logs for select
 using(public.current_role() = 'admin');
