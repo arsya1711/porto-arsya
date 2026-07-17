@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { supabase } from "../lib/supabase";
-import { questions as seedQuestions, type Question } from "../mockData";
+import { type Question } from "../types";
 
 type Notify = (text: string, error?: boolean) => void;
 type SubjectOption = { id: string; name: string };
@@ -68,23 +68,12 @@ function titleCase(value: string) {
   return value ? value[0].toUpperCase() + value.slice(1) : value;
 }
 
-function localBankId(name: string) {
-  return `local-${name.toLowerCase().replace(/\s+/g, "-")}`;
-}
-
 export function QuestionBank({ notify }: { notify: Notify }) {
   const { profile } = useAuth();
-  const [questions, setQuestions] = useState<Question[]>(
-    supabase
-      ? []
-      : seedQuestions.map((question) => ({
-          ...question,
-          bankId: localBankId(question.bank),
-        })),
-  );
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [banks, setBanks] = useState<Bank[]>([]);
   const [subjects, setSubjects] = useState<SubjectOption[]>([]);
-  const [loading, setLoading] = useState(Boolean(supabase));
+  const [loading, setLoading] = useState(true);
   const [createQuestion, setCreateQuestion] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [createBank, setCreateBank] = useState(false);
@@ -98,26 +87,8 @@ export function QuestionBank({ notify }: { notify: Notify }) {
 
   const loadData = useCallback(async () => {
     if (!supabase) {
-      const localSubjects = Array.from(
-        new Set(seedQuestions.map((question) => question.subject)),
-      ).map((name) => ({ id: name.toLowerCase(), name }));
-      const localBanks = Array.from(
-        new Set(seedQuestions.map((question) => question.bank)),
-      ).map((name) => {
-        const first = seedQuestions.find((question) => question.bank === name)!;
-        return {
-          id: localBankId(name),
-          name,
-          subjectId: first.subject.toLowerCase(),
-          subject: first.subject,
-          gradeLevel: "",
-          questionCount: seedQuestions.filter(
-            (question) => question.bank === name,
-          ).length,
-        };
-      });
-      setSubjects(localSubjects);
-      setBanks(localBanks);
+      setLoading(false);
+      notify("Server belum dikonfigurasi. Bank soal tidak dapat digunakan.", true);
       return;
     }
 

@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import type { Profile } from "../auth/AuthContext";
 import { supabase } from "../lib/supabase";
-import type { ExamStatus } from "../mockData";
+import type { ExamStatus } from "../types";
 
 type StaffExam = {
   id: string;

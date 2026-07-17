@@ -1,7 +1,7 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
-import type { Role } from '../mockData'
-import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import type { Role } from '../types'
+import { supabase } from '../lib/supabase'
 
 export type Profile = {
   id: string
@@ -17,10 +17,8 @@ type AuthContextValue = {
   user: User | null
   profile: Profile | null
   loading: boolean
-  demo: boolean
   passwordRecovery: boolean
   login: (email: string, password: string) => Promise<Profile>
-  loginDemo: (role: Role) => void
   logout: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
   updatePassword: (password: string) => Promise<void>
@@ -33,7 +31,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
-  const [demo, setDemo] = useState(false)
   const [passwordRecovery, setPasswordRecovery] = useState(false)
 
   const fetchProfile = useCallback(async (userId: string): Promise<Profile> => {
@@ -58,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: listener } = client.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession)
       if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true)
-      if (!nextSession) { setProfile(null); setDemo(false); return }
+      if (!nextSession) { setProfile(null); return }
       window.setTimeout(() => fetchProfile(nextSession.user.id).then(setProfile).catch(async() => { setProfile(null); await client.auth.signOut() }), 0)
     })
     return () => listener.subscription.unsubscribe()
@@ -69,7 +66,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user: session?.user ?? null,
     profile,
     loading,
-    demo,
     passwordRecovery,
     login: async (email, password) => {
       if (!supabase) throw new Error('Supabase belum dikonfigurasi.')
@@ -79,15 +75,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try { nextProfile = await fetchProfile(data.user.id) }
       catch (error) { await supabase.auth.signOut(); throw error }
       if (!nextProfile) throw new Error('Profil pengguna tidak ditemukan.')
-      setSession(data.session); setProfile(nextProfile); setDemo(false)
+      setSession(data.session); setProfile(nextProfile)
       return nextProfile
     },
-    loginDemo: (role) => {
-      if (isSupabaseConfigured) return
-      setDemo(true)
-      setProfile({ id: `demo-${role}`, full_name: role === 'siswa' ? 'Alya Putri' : role === 'admin' ? 'Admin Sekolah' : 'Ibu Rina', email: `demo-${role}@local`, role, student_number: role === 'siswa' ? '24001' : null, active: true })
-    },
-    logout: async () => { await supabase?.auth.signOut(); setSession(null); setProfile(null); setDemo(false) },
+    logout: async () => { await supabase?.auth.signOut(); setSession(null); setProfile(null) },
     resetPassword: async (email) => {
       if (!supabase) throw new Error('Supabase belum dikonfigurasi.')
       const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/` })
@@ -100,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setPasswordRecovery(false)
     },
     refreshProfile: async () => { if (session) setProfile(await fetchProfile(session.user.id)) },
-  }), [session, profile, loading, demo, passwordRecovery, fetchProfile])
+  }), [session, profile, loading, passwordRecovery, fetchProfile])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

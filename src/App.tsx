@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -35,7 +36,6 @@ import {
   Eye,
   EyeOff,
   FileQuestion,
-  Filter,
   GraduationCap,
   LayoutDashboard,
   LockKeyhole,
@@ -55,12 +55,7 @@ import {
   Wifi,
   X,
 } from "lucide-react";
-import {
-  examQuestions,
-  exams as seedExams,
-  type Exam,
-  type Role,
-} from "./mockData";
+import { type Exam, type Role } from "./types";
 import {
   isSupabaseConfigured,
   loadLocal,
@@ -95,7 +90,7 @@ function Application() {
     updatePassword,
   } = useAuth();
   const [toast, setToast] = useState<Toast>(null);
-  const [examList, setExamList] = useState<Exam[]>(seedExams);
+  const [examList, setExamList] = useState<Exam[]>([]);
 
   useEffect(() => {
     if (!toast) return;
@@ -112,7 +107,7 @@ function Application() {
       )
       .order("starts_at")
       .then((examResult) => {
-        if (!examResult.error && examResult.data?.length) {
+        if (!examResult.error) {
           setExamList(
             examResult.data.map((row) => ({
               id: row.id,
@@ -142,6 +137,15 @@ function Application() {
     (text: string, error = false) => setToast({ text, error }),
     [],
   );
+  if (!isSupabaseConfigured) {
+    return (
+      <main className="auth-loading">
+        <span><AlertTriangle /></span>
+        <h1>Konfigurasi server belum tersedia</h1>
+        <p>Administrator harus mengatur VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY sebelum aplikasi digunakan.</p>
+      </main>
+    );
+  }
   if (authLoading)
     return (
       <div className="auth-loading">
@@ -306,7 +310,7 @@ function Login({
 }: {
   notify: (text: string, error?: boolean) => void;
 }) {
-  const { login, loginDemo, resetPassword } = useAuth();
+  const { login, resetPassword } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -327,10 +331,6 @@ function Login({
     } finally {
       setLoading(false);
     }
-  };
-  const demo = (role: Role) => {
-    loginDemo(role);
-    navigate(role === "siswa" ? "/siswa" : "/app");
   };
   const forgotPassword = async () => {
     if (!email) {
@@ -433,29 +433,11 @@ function Login({
             {loading ? "Memeriksa…" : "Masuk"}
             <ArrowRight />
           </button>
-          {!isSupabaseConfigured && (
-            <>
-              <div className="divider">
-                <span>atau coba mode demo</span>
-              </div>
-              <div className="demo-buttons">
-                <button type="button" onClick={() => demo("admin")}>
-                  Admin
-                </button>
-                <button type="button" onClick={() => demo("guru")}>
-                  Guru
-                </button>
-                <button type="button" onClick={() => demo("siswa")}>
-                  Siswa
-                </button>
-              </div>
-            </>
-          )}
           <p className="connection">
             <i className={isSupabaseConfigured ? "online" : ""} />
             {isSupabaseConfigured
               ? "Autentikasi Supabase aktif"
-              : "Mode demo lokal aktif"}
+              : "Konfigurasi server belum tersedia"}
           </p>
         </form>
       </section>
@@ -547,23 +529,30 @@ function Portal({
       <main className="portal-main">
         <Topbar profile={profile} />
         <Routes>
-          <Route
-            index
-            element={<StaffDashboard profile={profile} />}
-          />
+          <Route index element={<StaffDashboard profile={profile} />} />
           <Route
             path="ujian"
-            element={role === "guru" ? (
-              <ExamManagement
-                exams={exams}
-                setExams={setExams}
-                notify={notify}
-              />
-            ) : <Navigate to="/app" />}
+            element={
+              role === "guru" ? (
+                <ExamManagement
+                  exams={exams}
+                  setExams={setExams}
+                  notify={notify}
+                />
+              ) : (
+                <Navigate to="/app" />
+              )
+            }
           />
           <Route
             path="bank-soal"
-            element={role === "guru" ? <QuestionBank notify={notify} /> : <Navigate to="/app" />}
+            element={
+              role === "guru" ? (
+                <QuestionBank notify={notify} />
+              ) : (
+                <Navigate to="/app" />
+              )
+            }
           />
           <Route
             path="kelas"
@@ -611,22 +600,49 @@ function Portal({
           />
           <Route
             path="tahun-ajaran"
-            element={role === "admin" ? <AcademicYearsPage notify={notify} /> : <Navigate to="/app" />}
+            element={
+              role === "admin" ? (
+                <AcademicYearsPage notify={notify} />
+              ) : (
+                <Navigate to="/app" />
+              )
+            }
           />
           <Route
             path="mata-pelajaran"
-            element={role === "admin" ? <SubjectsPage notify={notify} /> : <Navigate to="/app" />}
+            element={
+              role === "admin" ? (
+                <SubjectsPage notify={notify} />
+              ) : (
+                <Navigate to="/app" />
+              )
+            }
           />
           <Route
             path="audit"
-            element={role === "admin" ? <AuditSecurityPage notify={notify} /> : <Navigate to="/app" />}
+            element={
+              role === "admin" ? (
+                <AuditSecurityPage notify={notify} />
+              ) : (
+                <Navigate to="/app" />
+              )
+            }
           />
           <Route
             path="koreksi"
-            element={role === "guru" ? <Grading notify={notify} /> : <Navigate to="/app" />}
+            element={
+              role === "guru" ? (
+                <Grading notify={notify} />
+              ) : (
+                <Navigate to="/app" />
+              )
+            }
           />
           <Route path="laporan" element={<Reports />} />
-          <Route path="pengaturan" element={<SettingsPage profile={profile} />} />
+          <Route
+            path="pengaturan"
+            element={<SettingsPage profile={profile} notify={notify} />}
+          />
           <Route path="*" element={<Navigate to="/app" />} />
         </Routes>
       </main>
@@ -643,6 +659,26 @@ function getInitials(name: string) {
     .map((part) => part[0])
     .join("")
     .toUpperCase();
+}
+
+function downloadCsv(
+  filename: string,
+  headers: string[],
+  rows: (string | number)[][],
+) {
+  const escape = (value: string | number) =>
+    `"${String(value).replace(/"/g, '""')}"`;
+  const csv = [headers, ...rows]
+    .map((row) => row.map(escape).join(","))
+    .join("\n");
+  const url = URL.createObjectURL(
+    new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }),
+  );
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 function Topbar({ profile }: { profile: Profile }) {
   return (
@@ -678,19 +714,20 @@ function Topbar({ profile }: { profile: Profile }) {
 }
 
 function MobilePortalNav({ role }: { role: Role }) {
-  const items = role === "admin"
-    ? [
-        ["/app", <LayoutDashboard />, "Beranda"],
-        ["/app/kelas", <Users />, "Siswa"],
-        ["/app/guru", <UserRound />, "Guru"],
-        ["/app/audit", <ShieldCheck />, "Audit"],
-      ]
-    : [
-        ["/app", <LayoutDashboard />, "Beranda"],
-        ["/app/ujian", <CalendarDays />, "Ujian"],
-        ["/app/bank-soal", <FileQuestion />, "Soal"],
-        ["/app/kelas", <Users />, "Kelas"],
-      ];
+  const items =
+    role === "admin"
+      ? [
+          ["/app", <LayoutDashboard />, "Beranda"],
+          ["/app/kelas", <Users />, "Siswa"],
+          ["/app/guru", <UserRound />, "Guru"],
+          ["/app/audit", <ShieldCheck />, "Audit"],
+        ]
+      : [
+          ["/app", <LayoutDashboard />, "Beranda"],
+          ["/app/ujian", <CalendarDays />, "Ujian"],
+          ["/app/bank-soal", <FileQuestion />, "Soal"],
+          ["/app/kelas", <Users />, "Kelas"],
+        ];
   return (
     <nav className="portal-mobile-nav">
       {items.map(([to, icon, label]) => (
@@ -753,6 +790,16 @@ function Status({ value }: { value: Exam["status"] }) {
     </span>
   );
 }
+type ExamDraft = Exam & {
+  subjectId?: string;
+  classId?: string;
+  startsAt?: string;
+  accessCode?: string;
+  shuffleQuestions?: boolean;
+  fullscreenMode?: boolean;
+  questionIds?: string[];
+};
+
 function ExamManagement({
   exams,
   setExams,
@@ -763,22 +810,90 @@ function ExamManagement({
   notify: (text: string, error?: boolean) => void;
 }) {
   const [create, setCreate] = useState(false);
-  const addExam = async (exam: Exam) => {
+  const [query, setQuery] = useState("");
+  const filteredExams = exams.filter((exam) =>
+    [exam.title, exam.subject, exam.className, exam.status]
+      .join(" ")
+      .toLowerCase()
+      .includes(query.trim().toLowerCase()),
+  );
+  const exportExams = () => {
+    downloadCsv(
+      "daftar-ujian.csv",
+      [
+        "Judul",
+        "Mata pelajaran",
+        "Kelas",
+        "Tanggal",
+        "Waktu",
+        "Durasi",
+        "Peserta",
+        "Status",
+      ],
+      filteredExams.map((exam) => [
+        exam.title,
+        exam.subject,
+        exam.className,
+        exam.date,
+        exam.time,
+        exam.duration,
+        exam.participants,
+        exam.status,
+      ]),
+    );
+    notify("Daftar ujian berhasil diekspor");
+  };
+  const advanceStatus = async (exam: Exam) => {
+    const nextStatus: Record<Exam["status"], Exam["status"]> = {
+      draft: "terjadwal",
+      terjadwal: "berlangsung",
+      berlangsung: "selesai",
+      selesai: "selesai",
+    };
+    const status = nextStatus[exam.status];
+    if (status === exam.status) {
+      notify("Ujian ini sudah selesai");
+      return;
+    }
     try {
       if (supabase) {
-        const { error } = await supabase.from("exams").insert({
-          title: exam.title,
-          duration_minutes: exam.duration,
-          starts_at: new Date().toISOString(),
-          status: "draft",
-        });
+        const { error } = await supabase
+          .from("exams")
+          .update({ status })
+          .eq("id", exam.id);
         if (error) throw error;
+      }
+      setExams(exams.map((item) => item.id === exam.id ? { ...item, status } : item));
+      notify(`Status ujian diubah menjadi ${status}`);
+    } catch {
+      notify("Status ujian gagal diperbarui", true);
+    }
+  };
+  const addExam = async (exam: ExamDraft) => {
+    try {
+      if (supabase) {
+        const { data: createdId, error } = await supabase.rpc(
+          "create_scheduled_exam",
+          {
+            exam_title: exam.title,
+            target_subject_id: exam.subjectId,
+            target_class_id: exam.classId,
+            start_time: exam.startsAt,
+            duration_in_minutes: exam.duration,
+            question_ids: exam.questionIds,
+            access_code_value: exam.accessCode || null,
+            should_shuffle_questions: exam.shuffleQuestions,
+            should_use_fullscreen: exam.fullscreenMode,
+          },
+        );
+        if (error) throw error;
+        exam = { ...exam, id: createdId };
       }
       setExams([exam, ...exams]);
       setCreate(false);
-      notify("Draft ujian berhasil dibuat");
-    } catch {
-      notify("Ujian gagal disimpan", true);
+      notify("Ujian berhasil dijadwalkan");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Ujian gagal disimpan", true);
     }
   };
   return (
@@ -794,7 +909,12 @@ function ExamManagement({
           </button>
         }
       />
-      <Toolbar placeholder="Cari judul atau mata pelajaran…" />
+      <Toolbar
+        placeholder="Cari judul, mata pelajaran, atau kelas…"
+        value={query}
+        onChange={setQuery}
+        onExport={exportExams}
+      />
       <div className="table-card">
         <table>
           <thead>
@@ -808,7 +928,7 @@ function ExamManagement({
             </tr>
           </thead>
           <tbody>
-            {exams.map((exam) => (
+            {filteredExams.map((exam) => (
               <tr key={exam.id}>
                 <td>
                   <div className="exam-cell">
@@ -842,7 +962,12 @@ function ExamManagement({
                   <Status value={exam.status} />
                 </td>
                 <td>
-                  <button className="more">
+                  <button
+                    className="more"
+                    title="Majukan status ujian"
+                    aria-label={`Majukan status ${exam.title}`}
+                    onClick={() => void advanceStatus(exam)}
+                  >
                     <MoreHorizontal />
                   </button>
                 </td>
@@ -851,7 +976,9 @@ function ExamManagement({
           </tbody>
         </table>
         <div className="table-footer">
-          <span>Menampilkan {exams.length} ujian</span>
+          <span>
+            Menampilkan {filteredExams.length} dari {exams.length} ujian
+          </span>
           <div>
             <button disabled>
               <ArrowLeft />
@@ -872,10 +999,12 @@ function Toolbar({
   placeholder,
   value,
   onChange,
+  onExport,
 }: {
   placeholder: string;
   value?: string;
   onChange?: (value: string) => void;
+  onExport?: () => void;
 }) {
   return (
     <div className="toolbar">
@@ -889,11 +1018,13 @@ function Toolbar({
           }
         />
       </div>
-      <button>
-        <Filter />
-        Filter
-      </button>
-      <button>
+      {value && onChange && (
+        <button onClick={() => onChange("")}>
+          <X />
+          Bersihkan
+        </button>
+      )}
+      <button onClick={onExport} disabled={!onExport}>
         <Download />
         Ekspor
       </button>
@@ -906,25 +1037,97 @@ function ExamModal({
   save,
 }: {
   close: () => void;
-  save: (exam: Exam) => void;
+  save: (exam: ExamDraft) => void;
 }) {
+  type Option = { id: string; name: string };
+  type AssignmentOption = { subjectId: string; classId: string; className: string };
+  type QuestionOption = { id: string; body: string; type: string };
   const [step, setStep] = useState(1);
   const [title, setTitle] = useState("");
-  const [subject, setSubject] = useState("Matematika");
-  const [className, setClass] = useState("IX A");
+  const [subjects, setSubjects] = useState<Option[]>([]);
+  const [classes, setClasses] = useState<Option[]>([]);
+  const [assignments, setAssignments] = useState<AssignmentOption[]>([]);
+  const [availableQuestions, setAvailableQuestions] = useState<QuestionOption[]>([]);
+  const [subjectId, setSubjectId] = useState("");
+  const [classId, setClassId] = useState("");
+  const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
   const [duration, setDuration] = useState(90);
+  const [startsAt, setStartsAt] = useState("");
+  const [accessCode, setAccessCode] = useState("");
+  const [shuffleQuestions, setShuffleQuestions] = useState(true);
+  const [fullscreenMode, setFullscreenMode] = useState(true);
+  useEffect(() => {
+    if (!supabase) {
+      return;
+    }
+    void supabase
+      .from("teacher_subjects")
+      .select("subject_id,class_id,subjects(name),classes(name)")
+      .then(({ data }) => {
+      const assignments = data ?? [];
+      const nextSubjects = Array.from(new Map(assignments.map((item) => [
+        item.subject_id,
+        { id: item.subject_id, name: relationName(item.subjects) },
+      ])).values());
+      const nextClasses = Array.from(new Map(assignments.map((item) => [
+        item.class_id,
+        { id: item.class_id, name: relationName(item.classes) },
+      ])).values());
+      setAssignments(assignments.map((item) => ({
+        subjectId: item.subject_id,
+        classId: item.class_id,
+        className: relationName(item.classes),
+      })));
+      setSubjects(nextSubjects);
+      setClasses(nextClasses);
+      setSubjectId((current) => current || nextSubjects[0]?.id || "");
+      setClassId((current) => current || nextClasses[0]?.id || "");
+      });
+  }, []);
+  useEffect(() => {
+    if (!subjectId || assignments.length === 0) return;
+    const matchingClasses = Array.from(new Map(
+      assignments
+        .filter((item) => item.subjectId === subjectId)
+        .map((item) => [item.classId, { id: item.classId, name: item.className }]),
+    ).values());
+    setClasses(matchingClasses);
+    setClassId((current) => matchingClasses.some((item) => item.id === current)
+      ? current
+      : matchingClasses[0]?.id ?? "");
+  }, [assignments, subjectId]);
+  useEffect(() => {
+    if (!supabase || !subjectId) return;
+    void supabase
+      .from("questions")
+      .select("id,body,type,question_banks!inner(subject_id)")
+      .eq("question_banks.subject_id", subjectId)
+      .eq("archived", false)
+      .order("created_at")
+      .then(({ data }) => setAvailableQuestions((data ?? []).map((item) => ({ id: item.id, body: item.body, type: item.type }))));
+    setSelectedQuestions([]);
+  }, [subjectId]);
+  const subject = subjects.find((item) => item.id === subjectId)?.name ?? "—";
+  const className = classes.find((item) => item.id === classId)?.name ?? "—";
   const finish = () =>
     save({
       id: crypto.randomUUID(),
       title,
       subject,
       className,
-      date: "Belum dijadwalkan",
-      time: "—",
+      date: startsAt ? new Date(startsAt).toLocaleDateString("id-ID") : "Belum dijadwalkan",
+      time: startsAt ? new Date(startsAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "—",
       duration,
-      questions: 0,
-      status: "draft",
-      participants: 32,
+      questions: selectedQuestions.length,
+      status: startsAt ? "terjadwal" : "draft",
+      participants: 0,
+      subjectId,
+      classId,
+      startsAt: startsAt ? new Date(startsAt).toISOString() : undefined,
+      accessCode,
+      shuffleQuestions,
+      fullscreenMode,
+      questionIds: selectedQuestions,
     });
   return (
     <Modal close={close} wide>
@@ -968,35 +1171,37 @@ function ExamModal({
               <div className="form-grid">
                 <FormField label="Mata pelajaran">
                   <select
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
+                    value={subjectId}
+                    onChange={(e) => setSubjectId(e.target.value)}
                   >
-                    <option>Matematika</option>
-                    <option>IPA</option>
-                    <option>Bahasa Indonesia</option>
+                    {subjects.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
                   </select>
                 </FormField>
                 <FormField label="Target kelas">
                   <select
-                    value={className}
-                    onChange={(e) => setClass(e.target.value)}
+                    value={classId}
+                    onChange={(e) => setClassId(e.target.value)}
                   >
-                    <option>IX A</option>
-                    <option>IX B</option>
-                    <option>VIII A</option>
+                    {classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
                   </select>
                 </FormField>
               </div>
             </>
           )}
           {step === 2 && (
-            <div className="choice-card">
-              <FileQuestion />
-              <div>
-                <b>Ambil dari bank soal</b>
-                <p>Pilih soal secara manual setelah draft dibuat.</p>
-              </div>
-              <span>0 soal dipilih</span>
+            <div className="wizard-question-list">
+              <p>{selectedQuestions.length} dari {availableQuestions.length} soal dipilih</p>
+              {availableQuestions.length === 0 && <div className="choice-card"><FileQuestion /><div><b>Belum ada soal</b><p>Tambahkan soal pada bank soal untuk mata pelajaran ini.</p></div></div>}
+              {availableQuestions.map((item) => (
+                <label className="choice-card" key={item.id}>
+                  <input
+                    type="checkbox"
+                    checked={selectedQuestions.includes(item.id)}
+                    onChange={(event) => setSelectedQuestions((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))}
+                  />
+                  <div><b>{item.body}</b><p>{item.type === "essay" ? "Essay" : "Pilihan ganda"}</p></div>
+                </label>
+              ))}
             </div>
           )}
           {step === 3 && (
@@ -1009,8 +1214,11 @@ function ExamModal({
                     onChange={(e) => setDuration(Number(e.target.value))}
                   />
                 </FormField>
+                <FormField label="Mulai ujian">
+                  <input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
+                </FormField>
                 <FormField label="Kode akses (opsional)">
-                  <input placeholder="Contoh: MATH26" />
+                  <input value={accessCode} onChange={(e) => setAccessCode(e.target.value.toUpperCase())} placeholder="Contoh: MATH26" />
                 </FormField>
               </div>
               <div className="switch-list">
@@ -1019,14 +1227,14 @@ function ExamModal({
                     <b>Acak urutan soal</b>
                     <small>Urutan berbeda untuk setiap siswa</small>
                   </span>
-                  <input type="checkbox" defaultChecked />
+                  <input type="checkbox" checked={shuffleQuestions} onChange={(e) => setShuffleQuestions(e.target.checked)} />
                 </label>
                 <label>
                   <span>
                     <b>Mode layar penuh</b>
                     <small>Catat saat siswa keluar dari ujian</small>
                   </span>
-                  <input type="checkbox" defaultChecked />
+                  <input type="checkbox" checked={fullscreenMode} onChange={(e) => setFullscreenMode(e.target.checked)} />
                 </label>
               </div>
             </>
@@ -1039,8 +1247,7 @@ function ExamModal({
                 <b>{title || "Tanpa judul"}</b> · {subject} · Kelas {className}
               </p>
               <span>
-                {duration} menit · Soal dapat ditambahkan setelah draft
-                tersimpan
+                {duration} menit · {selectedQuestions.length} soal · {startsAt ? new Date(startsAt).toLocaleString("id-ID") : "Belum dijadwalkan"}
               </span>
             </div>
           )}
@@ -1053,10 +1260,10 @@ function ExamModal({
             )}
             <button
               className="primary"
-              disabled={step === 1 && !title.trim()}
+              disabled={(step === 1 && (!title.trim() || !subjectId || !classId)) || (step === 2 && selectedQuestions.length === 0) || (step === 3 && (!startsAt || duration < 1))}
               onClick={() => (step < 4 ? setStep(step + 1) : finish())}
             >
-              {step < 4 ? "Lanjut" : "Simpan Draft"}
+              {step < 4 ? "Lanjut" : "Jadwalkan ujian"}
               <ArrowRight />
             </button>
           </div>
@@ -1816,15 +2023,50 @@ function ResetUserPasswordModal({
 }
 
 function Grading({ notify }: { notify: (text: string) => void }) {
+  type GradingItem = { id: string; name: string; answer: string; question: string; key: string; weight: number };
   const [selected, setSelected] = useState(0);
+  const [items, setItems] = useState<GradingItem[]>([]);
+  const [gradingLoading, setGradingLoading] = useState(true);
   const [scores, setScores] = useState<Record<number, string>>({});
-  const names = [
-    "Alya Putri",
-    "Bima Saputra",
-    "Citra Lestari",
-    "Dian Pratama",
-    "Eka Lestari",
-  ];
+  const [comments, setComments] = useState<Record<number, string>>({});
+  const [showRubric, setShowRubric] = useState(false);
+  useEffect(() => {
+    if (!supabase) {
+      setGradingLoading(false);
+      return;
+    }
+    void supabase
+      .from("answers")
+      .select("id,essay_text,score,teacher_comment,questions!inner(body,answer_key,weight,type),attempts!inner(status,profiles!attempts_student_id_fkey(full_name))")
+      .eq("questions.type", "essay")
+      .in("attempts.status", ["submitted", "grading"])
+      .order("answered_at")
+      .then(({ data }) => {
+        const loaded = (data ?? []).map((row) => {
+          const question = Array.isArray(row.questions) ? row.questions[0] : row.questions;
+          const attempt = Array.isArray(row.attempts) ? row.attempts[0] : row.attempts;
+          return {
+            id: row.id,
+            name: relationName(attempt?.profiles),
+            answer: row.essay_text ?? "(Tidak ada jawaban)",
+            question: question?.body ?? "—",
+            key: question?.answer_key ?? "Belum ada kunci jawaban.",
+            weight: Number(question?.weight ?? 1),
+          };
+        });
+        setItems(loaded);
+        setScores(Object.fromEntries((data ?? []).map((row, index) => [index, row.score === null ? "" : String(row.score)])));
+        setComments(Object.fromEntries((data ?? []).map((row, index) => [index, row.teacher_comment ?? ""])));
+        setGradingLoading(false);
+      });
+  }, []);
+  if (gradingLoading) {
+    return <div className="portal-page"><div className="card dashboard-empty">Memuat jawaban essay…</div></div>;
+  }
+  const currentItem = items[selected];
+  if (!currentItem) {
+    return <div className="portal-page"><PageTitle eyebrow="PENILAIAN" title="Koreksi Essay" description="Penilaian per soal membantu menjaga konsistensi skor." /><div className="card dashboard-empty">Tidak ada jawaban essay yang menunggu koreksi.</div></div>;
+  }
   return (
     <div className="portal-page">
       <PageTitle
@@ -1836,30 +2078,30 @@ function Grading({ notify }: { notify: (text: string) => void }) {
         <aside>
           <div className="grading-progress">
             <p>
-              <b>Soal 3 dari 5</b>
-              <span>24 / 32 dinilai</span>
+              <b>Jawaban {selected + 1} dari {items.length}</b>
+              <span>{Object.values(scores).filter(Boolean).length} / {items.length} dinilai</span>
             </p>
             <i>
-              <span style={{ width: "75%" }} />
+              <span style={{ width: `${(Object.values(scores).filter(Boolean).length / items.length) * 100}%` }} />
             </i>
           </div>
           <div className="student-answer-list">
-            {names.map((n, i) => (
+            {items.map((item, i) => (
               <button
                 onClick={() => setSelected(i)}
                 className={selected === i ? "active" : ""}
-                key={n}
+                key={item.id}
               >
                 <span>
-                  {n
+                  {item.name
                     .split(" ")
                     .map((x) => x[0])
                     .join("")}
                 </span>
                 <p>
-                  <b>{n}</b>
+                    <b>{item.name}</b>
                   <small>
-                    {scores[i] ? `Skor ${scores[i]}/10` : "Belum dinilai"}
+                    {scores[i] ? `Skor ${scores[i]}/${item.weight}` : "Belum dinilai"}
                   </small>
                 </p>
                 {scores[i] ? <CheckCircle2 /> : <ChevronRight />}
@@ -1869,46 +2111,42 @@ function Grading({ notify }: { notify: (text: string) => void }) {
         </aside>
         <main className="grading-main">
           <div className="question-reference">
-            <small>SOAL ESSAY · BOBOT 10 POIN</small>
+            <small>SOAL ESSAY · BOBOT {currentItem.weight} POIN</small>
             <h3>
-              Jelaskan dengan bahasamu sendiri bagaimana proses fotosintesis
-              terjadi dan faktor apa saja yang memengaruhinya.
+              {currentItem.question}
             </h3>
-            <button>
+            <button onClick={() => setShowRubric((value) => !value)}>
               <BookOpen />
-              Lihat rubrik & kunci jawaban
+              {showRubric ? "Tutup rubrik" : "Lihat rubrik & kunci jawaban"}
             </button>
+            {showRubric && (
+              <div className="rubric-box">
+                <b>Pedoman penilaian</b>
+                <p>{currentItem.key}</p>
+              </div>
+            )}
           </div>
           <div className="answer-paper">
             <div>
               <span className="avatar sm">
-                {names[selected]
+                {currentItem.name
                   .split(" ")
                   .map((x) => x[0])
                   .join("")}
               </span>
               <p>
-                <b>{names[selected]}</b>
-                <small>Kelas IX A · Tersimpan 09.42</small>
+                <b>{currentItem.name}</b>
+                <small>Jawaban tersimpan pada sistem</small>
               </p>
             </div>
-            <p>
-              Fotosintesis adalah proses tumbuhan membuat makanan dengan bantuan
-              cahaya matahari. Proses ini terjadi di daun pada bagian klorofil.
-              Tumbuhan menggunakan air dari akar dan karbon dioksida dari udara,
-              lalu menghasilkan glukosa dan oksigen.
-            </p>
-            <p>
-              Faktor yang memengaruhi yaitu intensitas cahaya, jumlah air, kadar
-              karbon dioksida, suhu, dan banyaknya klorofil.
-            </p>
+            <p>{currentItem.answer}</p>
           </div>
           <div className="score-panel">
-            <FormField label="Skor (maks. 10)">
+            <FormField label={`Skor (maks. ${currentItem.weight})`}>
               <input
                 type="number"
                 min="0"
-                max="10"
+                max={currentItem.weight}
                 value={scores[selected] ?? ""}
                 onChange={(e) =>
                   setScores({ ...scores, [selected]: e.target.value })
@@ -1917,13 +2155,35 @@ function Grading({ notify }: { notify: (text: string) => void }) {
               />
             </FormField>
             <FormField label="Komentar untuk siswa (opsional)">
-              <input placeholder="Berikan umpan balik singkat…" />
+              <input
+                value={comments[selected] ?? ""}
+                onChange={(event) =>
+                  setComments({ ...comments, [selected]: event.target.value })
+                }
+                placeholder="Berikan umpan balik singkat…"
+              />
             </FormField>
             <button
               className="primary"
-              onClick={() => {
+              onClick={async () => {
+                const score = Number(scores[selected]);
+                if (scores[selected] === "" || score < 0 || score > currentItem.weight) {
+                  notify(`Masukkan skor antara 0 sampai ${currentItem.weight}`);
+                  return;
+                }
+                if (supabase) {
+                  const { error } = await supabase.rpc("grade_essay_answer", {
+                    target_answer_id: currentItem.id,
+                    awarded_score: score,
+                    feedback: comments[selected] || null,
+                  });
+                  if (error) {
+                    notify(error.message);
+                    return;
+                  }
+                }
                 notify("Nilai berhasil disimpan");
-                if (selected < names.length - 1) setSelected(selected + 1);
+                if (selected < items.length - 1) setSelected(selected + 1);
               }}
             >
               Simpan & lanjut
@@ -1937,7 +2197,37 @@ function Grading({ notify }: { notify: (text: string) => void }) {
 }
 
 function Reports() {
-  const grades = [72, 76, 78, 82, 84, 76, 88, 92, 80, 86, 74, 90];
+  type ReportRow = { name: string; className: string; exam: string; score: number; status: string };
+  const [rows, setRows] = useState<ReportRow[]>([]);
+  useEffect(() => {
+    if (!supabase) return;
+    void supabase
+      .from("attempts")
+      .select("final_score,status,profiles!attempts_student_id_fkey(full_name),exams!inner(title,classes(name))")
+      .in("status", ["submitted", "grading", "final"])
+      .order("submitted_at", { ascending: false })
+      .then(({ data }) => setRows((data ?? []).map((item) => {
+        const exam = Array.isArray(item.exams) ? item.exams[0] : item.exams;
+        return {
+          name: relationName(item.profiles),
+          className: relationName(exam?.classes),
+          exam: String(exam?.title ?? "—"),
+          score: Number(item.final_score ?? 0),
+          status: Number(item.final_score ?? 0) >= 75 ? "Lulus" : "Perlu pendampingan",
+        };
+      })));
+  }, []);
+  const grades = rows.map((item) => item.score);
+  const average = grades.length ? grades.reduce((total, value) => total + value, 0) / grades.length : 0;
+  const highest = grades.length ? Math.max(...grades) : 0;
+  const lowest = grades.length ? Math.min(...grades) : 0;
+  const passed = rows.filter((item) => item.score >= 75).length;
+  const exportReport = () =>
+    downloadCsv(
+      "laporan-hasil-ujian.csv",
+      ["Nama", "Kelas", "Ujian", "Nilai", "Status"],
+      rows.map((item) => [item.name, item.className, item.exam, item.score, item.status]),
+    );
   return (
     <div className="portal-page">
       <PageTitle
@@ -1945,41 +2235,32 @@ function Reports() {
         title="Hasil Ujian"
         description="Analisis capaian kelas dan kualitas soal."
         action={
-          <button className="outline">
+          <button className="outline" onClick={exportReport}>
             <Download />
             Ekspor laporan
           </button>
         }
       />
-      <div className="report-filter">
-        <select>
-          <option>Penilaian Akhir Semester</option>
-        </select>
-        <select>
-          <option>Kelas IX A</option>
-        </select>
-        <button>Terapkan</button>
-      </div>
       <div className="report-stats">
         <div>
           <small>RATA-RATA</small>
-          <b>82,4</b>
-          <span className="up">↑ 3,2</span>
+          <b>{average.toLocaleString("id-ID", { maximumFractionDigits: 1 })}</b>
+          <span>{rows.length} hasil</span>
         </div>
         <div>
           <small>NILAI TERTINGGI</small>
-          <b>96</b>
-          <span>Alya Putri</span>
+          <b>{highest}</b>
+          <span>{rows.find((item) => item.score === highest)?.name ?? "—"}</span>
         </div>
         <div>
           <small>NILAI TERENDAH</small>
-          <b>62</b>
+          <b>{lowest}</b>
           <span>Perlu pendampingan</span>
         </div>
         <div>
           <small>KETUNTASAN</small>
-          <b>87,5%</b>
-          <span>28 dari 32 siswa</span>
+          <b>{rows.length ? Math.round((passed / rows.length) * 100) : 0}%</b>
+          <span>{passed} dari {rows.length} siswa</span>
         </div>
       </div>
       <div className="report-grid">
@@ -1988,8 +2269,8 @@ function Reports() {
           <div className="grade-chart">
             {grades.map((v, i) => (
               <div key={i}>
-                <i style={{ height: `${v - 40}%` }} />
-                <span>{60 + i * 3}</span>
+                <i style={{ height: `${Math.max(v, 4)}%` }} />
+                <span>{i + 1}</span>
               </div>
             ))}
           </div>
@@ -1998,17 +2279,17 @@ function Reports() {
           <CardHead title="Ringkasan pengerjaan" />
           <div className="donut-wrap">
             <div className="donut">
-              <strong>32</strong>
+              <strong>{rows.length}</strong>
               <span>peserta</span>
             </div>
             <ul>
               <li>
                 <i className="green" />
-                Lulus KKM <b>28</b>
+                Lulus KKM <b>{passed}</b>
               </li>
               <li>
                 <i className="amber" />
-                Di bawah KKM <b>4</b>
+                Di bawah KKM <b>{rows.length - passed}</b>
               </li>
               <li>
                 <i className="gray" />
@@ -2019,37 +2300,90 @@ function Reports() {
         </section>
       </div>
       <section className="card item-analysis">
-        <CardHead title="Analisis butir soal" link="Lihat seluruh soal" />
-        <div className="analysis-row">
-          <span>01</span>
-          <p>
-            <b>Persamaan linear satu variabel</b>
-            <small>Q-1042 · Pilihan Ganda</small>
-          </p>
-          <div>
-            <small>DIJAWAB BENAR</small>
-            <b>91%</b>
+        <CardHead title="Data hasil siswa" />
+        {rows.length === 0 ? (
+          <div className="dashboard-empty">Belum ada hasil ujian yang dapat dianalisis.</div>
+        ) : rows.slice(0, 8).map((item, index) => (
+          <div className="analysis-row" key={`${item.name}-${item.exam}-${index}`}>
+            <span>{String(index + 1).padStart(2, "0")}</span>
+            <p><b>{item.name}</b><small>{item.exam} · {item.className}</small></p>
+            <div><small>NILAI AKHIR</small><b>{item.score}</b></div>
+            <span className={`difficulty ${item.score >= 75 ? "mudah" : "sedang"}`}>
+              {item.status}
+            </span>
           </div>
-          <span className="difficulty mudah">Mudah</span>
-        </div>
-        <div className="analysis-row">
-          <span>12</span>
-          <p>
-            <b>Sistem persamaan linear dua variabel</b>
-            <small>Q-1041 · Essay</small>
-          </p>
-          <div>
-            <small>RATA-RATA SKOR</small>
-            <b>68%</b>
-          </div>
-          <span className="difficulty sedang">Sedang</span>
-        </div>
+        ))}
       </section>
     </div>
   );
 }
 
-function SettingsPage({ profile }: { profile: Profile }) {
+function SettingsPage({
+  profile,
+  notify,
+}: {
+  profile: Profile;
+  notify: (text: string, error?: boolean) => void;
+}) {
+  const [tab, setTab] = useState("profile");
+  const [settings, setSettings] = useState(() =>
+    loadLocal("school-settings", {
+      schoolName: "SMP Negeri Harapan Bangsa",
+      npsn: "20123456",
+      address: "Jl. Pendidikan No. 17, Jakarta",
+      academicYear: "2026/2027",
+      examReminder: true,
+      gradingReminder: true,
+      securityAlert: true,
+    }),
+  );
+  const [savingSettings, setSavingSettings] = useState(false);
+  useEffect(() => {
+    if (!supabase || profile.role !== "admin") return;
+    void supabase
+      .from("school_settings")
+      .select("school_name,npsn,address,academic_year,exam_reminder,grading_reminder,security_alert")
+      .eq("id", true)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data) return;
+        setSettings({
+          schoolName: data.school_name,
+          npsn: data.npsn,
+          address: data.address,
+          academicYear: data.academic_year,
+          examReminder: data.exam_reminder,
+          gradingReminder: data.grading_reminder,
+          securityAlert: data.security_alert,
+        });
+      });
+  }, [profile.role]);
+  const saveSettings = async () => {
+    setSavingSettings(true);
+    try {
+      if (supabase) {
+        const { error } = await supabase.from("school_settings").upsert({
+          id: true,
+          school_name: settings.schoolName,
+          npsn: settings.npsn,
+          address: settings.address,
+          academic_year: settings.academicYear,
+          exam_reminder: settings.examReminder,
+          grading_reminder: settings.gradingReminder,
+          security_alert: settings.securityAlert,
+          updated_at: new Date().toISOString(),
+          updated_by: profile.id,
+        });
+        if (error) throw error;
+      }
+      saveLocal("school-settings", settings);
+      notify("Pengaturan berhasil disimpan");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Pengaturan gagal disimpan", true);
+    } finally {
+      setSavingSettings(false);
+    }
+  };
   if (profile.role === "guru") {
     return (
       <div className="portal-page">
@@ -2085,33 +2419,154 @@ function SettingsPage({ profile }: { profile: Profile }) {
       />
       <div className="settings-grid">
         <aside>
-          <button className="active">Profil sekolah</button>
-          <button>Keamanan</button>
-          <button>Tahun ajaran</button>
-          <button>Notifikasi</button>
+          <button
+            className={tab === "profile" ? "active" : ""}
+            onClick={() => setTab("profile")}
+          >
+            Profil sekolah
+          </button>
+          <button
+            className={tab === "security" ? "active" : ""}
+            onClick={() => setTab("security")}
+          >
+            Keamanan
+          </button>
+          <button
+            className={tab === "academic" ? "active" : ""}
+            onClick={() => setTab("academic")}
+          >
+            Tahun ajaran
+          </button>
+          <button
+            className={tab === "notifications" ? "active" : ""}
+            onClick={() => setTab("notifications")}
+          >
+            Notifikasi
+          </button>
         </aside>
         <div className="card settings-form">
-          <h2>Profil sekolah</h2>
-          <p>Informasi ini digunakan pada laporan dan halaman siswa.</p>
-          <div className="school-logo">
-            <span>
-              <GraduationCap />
-            </span>
-            <button>Ganti logo</button>
-          </div>
-          <div className="form-grid">
-            <FormField label="Nama sekolah">
-              <input defaultValue="SMP Negeri Harapan Bangsa" />
-            </FormField>
-            <FormField label="NPSN">
-              <input defaultValue="20123456" />
-            </FormField>
-          </div>
-          <FormField label="Alamat">
-            <textarea rows={3} defaultValue="Jl. Pendidikan No. 17, Jakarta" />
-          </FormField>
+          {tab === "profile" && (
+            <>
+              <h2>Profil sekolah</h2>
+              <p>Informasi ini digunakan pada laporan dan halaman siswa.</p>
+              <div className="school-logo">
+                <span>
+                  <GraduationCap />
+                </span>
+              </div>
+              <div className="form-grid">
+                <FormField label="Nama sekolah">
+                  <input
+                    value={settings.schoolName}
+                    onChange={(e) =>
+                      setSettings({ ...settings, schoolName: e.target.value })
+                    }
+                  />
+                </FormField>
+                <FormField label="NPSN">
+                  <input
+                    value={settings.npsn}
+                    onChange={(e) =>
+                      setSettings({ ...settings, npsn: e.target.value })
+                    }
+                  />
+                </FormField>
+              </div>
+              <FormField label="Alamat">
+                <textarea
+                  rows={3}
+                  value={settings.address}
+                  onChange={(e) =>
+                    setSettings({ ...settings, address: e.target.value })
+                  }
+                />
+              </FormField>
+            </>
+          )}
+          {tab === "security" && (
+            <>
+              <h2>Keamanan akun</h2>
+              <p>Informasi akses administrator yang sedang aktif.</p>
+              <div className="form-grid">
+                <FormField label="Administrator">
+                  <input value={profile.full_name} readOnly />
+                </FormField>
+                <FormField label="Email akun">
+                  <input value={profile.email} readOnly />
+                </FormField>
+              </div>
+              <div className="dashboard-error">
+                <ShieldCheck /> Sesi dan hak akses dikelola oleh Supabase Auth.
+                Jangan bagikan akun administrator.
+              </div>
+            </>
+          )}
+          {tab === "academic" && (
+            <>
+              <h2>Tahun ajaran aktif</h2>
+              <p>
+                Digunakan sebagai periode bawaan saat membuat ujian dan laporan.
+              </p>
+              <FormField label="Tahun ajaran">
+                <input
+                  value={settings.academicYear}
+                  onChange={(e) =>
+                    setSettings({ ...settings, academicYear: e.target.value })
+                  }
+                  placeholder="2026/2027"
+                />
+              </FormField>
+            </>
+          )}
+          {tab === "notifications" && (
+            <>
+              <h2>Preferensi notifikasi</h2>
+              <p>
+                Pilih informasi penting yang ingin ditampilkan kepada
+                administrator.
+              </p>
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={settings.examReminder}
+                  onChange={(e) =>
+                    setSettings({ ...settings, examReminder: e.target.checked })
+                  }
+                />{" "}
+                Pengingat ujian yang akan dimulai
+              </label>
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={settings.gradingReminder}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      gradingReminder: e.target.checked,
+                    })
+                  }
+                />{" "}
+                Pengingat jawaban yang belum dikoreksi
+              </label>
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={settings.securityAlert}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      securityAlert: e.target.checked,
+                    })
+                  }
+                />{" "}
+                Peringatan aktivitas keamanan
+              </label>
+            </>
+          )}
           <div className="settings-save">
-            <button className="primary">Simpan perubahan</button>
+              <button className="primary" disabled={savingSettings} onClick={() => void saveSettings()}>
+                {savingSettings ? "Menyimpan…" : "Simpan perubahan"}
+            </button>
             <span>Anda masuk sebagai Admin.</span>
           </div>
         </div>
@@ -2127,43 +2582,116 @@ function ExamRunner({
 }) {
   const { examId = "1" } = useParams();
   const navigate = useNavigate();
+  type RunnerQuestion = {
+    id: string;
+    text: string;
+    type: "multiple_choice" | "essay";
+    options: string[];
+    weight: number;
+  };
   const [current, setCurrent] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, number>>(() =>
+  const [answers, setAnswers] = useState<Record<string, number | string>>(() =>
     loadLocal(`answers:${examId}`, {}),
   );
   const [marked, setMarked] = useState<string[]>([]);
-  const [remaining, setRemaining] = useState(89 * 60 + 42);
+  const [remaining, setRemaining] = useState(90 * 60);
   const [submit, setSubmit] = useState(false);
   const [attemptId, setAttemptId] = useState<string | null>(null);
-  const question = examQuestions[current];
+  const [questions, setQuestions] = useState<RunnerQuestion[]>([]);
+  const [examMeta, setExamMeta] = useState({
+    title: "Penilaian Akhir Semester",
+    subject: "Matematika",
+    className: "Kelas IX",
+  });
+  const [loadingExam, setLoadingExam] = useState(Boolean(supabase));
+  const [examError, setExamError] = useState("");
+  const [accessCode, setAccessCode] = useState("");
+  const [submittedAccessCode, setSubmittedAccessCode] = useState("");
+  const [startRequest, setStartRequest] = useState(0);
+  const [needsAccessCode, setNeedsAccessCode] = useState(false);
+  const essaySaveTimer = useRef<number | null>(null);
+  const pendingEssay = useRef<{ questionId: string; value: string } | null>(null);
+  const question = questions[current];
   useEffect(() => {
     const client = supabase;
     if (!client) return;
-    client.auth.getUser().then(async ({ data }) => {
-      if (!data.user) return;
-      const existing = await client
-        .from("attempts")
-        .select("id")
-        .eq("exam_id", examId)
-        .eq("student_id", data.user.id)
-        .maybeSingle();
-      if (existing.data) {
-        setAttemptId(existing.data.id);
-      } else {
-        const created = await client
-          .from("attempts")
-          .insert({
-            exam_id: examId,
-            student_id: data.user.id,
-            status: "in_progress",
-            started_at: new Date().toISOString(),
-          })
-          .select("id")
-          .single();
-        if (created.data) setAttemptId(created.data.id);
+    let active = true;
+    const load = async () => {
+      setLoadingExam(true);
+      const [{ data: authData }, examResult] = await Promise.all([
+        client.auth.getUser(),
+        client
+          .from("exams")
+          .select("id,title,starts_at,ends_at,duration_minutes,subjects(name),classes(name)")
+          .eq("id", examId)
+          .single(),
+      ]);
+      if (!active) return;
+      if (!authData.user || examResult.error) {
+        setExamError(examResult.error?.message ?? "Sesi siswa tidak ditemukan.");
+        setLoadingExam(false);
+        return;
       }
-    });
-  }, [examId]);
+      const startResult = await client.rpc("start_exam_attempt", {
+        requested_exam_id: examId,
+        provided_access_code: submittedAccessCode.trim() || null,
+      });
+      if (!active) return;
+      if (startResult.error) {
+        const message = startResult.error.message;
+        if (message.toLowerCase().includes("kode akses")) {
+          setNeedsAccessCode(true);
+          setExamError("");
+        } else {
+          setExamError(message);
+        }
+        setLoadingExam(false);
+        return;
+      }
+      const startedAttempt = startResult.data?.[0];
+      if (!startedAttempt) {
+        setExamError("Server tidak dapat memulai attempt ujian.");
+        setLoadingExam(false);
+        return;
+      }
+      setAttemptId(startedAttempt.attempt_id);
+      setNeedsAccessCode(false);
+      const questionResult = await client.rpc("get_exam_questions", {
+        requested_exam_id: examId,
+      });
+      if (questionResult.error) {
+        setExamError(questionResult.error.message);
+        setLoadingExam(false);
+        return;
+      }
+      const loadedQuestions: RunnerQuestion[] = (questionResult.data ?? []).map((row: Record<string, unknown>) => ({
+        id: String(row.question_id),
+        text: String(row.body),
+        type: row.kind === "essay" ? "essay" : "multiple_choice",
+        options: Array.isArray(row.options) ? row.options.map(String) : [],
+        weight: Number(row.weight ?? 1),
+      }));
+      if (!loadedQuestions.length) {
+        setExamError("Soal ujian belum tersedia atau waktu ujian sudah berakhir.");
+        setLoadingExam(false);
+        return;
+      }
+      setQuestions(loadedQuestions);
+      setExamMeta({
+        title: examResult.data.title,
+        subject: relationName(examResult.data.subjects),
+        className: relationName(examResult.data.classes),
+      });
+      setRemaining(Math.max(0, Math.floor((new Date(startedAttempt.deadline).getTime() - Date.now()) / 1000)));
+      const saved = await client.from("answers").select("question_id,selected_option,essay_text").eq("attempt_id", startedAttempt.attempt_id);
+      if (saved.data) {
+        setAnswers(Object.fromEntries(saved.data.map((item) => [item.question_id, item.essay_text ?? item.selected_option])));
+      }
+      setLoadingExam(false);
+    };
+    void load();
+    return () => { active = false; };
+  }, [examId, navigate, notify, submittedAccessCode, startRequest]);
   useEffect(() => {
     const id = window.setInterval(
       () => setRemaining((v) => Math.max(0, v - 1)),
@@ -2171,9 +2699,6 @@ function ExamRunner({
     );
     return () => clearInterval(id);
   }, []);
-  useEffect(() => {
-    if (remaining === 0) setSubmit(true);
-  }, [remaining]);
   useEffect(() => {
     const handler = async () => {
       if (document.hidden && supabase && attemptId) {
@@ -2187,54 +2712,138 @@ function ExamRunner({
     document.addEventListener("visibilitychange", handler);
     return () => document.removeEventListener("visibilitychange", handler);
   }, [examId, attemptId]);
+  useEffect(() => {
+    if (!attemptId) return;
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warnBeforeLeaving);
+    return () => window.removeEventListener("beforeunload", warnBeforeLeaving);
+  }, [attemptId]);
+  const answeredCount = useMemo(
+    () => Object.values(answers).filter((value) =>
+      typeof value === "number" || value.trim().length > 0,
+    ).length,
+    [answers],
+  );
   const time = useMemo(
     () =>
       `${String(Math.floor(remaining / 3600)).padStart(2, "0")}:${String(Math.floor((remaining % 3600) / 60)).padStart(2, "0")}:${String(remaining % 60).padStart(2, "0")}`,
     [remaining],
   );
-  const answer = async (option: number) => {
-    const next = { ...answers, [question.id]: option };
-    setAnswers(next);
-    saveLocal(`answers:${examId}`, next);
+  const persistAnswer = useCallback(async (questionId: string, value: number | string) => {
     if (supabase && attemptId) {
-      await supabase.from("answers").upsert(
+      const { error } = await supabase.from("answers").upsert(
         {
           attempt_id: attemptId,
-          question_id: question.id,
-          selected_option: option,
+          question_id: questionId,
+          selected_option: typeof value === "number" ? value : null,
+          essay_text: typeof value === "string" ? value : null,
           answered_at: new Date().toISOString(),
         },
         { onConflict: "attempt_id,question_id" },
       );
-    }
-  };
-  const finish = async () => {
-    try {
-      if (supabase && attemptId) {
-        const { error } = await supabase
-          .from("attempts")
-          .update({
-            status: "submitted",
-            submitted_at: new Date().toISOString(),
-          })
-          .eq("id", attemptId);
-        if (error) throw error;
+      if (error) {
+        notify(`Jawaban belum tersinkron: ${error.message}`, true);
+        return false;
       }
+    }
+    return true;
+  }, [attemptId, notify]);
+  const answer = (value: number | string) => {
+    const next = { ...answers, [question.id]: value };
+    setAnswers(next);
+    saveLocal(`answers:${examId}`, next);
+    void persistAnswer(question.id, value);
+  };
+  const updateEssay = (value: string) => {
+    const questionId = question.id;
+    const next = { ...answers, [questionId]: value };
+    setAnswers(next);
+    saveLocal(`answers:${examId}`, next);
+    pendingEssay.current = { questionId, value };
+    if (essaySaveTimer.current !== null) window.clearTimeout(essaySaveTimer.current);
+    essaySaveTimer.current = window.setTimeout(() => {
+      void persistAnswer(questionId, value);
+      pendingEssay.current = null;
+      essaySaveTimer.current = null;
+    }, 600);
+  };
+  const finish = useCallback(async () => {
+    try {
+      if (!supabase || !attemptId) throw new Error("Attempt belum siap.");
+      if (pendingEssay.current) {
+        if (essaySaveTimer.current !== null) window.clearTimeout(essaySaveTimer.current);
+        const synced = await persistAnswer(pendingEssay.current.questionId, pendingEssay.current.value);
+        if (!synced) throw new Error("Jawaban essay terakhir belum tersimpan. Periksa koneksi lalu coba kembali.");
+        pendingEssay.current = null;
+        essaySaveTimer.current = null;
+      }
+      const { error } = await supabase.rpc("submit_exam_attempt", {
+        target_attempt_id: attemptId,
+      });
+      if (error) throw error;
       localStorage.removeItem(`ruang-ujian:answers:${examId}`);
       notify("Jawaban berhasil dikumpulkan");
       navigate("/siswa");
-    } catch {
-      notify("Jawaban tersimpan lokal dan akan dikirim saat online");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Jawaban gagal dikumpulkan. Coba lagi sebelum meninggalkan halaman.", true);
     }
-  };
+  }, [attemptId, examId, navigate, notify, persistAnswer]);
+  useEffect(() => () => {
+    if (essaySaveTimer.current !== null) window.clearTimeout(essaySaveTimer.current);
+  }, []);
+  useEffect(() => {
+    if (remaining === 0 && attemptId) void finish();
+  }, [remaining, attemptId, finish]);
+  if (loadingExam) {
+    return <div className="auth-loading"><span><GraduationCap /></span><p>Menyiapkan ruang ujian…</p></div>;
+  }
+  if (needsAccessCode) {
+    return (
+      <div className="auth-loading">
+        <span><LockKeyhole /></span>
+        <p>Masukkan kode akses yang diberikan pengawas.</p>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!accessCode.trim()) return;
+            setLoadingExam(true);
+            setSubmittedAccessCode(accessCode.trim());
+            setStartRequest((value) => value + 1);
+          }}
+        >
+          <input
+            value={accessCode}
+            onChange={(event) => setAccessCode(event.target.value.toUpperCase())}
+            placeholder="Kode akses ujian"
+            autoFocus
+            required
+          />
+          <button className="primary">Mulai ujian</button>
+        </form>
+        <button onClick={() => navigate("/siswa")}>Kembali ke beranda</button>
+      </div>
+    );
+  }
+  if (examError || !question) {
+    return (
+      <div className="auth-loading">
+        <span><AlertTriangle /></span>
+        <p>{examError || "Soal ujian tidak ditemukan."}</p>
+        <button className="primary" onClick={() => navigate("/siswa")}>Kembali ke beranda</button>
+      </div>
+    );
+  }
   return (
     <div className="runner">
       <header>
         <div className="runner-brand">
           <GraduationCap />
           <span>
-            <small>MATEMATIKA · KELAS IX</small>
-            <b>Penilaian Akhir Semester</b>
+            <small>{examMeta.subject.toUpperCase()} · {examMeta.className.toUpperCase()}</small>
+            <b>{examMeta.title}</b>
           </span>
         </div>
         <div className="runner-stats">
@@ -2258,19 +2867,19 @@ function ExamRunner({
             <p>
               <b>Daftar Soal</b>
               <span>
-                {Object.keys(answers).length}/{examQuestions.length} terjawab
+                {answeredCount}/{questions.length} terjawab
               </span>
             </p>
             <i>
               <span
                 style={{
-                  width: `${(Object.keys(answers).length / examQuestions.length) * 100}%`,
+                  width: `${(answeredCount / questions.length) * 100}%`,
                 }}
               />
             </i>
           </div>
           <div className="number-grid">
-            {examQuestions.map((q, i) => (
+            {questions.map((q, i) => (
               <button
                 className={`${current === i ? "current" : ""} ${answers[q.id] !== undefined ? "answered" : ""} ${marked.includes(q.id) ? "marked" : ""}`}
                 onClick={() => setCurrent(i)}
@@ -2306,7 +2915,7 @@ function ExamRunner({
         <section className="question-area">
           <div className="question-top">
             <span>
-              SOAL {current + 1} DARI {examQuestions.length}
+              SOAL {current + 1} DARI {questions.length}
             </span>
             <button
               className={marked.includes(question.id) ? "marked" : ""}
@@ -2324,20 +2933,30 @@ function ExamRunner({
           </div>
           <article>
             <h1>{question.text}</h1>
-            <p>Pilih satu jawaban yang paling tepat.</p>
-            <div className="answer-options">
-              {question.options.map((option, i) => (
-                <button
-                  onClick={() => answer(i)}
-                  className={answers[question.id] === i ? "selected" : ""}
-                  key={option}
-                >
-                  <span>{String.fromCharCode(65 + i)}</span>
-                  <b>{option}</b>
-                  {answers[question.id] === i && <Check />}
-                </button>
-              ))}
-            </div>
+            <p>{question.type === "essay" ? "Tuliskan jawaban dengan jelas dan lengkap." : "Pilih satu jawaban yang paling tepat."}</p>
+            {question.type === "essay" ? (
+              <textarea
+                className="runner-essay"
+                rows={9}
+                value={typeof answers[question.id] === "string" ? answers[question.id] : ""}
+                onChange={(event) => updateEssay(event.target.value)}
+                placeholder="Tulis jawabanmu di sini…"
+              />
+            ) : (
+              <div className="answer-options">
+                {question.options.map((option, i) => (
+                  <button
+                    onClick={() => void answer(i)}
+                    className={answers[question.id] === i ? "selected" : ""}
+                    key={option}
+                  >
+                    <span>{String.fromCharCode(65 + i)}</span>
+                    <b>{option}</b>
+                    {answers[question.id] === i && <Check />}
+                  </button>
+                ))}
+              </div>
+            )}
           </article>
           <footer>
             <button
@@ -2348,7 +2967,7 @@ function ExamRunner({
               Sebelumnya
             </button>
             <span>Jawaban tersimpan otomatis</span>
-            {current < examQuestions.length - 1 ? (
+            {current < questions.length - 1 ? (
               <button className="next" onClick={() => setCurrent(current + 1)}>
                 Selanjutnya
                 <ArrowRight />
@@ -2375,10 +2994,10 @@ function ExamRunner({
             </p>
             <div>
               <span>
-                <b>{Object.keys(answers).length}</b>Terjawab
+                <b>{answeredCount}</b>Terjawab
               </span>
               <span className="empty">
-                <b>{examQuestions.length - Object.keys(answers).length}</b>Belum
+                <b>{questions.length - answeredCount}</b>Belum
                 dijawab
               </span>
               <span className="marked">

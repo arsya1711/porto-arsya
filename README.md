@@ -17,7 +17,7 @@ Website ujian sekolah berbasis React, TypeScript, dan Supabase. Implementasi dib
 - Pencatatan event saat siswa meninggalkan tab ujian
 - Tampilan responsif desktop, tablet, dan mobile
 
-Tombol mode demo di halaman login dapat digunakan sebelum Supabase dikonfigurasi.
+Supabase wajib dikonfigurasi. Aplikasi akan menolak login jika konfigurasi backend tidak tersedia agar data contoh tidak pernah muncul pada lingkungan operasional.
 
 ## Menjalankan proyek
 
@@ -36,6 +36,14 @@ npm run dev
 
    - `supabase/migrations/001_initial_schema.sql`
    - `supabase/migrations/002_auth_user_management.sql`
+   - `supabase/migrations/003_question_bank_crud.sql`
+   - `supabase/migrations/004_dashboard_query_indexes.sql`
+   - `supabase/migrations/005_staff_dashboard_metrics.sql`
+   - `supabase/migrations/006_role_responsibility_separation.sql`
+   - `supabase/migrations/007_school_settings.sql`
+   - `supabase/migrations/008_exam_scoring.sql`
+   - `supabase/migrations/009_exam_access_hardening.sql`
+   - `supabase/migrations/010_atomic_exam_creation.sql`
 3. Isi `.env.local`:
 
 ```env
@@ -72,7 +80,7 @@ npx supabase functions deploy admin-users
 
 6. Tambahkan URL website ke Authentication → URL Configuration → Redirect URLs agar tautan reset kata sandi kembali ke aplikasi dengan benar.
 
-Saat Supabase dikonfigurasi, tombol login demo otomatis disembunyikan. Seluruh role diambil dari profil pengguna terautentikasi, bukan dari `localStorage`.
+Seluruh role diambil dari profil pengguna terautentikasi, bukan dari `localStorage`.
 
 ## Verifikasi
 
@@ -80,5 +88,18 @@ Saat Supabase dikonfigurasi, tombol login demo otomatis disembunyikan. Seluruh r
 npm run build
 npm run lint
 ```
+
+## Checklist go-live
+
+- Jalankan seluruh migration `001` sampai `010` secara berurutan pada project Supabase tujuan.
+- Deploy Edge Function `admin-users` dan pastikan secret service role hanya berada di Supabase.
+- Isi `.env` deployment dengan URL dan anon key project production; jangan pernah memakai service-role key di Vite.
+- Atur Site URL dan Redirect URLs untuk domain production pada Supabase Auth.
+- Buat minimal satu tahun ajaran, kelas, penugasan guru, siswa aktif, bank soal, dan soal.
+- Uji alur lengkap menggunakan akun admin, guru, dan siswa pada staging sebelum ujian sebenarnya.
+- Aktifkan backup database, log monitoring, HTTPS, dan kebijakan retensi data sesuai aturan sekolah.
+- Pastikan jam server, jadwal ujian, dan zona waktu operator sudah benar sebelum menerbitkan ujian.
+
+Jika konfigurasi Supabase tidak tersedia, aplikasi akan berhenti pada halaman konfigurasi dan tidak menampilkan data contoh.
 
 Mode web menggunakan `localStorage` sebagai antrean autosave ringan. Kebutuhan offline native berbasis SQLite/Drift dan kiosk mode Android dari PRD sengaja tidak diimplementasikan karena berada di luar cakupan website.
