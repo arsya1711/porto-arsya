@@ -42,6 +42,51 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  void showHelp({bool forgotPassword = false}) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                forgotPassword
+                    ? Icons.lock_reset_rounded
+                    : Icons.help_outline_rounded,
+                size: 32,
+                color: AppColors.blue,
+              ),
+              const SizedBox(height: 14),
+              Text(
+                forgotPassword ? 'Lupa kata sandi?' : 'Cara masuk',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                forgotPassword
+                    ? 'Hubungi guru atau petugas ujian untuk mengatur ulang kata sandi. Siapkan nama lengkap dan NIS kamu.'
+                    : 'Masukkan NIS dan kata sandi yang diberikan sekolah. Jika belum memilikinya atau data ditolak, minta bantuan guru atau petugas ujian.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Saya mengerti'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -86,7 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 TextButton.icon(
-                  onPressed: () {},
+                  onPressed: showHelp,
                   icon: const Icon(Icons.help_outline_rounded, size: 16),
                   label: const Text('Bantuan', style: TextStyle(fontSize: 10)),
                 ),
@@ -111,6 +156,7 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 8),
             TextField(
               controller: username,
+              autofillHints: const [AutofillHints.username],
               keyboardType: TextInputType.number,
               textInputAction: TextInputAction.next,
               decoration: const InputDecoration(
@@ -123,7 +169,7 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 const Expanded(child: _FieldTitle('Kata sandi')),
                 TextButton(
-                  onPressed: () {},
+                  onPressed: () => showHelp(forgotPassword: true),
                   child: const Text(
                     'Lupa kata sandi?',
                     style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
@@ -134,6 +180,7 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 3),
             TextField(
               controller: password,
+              autofillHints: const [AutofillHints.password],
               obscureText: obscure,
               onSubmitted: (_) => submit(),
               decoration: InputDecoration(

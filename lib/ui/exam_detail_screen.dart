@@ -268,6 +268,11 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                 prefixIcon: const Icon(Icons.key_outlined),
               ),
             ),
+            const SizedBox(height: 6),
+            const Text(
+              'Kode diberikan oleh pengawas saat ujian dimulai.',
+              style: TextStyle(fontSize: 11, color: AppColors.muted),
+            ),
           ],
           if (available) ...[
             const SizedBox(height: 14),
@@ -304,18 +309,34 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
             color: Colors.white,
             border: Border(top: BorderSide(color: AppColors.border)),
           ),
-          child: ElevatedButton(
-            onPressed: available && agreed ? _start : null,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  available ? Icons.play_arrow_rounded : Icons.schedule_rounded,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ElevatedButton(
+                onPressed: available && agreed ? _start : null,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      available
+                          ? Icons.play_arrow_rounded
+                          : Icons.schedule_rounded,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(available ? 'Mulai ujian' : 'Belum tersedia'),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Text(available ? 'Mulai ujian' : 'Belum tersedia'),
-              ],
-            ),
+              ),
+              if (available && !agreed)
+                const Padding(
+                  padding: EdgeInsets.only(top: 7),
+                  child: Text(
+                    'Centang “sudah membaca petunjuk” agar tombol dapat digunakan.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 10, color: AppColors.muted),
+                  ),
+                ),
+            ],
           ),
         ),
       ),
@@ -327,6 +348,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
       setState(() => codeError = 'Gunakan kode demo: UJIAN');
       return;
     }
+    FocusScope.of(context).unfocus();
     widget.controller.startExam(widget.exam);
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(

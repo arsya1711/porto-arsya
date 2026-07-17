@@ -260,7 +260,7 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
                     IconButton.filledTonal(
                       onPressed: _openNavigator,
                       icon: const Icon(Icons.grid_view_rounded),
-                      tooltip: 'Navigator soal',
+                      tooltip: 'Lihat semua nomor soal',
                     ),
                     const SizedBox(width: 8),
                     OutlinedButton(
@@ -734,7 +734,7 @@ class ReviewSheet extends StatelessWidget {
             ],
             const SizedBox(height: 22),
             ElevatedButton(
-              onPressed: onSubmit,
+              onPressed: () => _confirmSubmit(context),
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -755,6 +755,32 @@ class ReviewSheet extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _confirmSubmit(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.send_rounded, color: AppColors.blue),
+        title: const Text('Kumpulkan ujian sekarang?'),
+        content: Text(
+          controller.answeredCount == controller.questions.length
+              ? 'Jawaban tidak dapat diubah setelah ujian dikumpulkan.'
+              : 'Masih ada ${controller.questions.length - controller.answeredCount} soal belum dijawab. Jawaban tidak dapat diubah setelah dikumpulkan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Periksa lagi'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Ya, kumpulkan'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) onSubmit();
   }
 }
 

@@ -213,6 +213,34 @@ class _HomeHeader extends StatelessWidget {
   const _HomeHeader({required this.controller});
   final AppController controller;
 
+  String _formattedDate() {
+    const days = [
+      'Senin',
+      'Selasa',
+      'Rabu',
+      'Kamis',
+      'Jumat',
+      'Sabtu',
+      'Minggu',
+    ];
+    const months = [
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember',
+    ];
+    final now = DateTime.now();
+    return '${days[now.weekday - 1]}, ${now.day} ${months[now.month - 1]} ${now.year}';
+  }
+
   @override
   Widget build(BuildContext context) => Container(
     color: Colors.white,
@@ -276,7 +304,8 @@ class _HomeHeader extends StatelessWidget {
                 borderRadius: BorderRadius.circular(13),
               ),
               child: IconButton(
-                onPressed: controller.toggleConnection,
+                tooltip: 'Informasi status data',
+                onPressed: () => _showStatus(context),
                 icon: const Icon(
                   Icons.notifications_none_rounded,
                   size: 20,
@@ -296,8 +325,8 @@ class _HomeHeader extends StatelessWidget {
         const SizedBox(height: 5),
         Row(
           children: [
-            const Text(
-              'Senin, 13 Juli 2026',
+            Text(
+              _formattedDate(),
               style: TextStyle(fontSize: 10, color: AppColors.muted),
             ),
             const Spacer(),
@@ -345,6 +374,46 @@ class _HomeHeader extends StatelessWidget {
     if (hour < 15) return 'Selamat siang';
     if (hour < 18) return 'Selamat sore';
     return 'Selamat malam';
+  }
+
+  void _showStatus(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Status data',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                controller.isOnline
+                    ? 'Aplikasi terhubung. Jadwal dan jawaban akan tersimpan ke server secara otomatis.'
+                    : 'Aplikasi sedang offline. Jawaban tetap tersimpan di perangkat dan akan dikirim saat koneksi kembali.',
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    await controller.refreshExams();
+                  },
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Perbarui jadwal ujian'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
