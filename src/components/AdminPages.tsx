@@ -269,9 +269,30 @@ export function SubjectsPage({ notify }: { notify: Notify }) {
 
   const deleteSubject = async (subject: Subject) => {
     if (!supabase || !window.confirm(`Hapus mata pelajaran ${subject.name}?`)) return;
-    const { error } = await supabase.from("subjects").delete().eq("id", subject.id);
-    if (error) notify(error.message, true);
-    else {
+    const { data, error } = await supabase.rpc("delete_subject_safely", {
+      target_subject_id: subject.id,
+    });
+    if (error) {
+      notify(error.message, true);
+      return;
+    }
+    const result = data as {
+      deleted: boolean;
+      question_banks: number;
+      exams: number;
+      teacher_assignments: number;
+    } | null;
+    if (!result?.deleted) {
+      const usage = [
+        result?.question_banks ? `${result.question_banks} bank soal` : "",
+        result?.exams ? `${result.exams} ujian` : "",
+        result?.teacher_assignments ? `${result.teacher_assignments} penugasan guru` : "",
+      ].filter(Boolean).join(", ");
+      notify(
+        `${subject.name} belum dapat dihapus karena masih dipakai oleh ${usage || "data akademik lain"}. Pindahkan atau hapus data terkait terlebih dahulu.`,
+        true,
+      );
+    } else {
       notify("Mata pelajaran berhasil dihapus.");
       await load();
     }
