@@ -36,6 +36,12 @@ npm run dev
 
    - `supabase/migrations/001_initial_schema.sql`
    - `supabase/migrations/002_auth_user_management.sql`
+   - `supabase/migrations/003_question_bank_crud.sql`
+   - `supabase/migrations/004_dashboard_query_indexes.sql`
+   - `supabase/migrations/005_staff_dashboard_metrics.sql`
+   - `supabase/migrations/006_role_responsibility_separation.sql`
+   - `supabase/migrations/007_real_assessment_workflow.sql`
+   - `supabase/migrations/008_admin_experience_settings.sql`
 3. Isi `.env.local`:
 
 ```env

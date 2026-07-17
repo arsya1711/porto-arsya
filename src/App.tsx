@@ -21,14 +21,12 @@ import {
   ArrowLeft,
   ArrowRight,
   BarChart3,
-  Bell,
   BookOpen,
   CalendarDays,
   Check,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
-  CircleHelp,
   ClipboardCheck,
   Clock3,
   Download,
@@ -40,7 +38,6 @@ import {
   LayoutDashboard,
   LockKeyhole,
   LogOut,
-  Menu,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -57,7 +54,6 @@ import {
 } from "lucide-react";
 import {
   examQuestions,
-  exams as seedExams,
   type Exam,
   type Role,
 } from "./mockData";
@@ -75,6 +71,14 @@ import {
   AuditSecurityPage,
   SubjectsPage,
 } from "./components/AdminPages";
+import {
+  RealExamManagement,
+  RealGrading,
+  RealReports,
+} from "./components/AssessmentPages";
+import { RealExamRunner } from "./components/ExamRunner";
+import { RealSettingsPage } from "./components/SettingsPage";
+import { PortalTopbar } from "./components/PortalTopbar";
 
 type Toast = { text: string; error?: boolean } | null;
 
@@ -95,48 +99,12 @@ function Application() {
     updatePassword,
   } = useAuth();
   const [toast, setToast] = useState<Toast>(null);
-  const [examList, setExamList] = useState<Exam[]>(seedExams);
 
   useEffect(() => {
     if (!toast) return;
     const id = window.setTimeout(() => setToast(null), 2600);
     return () => window.clearTimeout(id);
   }, [toast]);
-
-  useEffect(() => {
-    if (!supabase || !profile) return;
-    supabase
-      .from("exams")
-      .select(
-        "id,title,subjects(name),classes(name),starts_at,duration_minutes,status,exam_questions(count),exam_assignments(count)",
-      )
-      .order("starts_at")
-      .then((examResult) => {
-        if (!examResult.error && examResult.data?.length) {
-          setExamList(
-            examResult.data.map((row) => ({
-              id: row.id,
-              title: row.title,
-              subject: relationName(row.subjects),
-              className: relationName(row.classes),
-              date: new Date(row.starts_at).toLocaleDateString("id-ID", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-              }),
-              time: new Date(row.starts_at).toLocaleTimeString("id-ID", {
-                hour: "2-digit",
-                minute: "2-digit",
-              }),
-              duration: row.duration_minutes,
-              questions: relationCount(row.exam_questions),
-              participants: relationCount(row.exam_assignments),
-              status: row.status,
-            })),
-          );
-        }
-      });
-  }, [profile]);
 
   const notify = useCallback(
     (text: string, error = false) => setToast({ text, error }),
@@ -175,8 +143,6 @@ function Application() {
               <Portal
                 profile={profile}
                 logout={logout}
-                exams={examList}
-                setExams={setExamList}
                 notify={notify}
               />
             ) : (
@@ -198,7 +164,7 @@ function Application() {
           path="/siswa/ujian/:examId"
           element={
             role === "siswa" ? (
-              <ExamRunner notify={notify} />
+              <RealExamRunner notify={notify} />
             ) : (
               <Navigate to="/" />
             )
@@ -294,9 +260,6 @@ function relationName(value: unknown): string {
     return String(value.name);
   return "—";
 }
-function relationCount(value: unknown): number {
-  return Array.isArray(value) ? Number(value[0]?.count ?? 0) : 0;
-}
 function capitalize(value: string) {
   return value ? value[0].toUpperCase() + value.slice(1) : value;
 }
@@ -384,7 +347,7 @@ function Login({
             </div>
           </div>
         </div>
-        <small>© 2026 SMP Negeri Harapan Bangsa</small>
+        <small>© 2026 Ruang Ujian</small>
       </section>
       <section className="login-panel">
         <form onSubmit={submit}>
@@ -466,18 +429,49 @@ function Login({
 function Portal({
   profile,
   logout,
-  exams,
-  setExams,
   notify,
 }: {
   profile: Profile;
   logout: () => void;
-  exams: Exam[];
-  setExams: (v: Exam[]) => void;
   notify: (text: string, error?: boolean) => void;
 }) {
   const location = useLocation();
   const role = profile.role;
+  const [schoolBrand, setSchoolBrand] = useState({ name: "Portal Sekolah", logoUrl: "" });
+  useEffect(() => {
+    const loadBrand = async () => {
+      if (!supabase) return;
+      const { data } = await supabase.from("school_profile_settings").select("school_name,logo_url").eq("id", 1).maybeSingle();
+      if (data) setSchoolBrand({ name: data.school_name || "Portal Sekolah", logoUrl: data.logo_url || "" });
+    };
+    void loadBrand();
+    window.addEventListener("school-settings-updated", loadBrand);
+    return () => window.removeEventListener("school-settings-updated", loadBrand);
+  }, []);
+  useEffect(() => {
+    let timeoutMinutes = 120;
+    let timeoutId = 0;
+    const resetTimer = () => {
+      window.clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(() => void logout(), timeoutMinutes * 60_000);
+    };
+    const loadTimeout = async () => {
+      if (supabase) {
+        const { data } = await supabase.from("school_profile_settings").select("session_timeout_minutes").eq("id", 1).maybeSingle();
+        timeoutMinutes = data?.session_timeout_minutes ?? 120;
+      }
+      resetTimer();
+    };
+    const events: (keyof WindowEventMap)[] = ["mousedown", "keydown", "touchstart"];
+    events.forEach((event) => window.addEventListener(event, resetTimer, { passive: true }));
+    window.addEventListener("school-settings-updated", loadTimeout);
+    void loadTimeout();
+    return () => {
+      window.clearTimeout(timeoutId);
+      events.forEach((event) => window.removeEventListener(event, resetTimer));
+      window.removeEventListener("school-settings-updated", loadTimeout);
+    };
+  }, [logout]);
   const teacherNav: [string, ReactNode, string][] = [
     ["/app", <LayoutDashboard />, "Ringkasan"],
     ["/app/ujian", <CalendarDays />, "Ujian"],
@@ -498,15 +492,25 @@ function Portal({
   ];
   const nav = role === "admin" ? adminNav : teacherNav;
   const initials = getInitials(profile.full_name);
+  useEffect(() => {
+    let animation: { kill: () => void } | undefined;
+    let cancelled = false;
+    const target = document.querySelector(".portal-page");
+    if (!target || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    void import("gsap").then(({ gsap }) => {
+      if (!cancelled) animation = gsap.fromTo(target, { autoAlpha: 0, y: 14 }, { autoAlpha: 1, y: 0, duration: 0.38, ease: "power2.out" });
+    });
+    return () => { cancelled = true; animation?.kill(); };
+  }, [location.pathname]);
   return (
     <div className="portal-shell">
       <aside className="portal-sidebar">
         <Link to="/app" className="portal-logo">
           <span>
-            <GraduationCap />
+            {schoolBrand.logoUrl ? <img src={schoolBrand.logoUrl} alt="Logo sekolah" /> : <GraduationCap />}
           </span>
           <b>
-            Ruang Ujian<small>SMP Harapan Bangsa</small>
+            Ruang Ujian<small>{schoolBrand.name}</small>
           </b>
         </Link>
         <div className="workspace">
@@ -529,7 +533,6 @@ function Portal({
             >
               {icon}
               {label}
-              {role === "guru" && label === "Koreksi" && <em>8</em>}
             </Link>
           ))}
         </nav>
@@ -545,7 +548,7 @@ function Portal({
         </div>
       </aside>
       <main className="portal-main">
-        <Topbar profile={profile} />
+        <Topbar profile={profile} logout={logout} />
         <Routes>
           <Route
             index
@@ -554,11 +557,7 @@ function Portal({
           <Route
             path="ujian"
             element={role === "guru" ? (
-              <ExamManagement
-                exams={exams}
-                setExams={setExams}
-                notify={notify}
-              />
+              <RealExamManagement profile={profile} notify={notify} />
             ) : <Navigate to="/app" />}
           />
           <Route
@@ -623,10 +622,10 @@ function Portal({
           />
           <Route
             path="koreksi"
-            element={role === "guru" ? <Grading notify={notify} /> : <Navigate to="/app" />}
+            element={role === "guru" ? <RealGrading notify={notify} /> : <Navigate to="/app" />}
           />
-          <Route path="laporan" element={<Reports />} />
-          <Route path="pengaturan" element={<SettingsPage profile={profile} />} />
+          <Route path="laporan" element={<RealReports />} />
+          <Route path="pengaturan" element={<RealSettingsPage profile={profile} notify={notify} />} />
           <Route path="*" element={<Navigate to="/app" />} />
         </Routes>
       </main>
@@ -644,37 +643,8 @@ function getInitials(name: string) {
     .join("")
     .toUpperCase();
 }
-function Topbar({ profile }: { profile: Profile }) {
-  return (
-    <header className="topbar">
-      <button className="mobile-menu">
-        <Menu />
-      </button>
-      <div className="global-search">
-        <Search />
-        <input
-          placeholder={
-            profile.role === "admin"
-              ? "Cari pengguna, kelas, atau aktivitas…"
-              : "Cari ujian, soal, atau siswa…"
-          }
-        />
-        <kbd>⌘ K</kbd>
-      </div>
-      <div className="top-actions">
-        <button>
-          <CircleHelp />
-        </button>
-        <button className="notification">
-          <Bell />
-          <i />
-        </button>
-        <span className="avatar" title={profile.full_name}>
-          {getInitials(profile.full_name)}
-        </span>
-      </div>
-    </header>
-  );
+function Topbar({ profile, logout }: { profile: Profile; logout: () => void }) {
+  return <PortalTopbar profile={profile} logout={logout} />;
 }
 
 function MobilePortalNav({ role }: { role: Role }) {
@@ -753,6 +723,8 @@ function Status({ value }: { value: Exam["status"] }) {
     </span>
   );
 }
+// Legacy demo implementation retained temporarily for visual reference.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function ExamManagement({
   exams,
   setExams,
@@ -872,10 +844,16 @@ function Toolbar({
   placeholder,
   value,
   onChange,
+  filterValue,
+  onFilterChange,
+  onExport,
 }: {
   placeholder: string;
   value?: string;
   onChange?: (value: string) => void;
+  filterValue?: string;
+  onFilterChange?: (value: string) => void;
+  onExport?: () => void;
 }) {
   return (
     <div className="toolbar">
@@ -889,14 +867,22 @@ function Toolbar({
           }
         />
       </div>
-      <button>
-        <Filter />
-        Filter
-      </button>
-      <button>
-        <Download />
-        Ekspor
-      </button>
+      {onFilterChange && (
+        <label className="toolbar-filter">
+          <Filter />
+          <select value={filterValue} onChange={(event) => onFilterChange(event.target.value)}>
+            <option value="all">Semua status</option>
+            <option value="active">Aktif</option>
+            <option value="inactive">Nonaktif</option>
+          </select>
+        </label>
+      )}
+      {onExport && (
+        <button type="button" onClick={onExport}>
+          <Download />
+          Ekspor CSV
+        </button>
+      )}
     </div>
   );
 }
@@ -1147,6 +1133,7 @@ function UserManagement({
   const [query, setQuery] = useState("");
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [classFilter, setClassFilter] = useState("");
+  const [activeFilter, setActiveFilter] = useState("all");
   const loadUsers = useCallback(async () => {
     if (!supabase) return;
     setLoading(true);
@@ -1318,10 +1305,28 @@ function UserManagement({
       await loadUsers();
     }
   };
+  const deleteClass = async () => {
+    if (!supabase || !classFilter) {
+      notify("Pilih kelas yang ingin dihapus terlebih dahulu.", true);
+      return;
+    }
+    const selectedClass = classes.find((item) => item.id === classFilter);
+    if (!selectedClass) return;
+    const memberCount = users.filter((user) => user.class_id === classFilter).length;
+    if (!window.confirm(`Hapus kelas ${selectedClass.name}? ${memberCount} siswa akan dilepas dari kelas ini.`)) return;
+    const { error } = await supabase.from("classes").delete().eq("id", classFilter);
+    if (error) notify(`Kelas belum dapat dihapus: ${error.message}`, true);
+    else {
+      setClassFilter("");
+      notify("Kelas berhasil dihapus.");
+      await loadUsers();
+    }
+  };
   const normalizedQuery = query.trim().toLowerCase();
   const filteredUsers = users.filter(
     (user) =>
       (!classFilter || user.class_id === classFilter) &&
+      (activeFilter === "all" || (activeFilter === "active" ? user.active : !user.active)) &&
       [
         user.full_name,
         user.email,
@@ -1330,6 +1335,21 @@ function UserManagement({
         user.role,
       ].some((value) => value.toLowerCase().includes(normalizedQuery)),
   );
+  const exportUsers = () => {
+    const headers = roleFilter === "siswa"
+      ? ["Nama", "Email", "Kelas", "NIS", "Status", "Dibuat"]
+      : ["Nama", "Email", "Peran", "Status", "Dibuat"];
+    const rows = filteredUsers.map((user) => roleFilter === "siswa"
+      ? [user.full_name, user.email, user.class_name ?? "Belum ditempatkan", user.student_number ?? "", user.active ? "Aktif" : "Nonaktif", new Date(user.created_at).toLocaleDateString("id-ID")]
+      : [user.full_name, user.email, capitalize(user.role), user.active ? "Aktif" : "Nonaktif", new Date(user.created_at).toLocaleDateString("id-ID")]);
+    const csv = [headers, ...rows].map((columns) => columns.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${roleFilter}-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
   return (
     <div className="portal-page">
       <PageTitle
@@ -1340,10 +1360,14 @@ function UserManagement({
           canManage ? (
             <div className="title-actions">
               {roleFilter === "siswa" && (
-                <button onClick={createClass}>
-                  <Plus />
-                  Tambah kelas
-                </button>
+                <>
+                  <button onClick={() => void deleteClass()} disabled={!classFilter}>
+                    <Trash2 /> Hapus kelas
+                  </button>
+                  <button onClick={() => void createClass()}>
+                    <Plus /> Tambah kelas
+                  </button>
+                </>
               )}
               <button className="primary" onClick={() => setCreate(true)}>
                 <UserPlus />
@@ -1376,9 +1400,12 @@ function UserManagement({
         </div>
       )}
       <Toolbar
-        placeholder="Cari nama, email, atau NIS…"
+        placeholder={roleFilter === "siswa" ? "Cari nama, email, atau NIS…" : "Cari nama atau email…"}
         value={query}
         onChange={setQuery}
+        filterValue={activeFilter}
+        onFilterChange={setActiveFilter}
+        onExport={exportUsers}
       />
       <div className="table-card users-table">
         <table>
@@ -1386,7 +1413,7 @@ function UserManagement({
             <tr>
               <th>PENGGUNA</th>
               <th>{roleFilter === "siswa" ? "KELAS" : "PERAN"}</th>
-              <th>NIS</th>
+              {roleFilter === "siswa" && <th>NIS</th>}
               <th>STATUS</th>
               <th>DIBUAT</th>
               <th />
@@ -1395,11 +1422,11 @@ function UserManagement({
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6}>Memuat pengguna…</td>
+                <td colSpan={roleFilter === "siswa" ? 6 : 5}>Memuat pengguna…</td>
               </tr>
             ) : filteredUsers.length === 0 ? (
               <tr>
-                <td colSpan={6}>Belum ada pengguna.</td>
+                <td colSpan={roleFilter === "siswa" ? 6 : 5}>Belum ada pengguna yang cocok.</td>
               </tr>
             ) : (
               filteredUsers.map((user) => (
@@ -1422,7 +1449,7 @@ function UserManagement({
                       </span>
                     )}
                   </td>
-                  <td>{user.student_number || "—"}</td>
+                  {roleFilter === "siswa" && <td>{user.student_number || "—"}</td>}
                   <td>
                     <span
                       className={`user-status ${user.active ? "active" : ""}`}
@@ -1555,7 +1582,7 @@ function CreateUserModal({
               required
             />
           </FormField>
-          <div className="form-grid">
+          <div className={lockedRole === "siswa" ? "form-grid" : ""}>
             <FormField label="Peran">
               <select
                 value={form.role}
@@ -1569,15 +1596,11 @@ function CreateUserModal({
                 <option value="admin">Admin</option>
               </select>
             </FormField>
-            <FormField label="NIS (khusus siswa)">
-              <input
-                value={form.student_number}
-                onChange={(e) =>
-                  setForm({ ...form, student_number: e.target.value })
-                }
-                disabled={form.role !== "siswa"}
-              />
-            </FormField>
+            {lockedRole === "siswa" && (
+              <FormField label="NIS">
+                <input value={form.student_number} onChange={(e) => setForm({ ...form, student_number: e.target.value })} />
+              </FormField>
+            )}
           </div>
           {lockedRole === "siswa" && (
             <FormField label="Kelas">
@@ -1686,7 +1709,7 @@ function EditUserModal({
               required
             />
           </FormField>
-          <div className="form-grid">
+          <div className={lockedRole === "siswa" ? "form-grid" : ""}>
             <FormField label="Peran">
               <select
                 value={form.role}
@@ -1700,15 +1723,11 @@ function EditUserModal({
                 <option value="admin">Admin</option>
               </select>
             </FormField>
-            <FormField label="NIS (khusus siswa)">
-              <input
-                value={form.student_number}
-                onChange={(event) =>
-                  setForm({ ...form, student_number: event.target.value })
-                }
-                disabled={form.role !== "siswa"}
-              />
-            </FormField>
+            {lockedRole === "siswa" && (
+              <FormField label="NIS">
+                <input value={form.student_number} onChange={(event) => setForm({ ...form, student_number: event.target.value })} />
+              </FormField>
+            )}
           </div>
           {lockedRole === "siswa" && (
             <FormField label="Kelas">
@@ -1815,6 +1834,7 @@ function ResetUserPasswordModal({
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function Grading({ notify }: { notify: (text: string) => void }) {
   const [selected, setSelected] = useState(0);
   const [scores, setScores] = useState<Record<number, string>>({});
@@ -1936,6 +1956,7 @@ function Grading({ notify }: { notify: (text: string) => void }) {
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function Reports() {
   const grades = [72, 76, 78, 82, 84, 76, 88, 92, 80, 86, 74, 90];
   return (
@@ -2049,6 +2070,7 @@ function Reports() {
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function SettingsPage({ profile }: { profile: Profile }) {
   if (profile.role === "guru") {
     return (
@@ -2120,6 +2142,7 @@ function SettingsPage({ profile }: { profile: Profile }) {
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function ExamRunner({
   notify,
 }: {
