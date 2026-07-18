@@ -22,7 +22,7 @@ import {
 import { BrandLogo } from "./BrandLogo";
 import type { Profile } from "../auth/AuthContext";
 import { supabase } from "../lib/supabase";
-import type { ExamStatus } from "../types";
+import type { ExamStatus, StudentExamCatalogRow } from "../types";
 
 type StaffExam = {
   id: string;
@@ -105,18 +105,6 @@ function getInitials(name: string) {
     .map((part) => part[0])
     .join("")
     .toUpperCase();
-}
-
-function firstName(name: string) {
-  return name.trim().split(/\s+/)[0] || "Siswa";
-}
-
-function greeting() {
-  const hour = new Date().getHours();
-  if (hour < 11) return "Selamat pagi";
-  if (hour < 15) return "Selamat siang";
-  if (hour < 18) return "Selamat sore";
-  return "Selamat malam";
 }
 
 function todayLabel() {
@@ -453,7 +441,7 @@ export function StaffDashboard({ profile }: { profile: Profile }) {
     <div className="portal-page real-dashboard">
       <PageTitle
         eyebrow={todayLabel()}
-        title={`${greeting()}, ${profile.full_name}`}
+        title={profile.full_name}
         description={
           profile.role === "admin"
             ? "Ringkasan operasional sekolah berdasarkan data Supabase."
@@ -620,19 +608,14 @@ export function StudentDashboard({
       }
       setLoading(true);
       setError("");
-      const [membershipResult, assignmentResult, attemptResult] =
+      const [membershipResult, catalogResult, attemptResult] =
         await Promise.all([
           supabase
             .from("class_students")
             .select("classes(name)")
             .eq("student_id", profile.id)
             .maybeSingle(),
-          supabase
-            .from("exam_assignments")
-            .select(
-              "exam_id,exams(id,title,starts_at,ends_at,duration_minutes,status,subjects(name),classes(name),exam_questions(count))",
-            )
-            .eq("student_id", profile.id),
+          supabase.rpc("get_student_exam_catalog"),
           supabase
             .from("attempts")
             .select("id,exam_id,status,final_score,started_at,submitted_at")
@@ -640,7 +623,7 @@ export function StudentDashboard({
         ]);
       const firstError = [
         membershipResult.error,
-        assignmentResult.error,
+        catalogResult.error,
         attemptResult.error,
       ].find(Boolean);
       if (!active) return;
@@ -660,18 +643,14 @@ export function StudentDashboard({
           submittedAt: row.submitted_at,
         }),
       );
-      const normalizedExams = (assignmentResult.data ?? [])
-        .map((assignment) => {
-          const rawExam = Array.isArray(assignment.exams)
-            ? assignment.exams[0]
-            : assignment.exams;
-          if (!rawExam) return null;
-          const duration = rawExam.duration_minutes;
+      const normalizedExams = ((catalogResult.data ?? []) as StudentExamCatalogRow[])
+        .map((rawExam) => {
+          const duration = Number(rawExam.duration_minutes);
           return {
-            id: rawExam.id,
+            id: rawExam.exam_id,
             title: rawExam.title,
-            subject: relationName(rawExam.subjects),
-            className: relationName(rawExam.classes),
+            subject: rawExam.subject_name ?? "Mata pelajaran",
+            className: rawExam.class_name ?? "Belum ada kelas",
             startsAt: rawExam.starts_at,
             endsAt: rawExam.ends_at,
             duration,
@@ -682,15 +661,13 @@ export function StudentDashboard({
               duration,
             ),
             participants: 0,
-            questionCount: relationCount(rawExam.exam_questions),
+            questionCount: Number(rawExam.question_count ?? 0),
             attempt:
-              attempts.find((attempt) => attempt.examId === rawExam.id) ?? null,
+              attempts.find((attempt) => attempt.examId === rawExam.exam_id) ??
+              null,
           } satisfies StudentExam;
         })
-        .filter(
-          (exam): exam is StudentExam =>
-            exam !== null && exam.status !== "draft",
-        );
+        .filter((exam) => exam.status !== "draft");
 
       setClassName(relationName(membershipResult.data?.classes));
       setExams(normalizedExams);
@@ -763,7 +740,7 @@ export function StudentDashboard({
         <div className="student-greeting">
           <p>{todayLabel()}</p>
           <h1>
-            {greeting()}, {firstName(profile.full_name)} 👋
+            {profile.full_name}
           </h1>
           <span>Siapkan dirimu dan kerjakan ujian dengan jujur.</span>
         </div>

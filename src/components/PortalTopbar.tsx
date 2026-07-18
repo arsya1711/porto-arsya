@@ -55,7 +55,15 @@ function auditTitle(action: string) {
   return labels[action] ?? action.replace(/[._]/g, " ");
 }
 
-export function PortalTopbar({ profile, logout }: { profile: Profile; logout: () => void }) {
+export function PortalTopbar({
+  profile,
+  logout,
+  onOpenNavigation,
+}: {
+  profile: Profile;
+  logout: () => void;
+  onOpenNavigation: () => void;
+}) {
   const navigate = useNavigate();
   const searchRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
@@ -156,7 +164,7 @@ export function PortalTopbar({ profile, logout }: { profile: Profile; logout: ()
 
   return (
     <header className="topbar">
-      <button className="mobile-menu" type="button" aria-label="Buka navigasi"><Menu /></button>
+      <button className="mobile-menu" type="button" aria-label="Buka navigasi" onClick={onOpenNavigation}><Menu /></button>
       <div className="global-search topbar-search">
         <Search />
         <input ref={searchRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={profile.role === "admin" ? "Cari pengguna, kelas, mata pelajaran, atau ujian…" : "Cari ujian, soal, atau siswa…"} />

@@ -14,7 +14,6 @@ import {
   Users,
   X,
 } from "lucide-react";
-import type { Profile } from "../auth/AuthContext";
 import { supabase } from "../lib/supabase";
 import type { ExamStatus } from "../types";
 
@@ -194,10 +193,8 @@ function PageState({
 }
 
 export function RealExamManagement({
-  profile,
   notify,
 }: {
-  profile: Profile;
   notify: Notify;
 }) {
   const [exams, setExams] = useState<ExamRow[]>([]);
@@ -327,59 +324,25 @@ export function RealExamManagement({
     }
     setSaving(true);
     const startsAt = new Date(draft.startsAt);
-    const payload = {
-      title: draft.title.trim(),
-      description: draft.description.trim() || null,
-      subject_id: draft.subjectId,
-      class_id: draft.classId,
-      starts_at: startsAt.toISOString(),
-      ends_at: new Date(startsAt.getTime() + draft.duration * 60_000).toISOString(),
-      duration_minutes: draft.duration,
-      access_code: draft.accessCode.trim() || null,
-      status: draft.status,
-      shuffle_questions: draft.shuffleQuestions,
-      shuffle_options: draft.shuffleOptions,
-      fullscreen_mode: draft.fullscreenMode,
-      record_tab_switches: draft.recordTabSwitches,
-      created_by: profile.id,
-    };
-
-    let examId = draft.id;
-    const examResult = draft.id
-      ? await supabase.from("exams").update(payload).eq("id", draft.id).select("id").single()
-      : await supabase.from("exams").insert(payload).select("id").single();
-    if (examResult.error || !examResult.data) {
-      setSaving(false);
-      notify(examResult.error?.message ?? "Ujian gagal disimpan.", true);
-      return;
-    }
-    examId = examResult.data.id;
-
-    const [oldQuestions, oldAssignments] = await Promise.all([
-      supabase.from("exam_questions").delete().eq("exam_id", examId),
-      supabase.from("exam_assignments").delete().eq("exam_id", examId),
-    ]);
-    if (oldQuestions.error || oldAssignments.error) {
-      setSaving(false);
-      notify((oldQuestions.error ?? oldAssignments.error)?.message ?? "Relasi ujian gagal diperbarui.", true);
-      return;
-    }
-    const { error: questionError } = await supabase.from("exam_questions").insert(
-      draft.questionIds.map((questionId, index) => ({ exam_id: examId, question_id: questionId, position: index + 1 })),
-    );
-    const { data: classMembers, error: memberError } = await supabase
-      .from("class_students")
-      .select("student_id")
-      .eq("class_id", draft.classId);
-    const assignmentResult = classMembers?.length
-      ? await supabase.from("exam_assignments").insert(
-          classMembers.map((member) => ({ exam_id: examId, student_id: member.student_id })),
-        )
-      : { error: null };
-    const relationError = questionError ?? memberError ?? assignmentResult.error;
+    const { error: saveError } = await supabase.rpc("save_managed_exam", {
+      target_exam_id: draft.id ?? null,
+      exam_title: draft.title.trim(),
+      exam_description: draft.description.trim() || null,
+      target_subject_id: draft.subjectId,
+      target_class_id: draft.classId,
+      start_time: startsAt.toISOString(),
+      duration_in_minutes: draft.duration,
+      target_status: draft.status,
+      question_ids: draft.questionIds,
+      access_code_value: draft.accessCode.trim() || null,
+      should_shuffle_questions: draft.shuffleQuestions,
+      should_shuffle_options: draft.shuffleOptions,
+      should_use_fullscreen: draft.fullscreenMode,
+      should_record_tab_switches: draft.recordTabSwitches,
+    });
     setSaving(false);
-    if (relationError) {
-      notify(relationError.message, true);
+    if (saveError) {
+      notify(saveError.message, true);
       return;
     }
     setDraft(null);
@@ -389,7 +352,9 @@ export function RealExamManagement({
 
   const removeExam = async (exam: ExamRow) => {
     if (!supabase || !window.confirm(`Hapus ujian “${exam.title}”? Semua penugasan ujian ikut terhapus.`)) return;
-    const { error: deleteError } = await supabase.from("exams").delete().eq("id", exam.id);
+    const { error: deleteError } = await supabase.rpc("delete_managed_exam", {
+      target_exam_id: exam.id,
+    });
     if (deleteError) notify(deleteError.message, true);
     else {
       notify("Ujian berhasil dihapus.");
@@ -571,25 +536,16 @@ export function RealGrading({ notify }: { notify: Notify }) {
       return;
     }
     setSaving(true);
-    const { error: saveError } = await supabase.from("answers").update({ score: numericScore, teacher_comment: comment.trim() || null }).eq("id", selected.answerId);
+    const { error: saveError } = await supabase.rpc("grade_essay_answer", {
+      target_answer_id: selected.answerId,
+      awarded_score: numericScore,
+      feedback: comment.trim() || null,
+    });
     if (saveError) {
       setSaving(false);
       notify(saveError.message, true);
       return;
     }
-    const [{ data: attemptAnswers }, { data: attemptRow }, { data: examQuestions }] = await Promise.all([
-      supabase.from("answers").select("score,questions(type,weight)").eq("attempt_id", selected.attemptId),
-      supabase.from("attempts").select("objective_score").eq("id", selected.attemptId).single(),
-      supabase.from("exam_questions").select("questions(weight)").eq("exam_id", selected.examId),
-    ]);
-    const rows = attemptAnswers ?? [];
-    const essayRows = rows.filter((row) => nestedRecord(row.questions).type === "essay");
-    const objectiveScore = Number(attemptRow?.objective_score ?? 0);
-    const essayScore = essayRows.reduce((total, row) => total + Number(row.score ?? 0), 0);
-    const totalWeight = (examQuestions ?? []).reduce((total, row) => total + Number(nestedRecord(row.questions).weight ?? 0), 0);
-    const completed = essayRows.every((row) => row.score !== null);
-    const finalScore = completed && totalWeight > 0 ? Math.round(((objectiveScore + essayScore) / totalWeight) * 10_000) / 100 : null;
-    await supabase.from("attempts").update({ objective_score: objectiveScore, essay_score: essayScore, final_score: finalScore, status: completed ? "final" : "grading", finalized_at: completed ? new Date().toISOString() : null }).eq("id", selected.attemptId);
     setSaving(false);
     notify("Nilai essay berhasil disimpan.");
     await load();
@@ -630,6 +586,7 @@ export function RealReports() {
   const [selectedExam, setSelectedExam] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [passingScore, setPassingScore] = useState(75);
 
   const loadAttempts = useCallback(async () => {
     if (!supabase) {
@@ -638,7 +595,12 @@ export function RealReports() {
       return;
     }
     setLoading(true);
-    const { data, error: loadError } = await supabase.from("attempts").select("id,exam_id,student_id,status,final_score,objective_score,essay_score,submitted_at,exams(title,classes(name)),profiles(full_name)").in("status", ["submitted", "grading", "final"]).order("submitted_at", { ascending: false });
+    const [attemptResult, settingsResult] = await Promise.all([
+      supabase.from("attempts").select("id,exam_id,student_id,status,final_score,objective_score,essay_score,submitted_at,exams(title,classes(name)),profiles(full_name)").in("status", ["submitted", "grading", "final"]).order("submitted_at", { ascending: false }),
+      supabase.from("school_profile_settings").select("passing_score").eq("id", 1).maybeSingle(),
+    ]);
+    const data = attemptResult.data;
+    const loadError = attemptResult.error ?? settingsResult.error;
     if (loadError) {
       setError(loadError.message);
       setLoading(false);
@@ -649,6 +611,7 @@ export function RealReports() {
       return { id: row.id, examId: row.exam_id, examTitle: String(exam.title ?? "Ujian"), className: relationName(exam.classes), studentName: relationName(row.profiles, "Siswa"), status: row.status, score: row.final_score === null ? null : Number(row.final_score), submittedAt: row.submitted_at };
     });
     setAttempts(normalized);
+    setPassingScore(Number(settingsResult.data?.passing_score ?? 75));
     setSelectedExam((current) => current && normalized.some((item) => item.examId === current) ? current : normalized[0]?.examId ?? "");
     setError("");
     setLoading(false);
@@ -659,8 +622,13 @@ export function RealReports() {
   useEffect(() => {
     if (!supabase || !selectedExam) { setAnalysis([]); return; }
     let active = true;
-    supabase.from("answers").select("question_id,selected_option,score,questions(body,type,correct_option,weight,difficulty),attempts!inner(exam_id)").eq("attempts.exam_id", selectedExam).then(({ data }) => {
+    supabase.from("answers").select("question_id,selected_option,score,questions(body,type,correct_option,weight,difficulty),attempts!inner(exam_id,status)").eq("attempts.exam_id", selectedExam).in("attempts.status", ["submitted", "grading", "final"]).then(({ data, error: analysisError }) => {
       if (!active) return;
+      if (analysisError) {
+        setError(analysisError.message);
+        setAnalysis([]);
+        return;
+      }
       const grouped = new Map<string, { body: string; type: "multiple_choice" | "essay"; difficulty: string; answered: number; sum: number }>();
       for (const row of data ?? []) {
         const question = nestedRecord(row.questions);
@@ -680,9 +648,9 @@ export function RealReports() {
   const rows = attempts.filter((item) => item.examId === selectedExam);
   const scores = rows.flatMap((item) => item.score === null ? [] : [item.score]);
   const average = scores.length ? scores.reduce((sum, value) => sum + value, 0) / scores.length : 0;
-  const passed = scores.filter((value) => value >= 75).length;
+  const passed = scores.filter((value) => value >= passingScore).length;
   const pending = rows.filter((item) => item.score === null).length;
-  const distribution = Array.from({ length: 10 }, (_, index) => scores.filter((score) => score >= index * 10 && score < (index + 1) * 10).length);
+  const distribution = Array.from({ length: 10 }, (_, index) => scores.filter((score) => score >= index * 10 && (index === 9 ? score <= 100 : score < (index + 1) * 10)).length);
   const maxDistribution = Math.max(1, ...distribution);
 
   const exportCsv = () => {
@@ -706,7 +674,7 @@ export function RealReports() {
         <div className="report-stats">
           <div><small>RATA-RATA</small><b>{scores.length ? average.toLocaleString("id-ID", { maximumFractionDigits: 1 }) : "—"}</b><span>{scores.length} nilai final</span></div>
           <div><small>NILAI TERTINGGI</small><b>{scores.length ? Math.max(...scores) : "—"}</b><span>{scores.length ? rows.find((item) => item.score === Math.max(...scores))?.studentName : "Belum ada"}</span></div>
-          <div><small>KETUNTASAN (KKM 75)</small><b>{scores.length ? `${Math.round((passed / scores.length) * 100)}%` : "—"}</b><span>{passed} dari {scores.length} siswa</span></div>
+          <div><small>KETUNTASAN (KKM {passingScore})</small><b>{scores.length ? `${Math.round((passed / scores.length) * 100)}%` : "—"}</b><span>{passed} dari {scores.length} siswa</span></div>
           <div><small>MENUNGGU KOREKSI</small><b>{pending}</b><span>jawaban belum final</span></div>
         </div>
         <div className="report-grid">

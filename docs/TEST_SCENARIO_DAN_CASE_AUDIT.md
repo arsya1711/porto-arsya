@@ -1,4 +1,4 @@
-# Test Scenario dan Test Case Audit — Ruang Ujian
+# Test Scenario dan Test Case Audit — AWExam
 
 Dokumen ini adalah suite regression/security tambahan berdasarkan temuan pada [`AUDIT_LENGKAP_MODUL.md`](./AUDIT_LENGKAP_MODUL.md). Dokumen ini melengkapi, bukan menggantikan, [`TEST_CASES_PRODUCTION.md`](./TEST_CASES_PRODUCTION.md).
 
@@ -370,7 +370,7 @@ Cleanup:
 **Priority/Severity:** P1/S2  
 **Langkah:** Bandingkan daftar file `supabase/migrations` dengan README, test plan, dan deployment checklist.
 
-**Expected:** Migration `001` sampai `012` tercantum berurutan; tidak ada instruksi yang hanya menjalankan `001–010`.
+**Expected:** Migration `001` sampai `014` tercantum berurutan; tidak ada instruksi yang berhenti sebelum migration terbaru.
 
 ### AUD-DOC-002 — Test plan sinkron dengan implementasi
 

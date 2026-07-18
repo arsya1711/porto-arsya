@@ -42,6 +42,8 @@ Deno.serve(async (request) => {
     if (body.action === 'create') {
       if (!body.full_name?.trim() || !body.email?.trim() || !body.password || !body.role) return json({ error: 'Data akun belum lengkap.' }, 400)
       if (body.password.length < 8) return json({ error: 'Kata sandi minimal 8 karakter.' }, 400)
+      const studentNumber = body.role === 'siswa' ? body.student_number?.trim() || null : null
+      if (body.role === 'siswa' && !studentNumber) return json({ error: 'NIS siswa wajib diisi.' }, 400)
       const { data, error } = await admin.auth.admin.createUser({
         email: body.email.trim().toLowerCase(), password: body.password, email_confirm: true,
         user_metadata: { full_name: body.full_name.trim(), role: body.role },
@@ -49,7 +51,7 @@ Deno.serve(async (request) => {
       if (error) return json({ error: error.message }, 400)
       const { error: profileError } = await admin.from('profiles').update({
         full_name: body.full_name.trim(), role: body.role,
-        student_number: body.role === 'siswa' ? body.student_number || null : null, active: true,
+        student_number: studentNumber, active: true,
       }).eq('id', data.user.id)
       if (profileError) { await admin.auth.admin.deleteUser(data.user.id); return json({ error: profileError.message }, 400) }
       if (body.role === 'siswa' && body.class_id) {
@@ -65,13 +67,15 @@ Deno.serve(async (request) => {
       if (!body.full_name?.trim() || !body.email?.trim() || !body.role) return json({ error: 'Data akun belum lengkap.' }, 400)
       if (body.user_id === callerData.user.id && body.role !== 'admin') return json({ error: 'Admin tidak dapat menurunkan role akunnya sendiri.' }, 400)
       const email = body.email.trim().toLowerCase()
+      const studentNumber = body.role === 'siswa' ? body.student_number?.trim() || null : null
+      if (body.role === 'siswa' && !studentNumber) return json({ error: 'NIS siswa wajib diisi.' }, 400)
       const { error: authError } = await admin.auth.admin.updateUserById(body.user_id, {
         email, user_metadata: { full_name: body.full_name.trim(), role: body.role },
       })
       if (authError) return json({ error: authError.message }, 400)
       const { error } = await admin.from('profiles').update({
         full_name: body.full_name.trim(), email, role: body.role,
-        student_number: body.role === 'siswa' ? body.student_number || null : null,
+        student_number: studentNumber,
       }).eq('id', body.user_id)
       if (error) return json({ error: error.message }, 400)
       const { error: clearClassError } = await admin.from('class_students').delete().eq('student_id', body.user_id)

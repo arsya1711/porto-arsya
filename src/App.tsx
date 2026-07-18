@@ -52,7 +52,7 @@ import {
   Wifi,
   X,
 } from "lucide-react";
-import { type Exam, type Role } from "./types";
+import { type Exam, type Role, type StudentExamCatalogRow } from "./types";
 import {
   isSupabaseConfigured,
   loadLocal,
@@ -420,6 +420,7 @@ function Portal({
 }) {
   const location = useLocation();
   const role = profile.role;
+  const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [schoolBrand, setSchoolBrand] = useState({ name: "Portal Sekolah", logoUrl: "" });
   useEffect(() => {
     const loadBrand = async () => {
@@ -474,6 +475,20 @@ function Portal({
     ["/app/audit", <LockKeyhole />, "Audit & Keamanan"],
   ];
   const nav = role === "admin" ? adminNav : teacherNav;
+  useEffect(() => setMobileNavigationOpen(false), [location.pathname]);
+  useEffect(() => {
+    if (!mobileNavigationOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileNavigationOpen(false);
+    };
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [mobileNavigationOpen]);
   useEffect(() => {
     let animation: { kill: () => void } | undefined;
     let cancelled = false;
@@ -486,8 +501,27 @@ function Portal({
   }, [location.pathname]);
   return (
     <div className="portal-shell">
-      <aside className="portal-sidebar">
-        <Link to="/app" className="portal-logo">
+      {mobileNavigationOpen && (
+        <button
+          type="button"
+          className="mobile-nav-overlay"
+          aria-label="Tutup navigasi"
+          onClick={() => setMobileNavigationOpen(false)}
+        />
+      )}
+      <aside className={`portal-sidebar${mobileNavigationOpen ? " mobile-open" : ""}`} aria-label="Navigasi utama">
+        {mobileNavigationOpen && (
+          <button
+            type="button"
+            className="mobile-nav-close"
+            aria-label="Tutup navigasi"
+            autoFocus
+            onClick={() => setMobileNavigationOpen(false)}
+          >
+            <X />
+          </button>
+        )}
+        <Link to="/app" className="portal-logo" onClick={() => setMobileNavigationOpen(false)}>
           <span>
             {schoolBrand.logoUrl ? <img src={schoolBrand.logoUrl} alt="Logo sekolah" /> : <BrandLogo />}
           </span>
@@ -501,6 +535,7 @@ function Portal({
               key={to}
               className={location.pathname === to ? "active" : ""}
               to={to}
+              onClick={() => setMobileNavigationOpen(false)}
             >
               {icon}
               {label}
@@ -508,24 +543,24 @@ function Portal({
           ))}
         </nav>
         <div className="side-bottom">
-          <Link to="/app/pengaturan">
+          <Link to="/app/pengaturan" onClick={() => setMobileNavigationOpen(false)}>
             <Settings />
             Pengaturan
           </Link>
-          <button onClick={logout}>
+          <button onClick={() => { setMobileNavigationOpen(false); void logout(); }}>
             <LogOut />
             Keluar
           </button>
         </div>
       </aside>
       <main className="portal-main">
-        <Topbar profile={profile} logout={logout} />
+        <Topbar profile={profile} logout={logout} onOpenNavigation={() => setMobileNavigationOpen(true)} />
         <Routes>
           <Route index element={<StaffDashboard profile={profile} />} />
           <Route
             path="ujian"
             element={role === "guru" ? (
-              <RealExamManagement profile={profile} notify={notify} />
+              <RealExamManagement notify={notify} />
             ) : <Navigate to="/app" />}
           />
           <Route
@@ -654,8 +689,16 @@ function downloadCsv(
   anchor.click();
   URL.revokeObjectURL(url);
 }
-function Topbar({ profile, logout }: { profile: Profile; logout: () => void }) {
-  return <PortalTopbar profile={profile} logout={logout} />;
+function Topbar({
+  profile,
+  logout,
+  onOpenNavigation,
+}: {
+  profile: Profile;
+  logout: () => void;
+  onOpenNavigation: () => void;
+}) {
+  return <PortalTopbar profile={profile} logout={logout} onOpenNavigation={onOpenNavigation} />;
 }
 
 function MobilePortalNav({ role }: { role: Role }) {
@@ -2593,7 +2636,9 @@ function ExamRunner({
   const [answers, setAnswers] = useState<Record<string, number | string>>(() =>
     loadLocal(`answers:${examId}`, {}),
   );
-  const [marked, setMarked] = useState<string[]>([]);
+  const [marked, setMarked] = useState<string[]>(() =>
+    loadLocal(`marked:${examId}`, []),
+  );
   const [remaining, setRemaining] = useState(90 * 60);
   const [submit, setSubmit] = useState(false);
   const [attemptId, setAttemptId] = useState<string | null>(null);
@@ -2602,6 +2647,8 @@ function ExamRunner({
     title: "Penilaian Akhir Semester",
     subject: "Matematika",
     className: "Kelas IX",
+    fullscreen: true,
+    recordTabSwitches: true,
   });
   const [loadingExam, setLoadingExam] = useState(Boolean(supabase));
   const [examError, setExamError] = useState("");
@@ -2611,6 +2658,11 @@ function ExamRunner({
   const [needsAccessCode, setNeedsAccessCode] = useState(false);
   const essaySaveTimer = useRef<number | null>(null);
   const pendingEssay = useRef<{ questionId: string; value: string } | null>(null);
+  const answerSaveQueue = useRef<Record<string, Promise<boolean>>>({});
+  const finishingRef = useRef(false);
+  const [pendingSaves, setPendingSaves] = useState(0);
+  const [submittingExam, setSubmittingExam] = useState(false);
+  const [studentId, setStudentId] = useState<string | null>(null);
   const question = questions[current];
   useEffect(() => {
     const client = supabase;
@@ -2618,20 +2670,23 @@ function ExamRunner({
     let active = true;
     const load = async () => {
       setLoadingExam(true);
-      const [{ data: authData }, examResult] = await Promise.all([
+      const [{ data: authData }, catalogResult] = await Promise.all([
         client.auth.getUser(),
-        client
-          .from("exams")
-          .select("id,title,starts_at,ends_at,duration_minutes,subjects(name),classes(name)")
-          .eq("id", examId)
-          .single(),
+        client.rpc("get_student_exam_catalog"),
       ]);
+      const examRow = (catalogResult.data as StudentExamCatalogRow[] | null)?.find(
+        (row) => row.exam_id === examId,
+      );
       if (!active) return;
-      if (!authData.user || examResult.error) {
-        setExamError(examResult.error?.message ?? "Sesi siswa tidak ditemukan.");
+      if (!authData.user || catalogResult.error || !examRow) {
+        setExamError(
+          catalogResult.error?.message ??
+            "Sesi siswa atau data ujian tidak ditemukan.",
+        );
         setLoadingExam(false);
         return;
       }
+      setStudentId(authData.user.id);
       const startResult = await client.rpc("start_exam_attempt", {
         requested_exam_id: examId,
         provided_access_code: submittedAccessCode.trim() || null,
@@ -2671,6 +2726,17 @@ function ExamRunner({
         options: Array.isArray(row.options) ? row.options.map(String) : [],
         weight: Number(row.weight ?? 1),
       }));
+      const remoteAnswers = Object.fromEntries(
+        (questionResult.data ?? [])
+          .filter((row: Record<string, unknown>) =>
+            row.essay_text !== null && row.essay_text !== undefined
+            || row.selected_option !== null && row.selected_option !== undefined,
+          )
+          .map((row: Record<string, unknown>) => [
+            String(row.question_id),
+            row.essay_text ?? Number(row.selected_option),
+          ]),
+      ) as Record<string, number | string>;
       if (!loadedQuestions.length) {
         setExamError("Soal ujian belum tersedia atau waktu ujian sudah berakhir.");
         setLoadingExam(false);
@@ -2678,15 +2744,18 @@ function ExamRunner({
       }
       setQuestions(loadedQuestions);
       setExamMeta({
-        title: examResult.data.title,
-        subject: relationName(examResult.data.subjects),
-        className: relationName(examResult.data.classes),
+        title: examRow.title,
+        subject: examRow.subject_name ?? "Mata pelajaran",
+        className: examRow.class_name ?? "Belum ada kelas",
+        fullscreen: examRow.fullscreen_mode ?? true,
+        recordTabSwitches: examRow.record_tab_switches ?? true,
       });
       setRemaining(Math.max(0, Math.floor((new Date(startedAttempt.deadline).getTime() - Date.now()) / 1000)));
-      const saved = await client.from("answers").select("question_id,selected_option,essay_text").eq("attempt_id", startedAttempt.attempt_id);
-      if (saved.data) {
-        setAnswers(Object.fromEntries(saved.data.map((item) => [item.question_id, item.essay_text ?? item.selected_option])));
-      }
+      const localAnswers = loadLocal<Record<string, number | string>>(
+        `answers:${examId}`,
+        {},
+      );
+      setAnswers({ ...remoteAnswers, ...localAnswers });
       setLoadingExam(false);
     };
     void load();
@@ -2701,9 +2770,15 @@ function ExamRunner({
   }, []);
   useEffect(() => {
     const handler = async () => {
-      if (document.hidden && supabase && attemptId) {
+      if (
+        document.hidden &&
+        examMeta.recordTabSwitches &&
+        supabase &&
+        attemptId
+      ) {
         await supabase.from("integrity_events").insert({
           attempt_id: attemptId,
+          student_id: studentId,
           event_type: "tab_hidden",
           metadata: { exam_id: examId },
         });
@@ -2711,7 +2786,7 @@ function ExamRunner({
     };
     document.addEventListener("visibilitychange", handler);
     return () => document.removeEventListener("visibilitychange", handler);
-  }, [examId, attemptId]);
+  }, [examId, attemptId, examMeta.recordTabSwitches, studentId]);
   useEffect(() => {
     if (!attemptId) return;
     const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
@@ -2721,6 +2796,35 @@ function ExamRunner({
     window.addEventListener("beforeunload", warnBeforeLeaving);
     return () => window.removeEventListener("beforeunload", warnBeforeLeaving);
   }, [attemptId]);
+  useEffect(() => {
+    if (!examMeta.fullscreen || !attemptId) return;
+    const enterFullscreen = () => {
+      if (!document.fullscreenElement) {
+        void document.documentElement.requestFullscreen().catch(() => {
+          notify("Mode layar penuh belum aktif. Izinkan fullscreen pada browser.", true);
+        });
+      }
+    };
+    document.addEventListener("pointerdown", enterFullscreen, {
+      capture: true,
+      once: true,
+    });
+    const recordExit = () => {
+      if (!document.fullscreenElement && supabase && !finishingRef.current) {
+        void supabase.from("integrity_events").insert({
+          attempt_id: attemptId,
+          student_id: studentId,
+          event_type: "fullscreen_exit",
+          metadata: { exam_id: examId },
+        });
+      }
+    };
+    document.addEventListener("fullscreenchange", recordExit);
+    return () => {
+      document.removeEventListener("pointerdown", enterFullscreen, true);
+      document.removeEventListener("fullscreenchange", recordExit);
+    };
+  }, [attemptId, examId, examMeta.fullscreen, notify, studentId]);
   const answeredCount = useMemo(
     () => Object.values(answers).filter((value) =>
       typeof value === "number" || value.trim().length > 0,
@@ -2732,24 +2836,35 @@ function ExamRunner({
       `${String(Math.floor(remaining / 3600)).padStart(2, "0")}:${String(Math.floor((remaining % 3600) / 60)).padStart(2, "0")}:${String(remaining % 60).padStart(2, "0")}`,
     [remaining],
   );
-  const persistAnswer = useCallback(async (questionId: string, value: number | string) => {
-    if (supabase && attemptId) {
-      const { error } = await supabase.from("answers").upsert(
-        {
-          attempt_id: attemptId,
-          question_id: questionId,
-          selected_option: typeof value === "number" ? value : null,
-          essay_text: typeof value === "string" ? value : null,
-          answered_at: new Date().toISOString(),
-        },
-        { onConflict: "attempt_id,question_id" },
-      );
-      if (error) {
-        notify(`Jawaban belum tersinkron: ${error.message}`, true);
-        return false;
+  const persistAnswer = useCallback((questionId: string, value: number | string) => {
+    const save = async () => {
+      if (!supabase || !attemptId) return false;
+      setPendingSaves((count) => count + 1);
+      try {
+        const { error } = await supabase.rpc("save_exam_answer", {
+          target_attempt_id: attemptId,
+          target_question_id: questionId,
+          target_selected_option: typeof value === "number" ? value : null,
+          target_essay_text: typeof value === "string" ? value : null,
+        });
+        if (error) {
+          notify(`Jawaban belum tersinkron: ${error.message}`, true);
+          return false;
+        }
+        return true;
+      } finally {
+        setPendingSaves((count) => Math.max(0, count - 1));
       }
-    }
-    return true;
+    };
+    const previous = answerSaveQueue.current[questionId] ?? Promise.resolve(true);
+    const queued = previous.then(save, save);
+    answerSaveQueue.current[questionId] = queued;
+    void queued.then(() => {
+      if (answerSaveQueue.current[questionId] === queued) {
+        delete answerSaveQueue.current[questionId];
+      }
+    });
+    return queued;
   }, [attemptId, notify]);
   const answer = (value: number | string) => {
     const next = { ...answers, [question.id]: value };
@@ -2770,27 +2885,58 @@ function ExamRunner({
       essaySaveTimer.current = null;
     }, 600);
   };
+  const toggleMarked = (questionId: string) => {
+    setMarked((currentMarked) => {
+      const nextMarked = currentMarked.includes(questionId)
+        ? currentMarked.filter((id) => id !== questionId)
+        : [...currentMarked, questionId];
+      saveLocal(`marked:${examId}`, nextMarked);
+      return nextMarked;
+    });
+  };
   const finish = useCallback(async () => {
+    if (finishingRef.current) return;
+    finishingRef.current = true;
+    setSubmittingExam(true);
     try {
       if (!supabase || !attemptId) throw new Error("Attempt belum siap.");
-      if (pendingEssay.current) {
+      const timeExpired = remaining === 0;
+      if (!timeExpired && pendingEssay.current) {
         if (essaySaveTimer.current !== null) window.clearTimeout(essaySaveTimer.current);
         const synced = await persistAnswer(pendingEssay.current.questionId, pendingEssay.current.value);
         if (!synced) throw new Error("Jawaban essay terakhir belum tersimpan. Periksa koneksi lalu coba kembali.");
         pendingEssay.current = null;
         essaySaveTimer.current = null;
       }
+      if (timeExpired) {
+        await Promise.allSettled(Object.values(answerSaveQueue.current));
+      } else {
+        const finalSaves = await Promise.all(
+          Object.entries(answers).map(([questionId, value]) =>
+            persistAnswer(questionId, value),
+          ),
+        );
+        if (finalSaves.some((saved) => !saved)) {
+          throw new Error(
+            "Masih ada jawaban yang belum tersimpan. Periksa koneksi lalu coba kembali.",
+          );
+        }
+      }
       const { error } = await supabase.rpc("submit_exam_attempt", {
         target_attempt_id: attemptId,
       });
       if (error) throw error;
       localStorage.removeItem(`ruang-ujian:answers:${examId}`);
+      localStorage.removeItem(`ruang-ujian:marked:${examId}`);
+      if (document.fullscreenElement) await document.exitFullscreen();
       notify("Jawaban berhasil dikumpulkan");
       navigate("/siswa");
     } catch (error) {
+      finishingRef.current = false;
+      setSubmittingExam(false);
       notify(error instanceof Error ? error.message : "Jawaban gagal dikumpulkan. Coba lagi sebelum meninggalkan halaman.", true);
     }
-  }, [attemptId, examId, navigate, notify, persistAnswer]);
+  }, [answers, attemptId, examId, navigate, notify, persistAnswer, remaining]);
   useEffect(() => () => {
     if (essaySaveTimer.current !== null) window.clearTimeout(essaySaveTimer.current);
   }, []);
@@ -2849,7 +2995,7 @@ function ExamRunner({
         <div className="runner-stats">
           <span>
             <Wifi />
-            Tersimpan
+            {pendingSaves > 0 ? `Menyimpan ${pendingSaves}…` : "Tersimpan"}
           </span>
           <p>
             <small>SISA WAKTU</small>
@@ -2907,8 +3053,14 @@ function ExamRunner({
           <div className="secure-note">
             <ShieldCheck />
             <p>
-              <b>Ujian aman</b>
-              <span>Aktivitas keluar layar dicatat.</span>
+              <b>
+                {examMeta.fullscreen ? "Mode layar penuh" : "Ujian aman"}
+              </b>
+              <span>
+                {examMeta.recordTabSwitches
+                  ? "Aktivitas keluar layar dicatat."
+                  : "Jawaban disimpan otomatis ke server."}
+              </span>
             </p>
           </div>
         </aside>
@@ -2919,13 +3071,7 @@ function ExamRunner({
             </span>
             <button
               className={marked.includes(question.id) ? "marked" : ""}
-              onClick={() =>
-                setMarked((m) =>
-                  m.includes(question.id)
-                    ? m.filter((x) => x !== question.id)
-                    : [...m, question.id],
-                )
-              }
+              onClick={() => toggleMarked(question.id)}
             >
               <Star />
               Tandai ragu
@@ -3006,8 +3152,8 @@ function ExamRunner({
             </div>
             <footer>
               <button onClick={() => setSubmit(false)}>Periksa lagi</button>
-              <button className="primary" onClick={finish}>
-                Ya, kumpulkan
+              <button className="primary" onClick={finish} disabled={submittingExam}>
+                {submittingExam ? "Mengirim…" : "Ya, kumpulkan"}
               </button>
             </footer>
           </div>

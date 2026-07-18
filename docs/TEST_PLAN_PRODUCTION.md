@@ -1,9 +1,9 @@
-# Test Plan Produksi — Ruang Ujian
+# Test Plan Produksi — AWExam
 
 | Atribut | Nilai |
 |---|---|
 | Dokumen | Test Plan Produksi |
-| Produk | Ruang Ujian Web |
+| Produk | AWExam Web |
 | Versi awal | 1.0 |
 | Tanggal | 17 Juli 2026 |
 | Pemilik | QA Lead / Product Owner |
@@ -18,7 +18,7 @@ Memastikan aplikasi layak digunakan untuk ujian sekolah nyata dengan memverifika
 2. Pemisahan akses berbasis role dan Row Level Security (RLS) tidak dapat dilewati.
 3. Jawaban siswa tersimpan konsisten, terkunci setelah submit, dan tidak hilang saat refresh atau gangguan jaringan.
 4. Waktu, kode akses, penugasan peserta, scoring, koreksi essay, dan nilai akhir dihitung oleh server secara benar.
-5. Migration `001`–`010` dapat diterapkan pada database kosong dan database staging yang sudah terisi.
+5. Migration `001`–`014` dapat diterapkan pada database kosong dan database staging yang sudah terisi.
 6. Aplikasi stabil pada browser/perangkat target dan beban ujian serentak.
 7. Tim operasional memiliki prosedur recovery, bukti pengujian, dan keputusan go/no-go yang terdokumentasi.
 
@@ -50,7 +50,7 @@ Memastikan aplikasi layak digunakan untuk ujian sekolah nyata dengan memverifika
 
 - `docs/PRD_Aplikasi_Ujian_Sekolah_v1.1.pdf`
 - `README.md`
-- `supabase/migrations/001_initial_schema.sql` sampai `010_atomic_exam_creation.sql`
+- `supabase/migrations/001_initial_schema.sql` sampai `014_student_exam_contract.sql`
 - Source route dan role guard pada `src/App.tsx`
 - Dashboard pada `src/components/Dashboards.tsx`
 - Bank soal pada `src/components/QuestionBank.tsx`
@@ -83,9 +83,9 @@ Memastikan aplikasi layak digunakan untuk ujian sekolah nyata dengan memverifika
 
 - Domain HTTPS terpisah dari production.
 - Project Supabase staging terpisah.
-- Migration `001`–`010` sudah diterapkan.
+- Migration `001`–`014` sudah diterapkan.
 - Redirect URL Auth hanya mengarah ke domain staging yang diizinkan.
-- Edge Function `admin-users` sudah di-deploy.
+- Edge Function `admin-users` dan `student-login` sudah di-deploy.
 - Secret service-role hanya tersedia pada Supabase runtime.
 - Browser memakai anon key, bukan service-role key.
 - Waktu server dan perangkat tester sinkron.
@@ -202,12 +202,12 @@ Setiap eksekusi wajib menyimpan:
 
 | ID | Pri | Langkah | Hasil yang diharapkan |
 |---|---|---|---|
-| MIG-001 | P0 | Terapkan `001`–`010` ke database kosong | Semua sukses berurutan |
+| MIG-001 | P0 | Terapkan `001`–`014` ke database kosong | Semua sukses berurutan |
 | MIG-002 | P0 | Jalankan kembali migration idempotent yang diizinkan (`007` dst.) | Tidak gagal karena policy/object sudah ada |
 | MIG-003 | P0 | Verifikasi seluruh tabel, enum, FK, index, trigger, RPC | Sesuai migration |
 | MIG-004 | P0 | Verifikasi RLS aktif pada seluruh tabel public sensitif | Semua aktif |
 | MIG-005 | P0 | Verifikasi EXECUTE RPC untuk `anon` | Ditolak pada RPC sensitif |
-| MIG-006 | P0 | Upgrade database berisi data dari `006` ke `010` | Data lama tetap utuh |
+| MIG-006 | P0 | Upgrade database berisi data dari `006` ke `014` | Data lama tetap utuh |
 | MIG-007 | P1 | Rollback staging dari backup sebelum migration | Database dapat dipulihkan dan aplikasi kembali berfungsi |
 | MIG-008 | P1 | Cek unique active academic year | Tidak dapat memiliki dua tahun aktif |
 | MIG-009 | P1 | Hapus kelas/soal yang direferensikan | Constraint mencegah kerusakan atau cascade sesuai desain |
@@ -672,7 +672,7 @@ Release dapat diajukan go-live jika:
 | Item | Owner | Status/Evidence |
 |---|---|---|
 | Build SHA dikunci | Release Lead | |
-| Migration `001`–`010` terverifikasi | DBA | |
+| Migration `001`–`014` terverifikasi | DBA | |
 | Backup terakhir berhasil | DBA | |
 | Edge Function sehat | Backend | |
 | RLS regression lulus | Security QA | |
@@ -783,4 +783,3 @@ Belum ada test runner pada `package.json`. Implementasi bertahap:
 | Skala ujian serentak | PERF-001–007 |
 | Recovery | REL-001–009 |
 | Kemudahan pengguna awam | UAT-001–008, A11Y-001–010 |
-

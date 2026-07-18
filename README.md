@@ -5,6 +5,7 @@ Website ujian sekolah berbasis React, TypeScript, dan Supabase. Implementasi dib
 Dokumen audit lengkap modul dan section tersedia di [`docs/AUDIT_LENGKAP_MODUL.md`](docs/AUDIT_LENGKAP_MODUL.md).
 Suite test scenario dan test case audit tersedia di [`docs/TEST_SCENARIO_DAN_CASE_AUDIT.md`](docs/TEST_SCENARIO_DAN_CASE_AUDIT.md).
 Bug report hasil pengujian tersedia di [`docs/BUG_REPORT_AUDIT_2026-07-17.md`](docs/BUG_REPORT_AUDIT_2026-07-17.md).
+Status remediasi terbaru tersedia di [`docs/REMEDIATION_STATUS_2026-07-19.md`](docs/REMEDIATION_STATUS_2026-07-19.md).
 
 ## Cakupan web
 
@@ -51,6 +52,7 @@ npm run dev
    - `supabase/migrations/011_real_assessment_workflow.sql`
    - `supabase/migrations/012_admin_experience_settings.sql`
    - `supabase/migrations/013_safe_subject_deletion.sql`
+   - `supabase/migrations/014_student_exam_contract.sql`
 3. Isi `.env.local`:
 
 ```env
@@ -58,18 +60,7 @@ VITE_SUPABASE_URL=https://PROJECT.supabase.co
 VITE_SUPABASE_ANON_KEY=ANON_KEY
 ```
 
-4. Buat akun admin pertama melalui Supabase Dashboard → Authentication → Users. Sertakan metadata:
-
-```json
-{
-  "full_name": "Nama Pengguna",
-  "role": "admin"
-}
-```
-
-Nilai role yang didukung: `admin`, `guru`, atau `siswa`. Trigger database otomatis membuat baris profil ketika user Auth dibuat.
-
-Jika akun sudah dibuat sebelum metadata role ditambahkan, jadikan akun tersebut admin satu kali melalui SQL Editor:
+4. Buat akun admin pertama melalui Supabase Dashboard → Authentication → Users. Trigger selalu membuat akun baru sebagai `siswa` untuk mencegah eskalasi role melalui metadata signup. Setelah akun dibuat, naikkan role akun bootstrap tersebut satu kali melalui SQL Editor:
 
 ```sql
 update public.profiles
@@ -77,12 +68,15 @@ set role = 'admin'
 where email = 'email-admin@sekolah.sch.id';
 ```
 
+Pastikan hanya tepat satu akun yang cocok sebelum menjalankan query. Setelah admin bootstrap tersedia, semua akun berikutnya dibuat dan dikelola melalui menu pengguna/Edge Function `admin-users`.
+
 5. Deploy Edge Function pengelolaan pengguna. `SUPABASE_SERVICE_ROLE_KEY` disediakan otomatis oleh runtime Supabase dan tidak boleh dimasukkan ke `.env` Vite.
 
 ```bash
 npx supabase login
 npx supabase link --project-ref PROJECT_REF
 npx supabase functions deploy admin-users
+npx supabase functions deploy student-login
 ```
 
 6. Tambahkan URL website ke Authentication → URL Configuration → Redirect URLs agar tautan reset kata sandi kembali ke aplikasi dengan benar.
@@ -98,10 +92,11 @@ npm run lint
 
 ## Checklist go-live
 
-- Jalankan seluruh migration `001` sampai `010` secara berurutan pada project Supabase tujuan.
-- Deploy Edge Function `admin-users` dan pastikan secret service role hanya berada di Supabase.
+- Jalankan seluruh migration `001` sampai `014` secara berurutan pada project Supabase tujuan.
+- Deploy Edge Function `admin-users` dan `student-login`, lalu pastikan secret service role hanya berada di Supabase.
 - Isi `.env` deployment dengan URL dan anon key project production; jangan pernah memakai service-role key di Vite.
 - Atur Site URL dan Redirect URLs untuk domain production pada Supabase Auth.
+- Nonaktifkan public user signup pada Supabase Auth; semua akun dibuat melalui Edge Function admin.
 - Buat minimal satu tahun ajaran, kelas, penugasan guru, siswa aktif, bank soal, dan soal.
 - Uji alur lengkap menggunakan akun admin, guru, dan siswa pada staging sebelum ujian sebenarnya.
 - Aktifkan backup database, log monitoring, HTTPS, dan kebijakan retensi data sesuai aturan sekolah.

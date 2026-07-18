@@ -1,4 +1,4 @@
-# Test Cases Produksi — Ruang Ujian
+# Test Cases Produksi — AWExam
 
 Dokumen ini adalah turunan eksekusi dari [TEST_PLAN_PRODUCTION.md](./TEST_PLAN_PRODUCTION.md). Fokus awal adalah test P0 dan P1 inti yang wajib lulus sebelum go-live.
 
@@ -128,7 +128,7 @@ Catatan/Cleanup:
 
 **Precondition:** Project Supabase staging baru tanpa schema aplikasi.
 
-1. Terapkan migration `001` sampai `010` berurutan.
+1. Terapkan migration `001` sampai `014` berurutan.
    - Expected: setiap migration sukses tanpa modifikasi manual.
 2. Query `pg_tables` untuk schema `public`.
    - Expected: seluruh tabel aplikasi tersedia dan `rowsecurity=true` untuk tabel sensitif.
@@ -151,7 +151,7 @@ Catatan/Cleanup:
 
 1. Catat count dan checksum data penting.
 2. Buat backup/snapshot.
-3. Terapkan `007`, `008`, `009`, `010`.
+3. Terapkan `007` sampai `014` secara berurutan.
    - Expected: seluruh migration sukses.
 4. Bandingkan count/checksum.
    - Expected: data lama tidak hilang/berubah tanpa alasan.
@@ -988,4 +988,3 @@ Expected:
 | IT/Release Lead | | | | |
 
 Keputusan hanya boleh `GO`, `CONDITIONAL GO`, atau `NO-GO`. Semua P0 harus `Pass` untuk keputusan `GO`.
-
