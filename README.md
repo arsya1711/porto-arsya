@@ -6,6 +6,7 @@ Dokumen audit lengkap modul dan section tersedia di [`docs/AUDIT_LENGKAP_MODUL.m
 Suite test scenario dan test case audit tersedia di [`docs/TEST_SCENARIO_DAN_CASE_AUDIT.md`](docs/TEST_SCENARIO_DAN_CASE_AUDIT.md).
 Bug report hasil pengujian tersedia di [`docs/BUG_REPORT_AUDIT_2026-07-17.md`](docs/BUG_REPORT_AUDIT_2026-07-17.md).
 Status remediasi terbaru tersedia di [`docs/REMEDIATION_STATUS_2026-07-19.md`](docs/REMEDIATION_STATUS_2026-07-19.md).
+Panduan varian logo putih tersedia di [`docs/PANDUAN_LOGO_PUTIH.md`](docs/PANDUAN_LOGO_PUTIH.md).
 
 ## Cakupan web
 
