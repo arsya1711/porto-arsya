@@ -2,6 +2,35 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
+String shortMonthName(int month, {bool uppercase = false}) {
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'Mei',
+    'Jun',
+    'Jul',
+    'Agu',
+    'Sep',
+    'Okt',
+    'Nov',
+    'Des',
+  ];
+  final value = month >= 1 && month <= 12 ? months[month - 1] : '-';
+  return uppercase ? value.toUpperCase() : value;
+}
+
+String initialsForName(String name) {
+  final parts = name
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((part) => part.isNotEmpty)
+      .take(2);
+  final initials = parts.map((part) => part[0].toUpperCase()).join();
+  return initials.isEmpty ? '?' : initials;
+}
+
 class BrandMark extends StatelessWidget {
   const BrandMark({super.key, this.dark = false, this.size = 44});
   final bool dark;
@@ -15,13 +44,19 @@ class BrandMark extends StatelessWidget {
         width: size,
         height: size,
         decoration: BoxDecoration(
+          color: dark
+              ? Colors.white.withValues(alpha: .08)
+              : AppColors.blue,
           border: dark
               ? Border.all(color: Colors.white.withValues(alpha: .15))
               : null,
         ),
-        child: Image.asset(
-          'assets/logo-mark-transparent.png',
-          fit: BoxFit.cover,
+        child: Padding(
+          padding: EdgeInsets.all(size * .14),
+          child: Image.asset(
+            'assets/logo-mark-white.png',
+            fit: BoxFit.contain,
+          ),
         ),
       ),
     );

@@ -264,11 +264,7 @@ class _HomeHeader extends StatelessWidget {
                 borderRadius: BorderRadius.circular(15),
               ),
               child: Text(
-                controller.profile.name
-                    .split(' ')
-                    .map((e) => e[0])
-                    .take(2)
-                    .join(),
+                initialsForName(controller.profile.name),
                 style: const TextStyle(
                   color: AppColors.blue,
                   fontSize: 12,
@@ -281,10 +277,6 @@ class _HomeHeader extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    _greeting(),
-                    style: const TextStyle(fontSize: 9, color: AppColors.muted),
-                  ),
                   Text(
                     controller.profile.name,
                     style: const TextStyle(
@@ -368,14 +360,6 @@ class _HomeHeader extends StatelessWidget {
     ),
   );
 
-  String _greeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 11) return 'Selamat pagi';
-    if (hour < 15) return 'Selamat siang';
-    if (hour < 18) return 'Selamat sore';
-    return 'Selamat malam';
-  }
-
   void _showStatus(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
@@ -395,15 +379,33 @@ class _HomeHeader extends StatelessWidget {
               Text(
                 controller.isOnline
                     ? 'Aplikasi terhubung. Jadwal dan jawaban akan tersimpan ke server secara otomatis.'
-                    : 'Aplikasi sedang offline. Jawaban tetap tersimpan di perangkat dan akan dikirim saat koneksi kembali.',
+                    : 'Koneksi ke server terputus. Perbarui jadwal atau coba lagi setelah koneksi kembali.',
               ),
               const SizedBox(height: 18),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () async {
+                    final messenger = ScaffoldMessenger.of(context);
                     Navigator.pop(context);
-                    await controller.refreshExams();
+                    try {
+                      await controller.refreshExams();
+                      messenger.showSnackBar(
+                        const SnackBar(
+                          content: Text('Jadwal ujian sudah diperbarui.'),
+                        ),
+                      );
+                    } catch (_) {
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            controller.operationError ??
+                                'Jadwal belum dapat diperbarui.',
+                          ),
+                          backgroundColor: AppColors.red,
+                        ),
+                      );
+                    }
                   },
                   icon: const Icon(Icons.refresh_rounded),
                   label: const Text('Perbarui jadwal ujian'),
@@ -504,7 +506,7 @@ class LegacyHomeHeader extends StatelessWidget {
                       ),
                       child: IconButton(
                         padding: EdgeInsets.zero,
-                        onPressed: controller.toggleConnection,
+                        onPressed: null,
                         icon: const Icon(
                           Icons.notifications_none_rounded,
                           color: Colors.white,
@@ -516,7 +518,7 @@ class LegacyHomeHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 26),
                 Text(
-                  '${_greeting()}, ${controller.profile.name.split(' ').first}!',
+                  controller.profile.name,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 24,
@@ -566,14 +568,6 @@ class LegacyHomeHeader extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  String _greeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 11) return 'Selamat pagi';
-    if (hour < 15) return 'Selamat siang';
-    if (hour < 18) return 'Selamat sore';
-    return 'Selamat malam';
   }
 }
 
@@ -861,9 +855,9 @@ class ScheduleExamCard extends StatelessWidget {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const Text(
-                      'JUL',
-                      style: TextStyle(
+                    Text(
+                      shortMonthName(exam.schedule.month, uppercase: true),
+                      style: const TextStyle(
                         color: AppColors.blue,
                         fontSize: 8,
                         fontWeight: FontWeight.w800,
@@ -995,7 +989,10 @@ class ExamCard extends StatelessWidget {
                                   ),
                                 ),
                                 Text(
-                                  'JUL',
+                                  shortMonthName(
+                                    exam.schedule.month,
+                                    uppercase: true,
+                                  ),
                                   style: TextStyle(
                                     color: accent,
                                     fontSize: 8,
@@ -1170,9 +1167,34 @@ class HistoryPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final completed = controller.exams
-        .where((e) => e.state == ExamState.completed)
+    final history = controller.exams
+        .where(
+          (exam) =>
+              exam.state == ExamState.completed ||
+              exam.state == ExamState.expired,
+        )
         .toList();
+    final completedCount = history
+        .where((exam) => exam.state == ExamState.completed)
+        .length;
+    final scores = history
+        .map((exam) => exam.score)
+        .whereType<double>()
+        .toList();
+    final average = scores.isEmpty
+        ? null
+        : scores.reduce((first, second) => first + second) / scores.length;
+    final predicate = average == null
+        ? '-'
+        : average >= 90
+        ? 'A'
+        : average >= 80
+        ? 'B'
+        : average >= 70
+        ? 'C'
+        : average >= 60
+        ? 'D'
+        : 'E';
     return Scaffold(
       appBar: AppBar(
         title: const Text('Riwayat ujian'),
@@ -1207,33 +1229,33 @@ class HistoryPage extends StatelessWidget {
                 ),
               ],
             ),
-            child: const Row(
+            child: Row(
               children: [
                 Expanded(
                   child: _HistoryStat(
-                    value: '88',
+                    value: average?.round().toString() ?? '-',
                     label: 'Rata-rata',
                     icon: Icons.trending_up_rounded,
                   ),
                 ),
-                SizedBox(
+                const SizedBox(
                   height: 46,
                   child: VerticalDivider(color: Colors.white24),
                 ),
                 Expanded(
                   child: _HistoryStat(
-                    value: '1',
+                    value: '$completedCount',
                     label: 'Ujian selesai',
                     icon: Icons.task_alt_rounded,
                   ),
                 ),
-                SizedBox(
+                const SizedBox(
                   height: 46,
                   child: VerticalDivider(color: Colors.white24),
                 ),
                 Expanded(
                   child: _HistoryStat(
-                    value: 'A',
+                    value: predicate,
                     label: 'Predikat',
                     icon: Icons.workspace_premium_outlined,
                   ),
@@ -1244,83 +1266,123 @@ class HistoryPage extends StatelessWidget {
           const SizedBox(height: 24),
           Text('Hasil terbaru', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 10),
-          ...completed.map(
-            (exam) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(17),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 46,
-                        height: 46,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEAF8F3),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          exam.subjectCode,
-                          style: const TextStyle(
-                            color: AppColors.green,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 11,
+          if (history.isEmpty)
+            const _EmptyHistoryState()
+          else
+            ...history.map(
+              (exam) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(17),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 46,
+                          height: 46,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEAF8F3),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            exam.subjectCode,
+                            style: const TextStyle(
+                              color: AppColors.green,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 11,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 13),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        const SizedBox(width: 13),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                exam.title,
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                exam.subject,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                              const SizedBox(height: 7),
+                              StatusPill(
+                                label: exam.state == ExamState.expired
+                                    ? 'Tidak dikerjakan'
+                                    : exam.score == null
+                                    ? 'Menunggu koreksi'
+                                    : 'Nilai final',
+                                color: exam.state == ExamState.expired
+                                    ? AppColors.red
+                                    : exam.score == null
+                                    ? AppColors.amber
+                                    : AppColors.green,
+                                icon: exam.state == ExamState.expired
+                                    ? Icons.event_busy_outlined
+                                    : exam.score == null
+                                    ? Icons.schedule_rounded
+                                    : Icons.verified_outlined,
+                              ),
+                            ],
+                          ),
+                        ),
+                        Column(
                           children: [
                             Text(
-                              exam.title,
-                              style: Theme.of(context).textTheme.titleMedium,
+                              exam.score?.round().toString() ?? '-',
+                              style: const TextStyle(
+                                fontSize: 27,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.navy,
+                              ),
                             ),
-                            const SizedBox(height: 3),
-                            Text(
-                              exam.subject,
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                            const SizedBox(height: 7),
-                            const StatusPill(
-                              label: 'Nilai final',
-                              color: AppColors.green,
-                              icon: Icons.verified_outlined,
+                            const Text(
+                              'Nilai',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: AppColors.muted,
+                              ),
                             ),
                           ],
                         ),
-                      ),
-                      Column(
-                        children: [
-                          Text(
-                            '${exam.score?.toInt()}',
-                            style: const TextStyle(
-                              fontSize: 27,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.navy,
-                            ),
-                          ),
-                          const Text(
-                            'Nilai',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: AppColors.muted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
   }
+}
+
+class _EmptyHistoryState extends StatelessWidget {
+  const _EmptyHistoryState();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(22),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      border: Border.all(color: AppColors.border),
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: const Column(
+      children: [
+        Icon(Icons.history_rounded, color: AppColors.muted, size: 32),
+        SizedBox(height: 9),
+        Text(
+          'Belum ada riwayat ujian',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+        ),
+      ],
+    ),
+  );
 }
 
 class ProfilePage extends StatelessWidget {
@@ -1330,23 +1392,18 @@ class ProfilePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = controller.profile;
+    final scores = controller.exams
+        .map((exam) => exam.score)
+        .whereType<double>()
+        .toList();
+    final average = scores.isEmpty
+        ? null
+        : scores.reduce((first, second) => first + second) / scores.length;
+    final synced = controller.isOnline && controller.unsyncedCount == 0;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Akun saya'),
         backgroundColor: Colors.white,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 14),
-            child: IconButton.filledTonal(
-              onPressed: () {},
-              icon: const Icon(Icons.edit_outlined, size: 18),
-              style: IconButton.styleFrom(
-                backgroundColor: AppColors.blueSoft,
-                foregroundColor: AppColors.blue,
-              ),
-            ),
-          ),
-        ],
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
@@ -1405,7 +1462,7 @@ class ProfilePage extends StatelessWidget {
                             ],
                           ),
                           child: Text(
-                            p.name.split(' ').map((e) => e[0]).take(2).join(),
+                            initialsForName(p.name),
                             style: const TextStyle(
                               fontWeight: FontWeight.w800,
                               color: AppColors.blue,
@@ -1455,31 +1512,31 @@ class ProfilePage extends StatelessWidget {
                         color: Colors.white.withValues(alpha: .11),
                         borderRadius: BorderRadius.circular(17),
                       ),
-                      child: const Row(
+                      child: Row(
                         children: [
                           Expanded(
                             child: _ProfileStat(
-                              value: '4',
+                              value: '${controller.exams.length}',
                               label: 'Total ujian',
                             ),
                           ),
-                          SizedBox(
+                          const SizedBox(
                             height: 28,
                             child: VerticalDivider(color: Colors.white24),
                           ),
                           Expanded(
                             child: _ProfileStat(
-                              value: '88',
+                              value: average?.round().toString() ?? '-',
                               label: 'Rata-rata',
                             ),
                           ),
-                          SizedBox(
+                          const SizedBox(
                             height: 28,
                             child: VerticalDivider(color: Colors.white24),
                           ),
                           Expanded(
                             child: _ProfileStat(
-                              value: '100%',
+                              value: synced ? '100%' : 'Tertunda',
                               label: 'Tersinkron',
                             ),
                           ),
@@ -1508,7 +1565,12 @@ class ProfilePage extends StatelessWidget {
                   iconBackground: AppColors.blueSoft,
                   title: 'Tampilan & ukuran teks',
                   subtitle: 'Mengikuti pengaturan perangkat',
-                  onTap: () {},
+                  onTap: () => _showInfo(
+                    context,
+                    title: 'Tampilan aplikasi',
+                    message:
+                        'Ukuran teks AWExam mengikuti pengaturan aksesibilitas perangkat.',
+                  ),
                 ),
                 const _ProfileDivider(),
                 _ProfileMenu(
@@ -1516,8 +1578,13 @@ class ProfilePage extends StatelessWidget {
                   iconColor: AppColors.amber,
                   iconBackground: Color(0xFFFFF5E5),
                   title: 'Pengingat ujian',
-                  subtitle: 'Aktif • 15 menit sebelum ujian',
-                  onTap: () {},
+                  subtitle: 'Belum diaktifkan',
+                  onTap: () => _showInfo(
+                    context,
+                    title: 'Pengingat ujian',
+                    message:
+                        'Fitur pengingat belum tersedia. Periksa jadwal ujian secara berkala.',
+                  ),
                 ),
                 const _ProfileDivider(),
                 _ProfileMenu(
@@ -1525,8 +1592,13 @@ class ProfilePage extends StatelessWidget {
                   iconColor: AppColors.green,
                   iconBackground: Color(0xFFE8F8F4),
                   title: 'Keamanan akun',
-                  subtitle: 'Kata sandi dan perangkat aktif',
-                  onTap: () {},
+                  subtitle: 'Dikelola oleh sekolah',
+                  onTap: () => _showInfo(
+                    context,
+                    title: 'Keamanan akun',
+                    message:
+                        'Hubungi guru atau admin sekolah untuk mengganti kata sandi dan mengelola akun.',
+                  ),
                 ),
               ],
             ),
@@ -1552,8 +1624,21 @@ class ProfilePage extends StatelessWidget {
                   subtitle: controller.unsyncedCount == 0
                       ? 'Semua data tersimpan aman'
                       : '${controller.unsyncedCount} jawaban menunggu jaringan',
-                  trailing: const _SyncedBadge(),
-                  onTap: () {},
+                  trailing: _SyncedBadge(synced: synced),
+                  onTap: () async {
+                    try {
+                      await controller.refreshExams();
+                    } catch (_) {
+                      if (context.mounted) {
+                        _showInfo(
+                          context,
+                          title: 'Sinkronisasi gagal',
+                          message:
+                              'Jadwal belum dapat diperbarui. Periksa koneksi lalu coba lagi.',
+                        );
+                      }
+                    }
+                  },
                 ),
                 const _ProfileDivider(),
                 _ProfileMenu(
@@ -1562,7 +1647,12 @@ class ProfilePage extends StatelessWidget {
                   iconBackground: const Color(0xFFFFEEE9),
                   title: 'Pusat bantuan',
                   subtitle: 'Panduan dan bantuan teknis',
-                  onTap: () {},
+                  onTap: () => _showInfo(
+                    context,
+                    title: 'Pusat bantuan',
+                    message:
+                        'Jika mengalami kendala saat ujian, segera hubungi guru atau petugas ujian.',
+                  ),
                 ),
               ],
             ),
@@ -1588,6 +1678,39 @@ class ProfilePage extends StatelessWidget {
             style: TextStyle(fontSize: 9, color: AppColors.muted),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showInfo(
+    BuildContext context, {
+    required String title,
+    required String message,
+  }) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 10),
+              Text(message),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Tutup'),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1728,18 +1851,20 @@ class _ProfileDivider extends StatelessWidget {
 }
 
 class _SyncedBadge extends StatelessWidget {
-  const _SyncedBadge();
+  const _SyncedBadge({required this.synced});
+  final bool synced;
+
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
     decoration: BoxDecoration(
-      color: const Color(0xFFE8F8F4),
+      color: synced ? const Color(0xFFE8F8F4) : const Color(0xFFFFF5E5),
       borderRadius: BorderRadius.circular(20),
     ),
-    child: const Text(
-      'AMAN',
+    child: Text(
+      synced ? 'AMAN' : 'TERTUNDA',
       style: TextStyle(
-        color: AppColors.green,
+        color: synced ? AppColors.green : AppColors.amber,
         fontSize: 7,
         fontWeight: FontWeight.w800,
       ),

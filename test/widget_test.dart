@@ -5,6 +5,7 @@ import 'package:awexam/app.dart';
 void main() {
   testWidgets('student can enter the demo application', (tester) async {
     await tester.pumpWidget(const AWExamApp());
+    await tester.pumpAndSettle();
 
     expect(
       find.text('Masuk untuk melihat jadwal dan mulai ujianmu.'),

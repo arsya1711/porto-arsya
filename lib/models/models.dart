@@ -1,4 +1,4 @@
-enum ExamState { available, upcoming, completed, inProgress }
+enum ExamState { available, upcoming, completed, inProgress, expired }
 
 enum QuestionType { multipleChoice, essay }
 
@@ -60,4 +60,20 @@ class ExamQuestion {
   final QuestionType type;
   final String body;
   final List<String> options;
+}
+
+class ExamSession {
+  const ExamSession({
+    required this.attemptId,
+    required this.startedAt,
+    required this.deadline,
+    required this.questions,
+    this.savedAnswers = const {},
+  });
+
+  final String attemptId;
+  final DateTime startedAt;
+  final DateTime deadline;
+  final List<ExamQuestion> questions;
+  final Map<String, String> savedAnswers;
 }

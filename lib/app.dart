@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'data/demo_repository.dart';
@@ -23,6 +25,7 @@ class _AWExamAppState extends State<AWExamApp> {
   void initState() {
     super.initState();
     controller = AppController(widget.repository ?? DemoRepository());
+    unawaited(controller.initialize());
   }
 
   @override
@@ -39,9 +42,16 @@ class _AWExamAppState extends State<AWExamApp> {
       theme: AppTheme.light,
       home: ListenableBuilder(
         listenable: controller,
-        builder: (context, _) => controller.isLoggedIn
-            ? HomeShell(controller: controller)
-            : LoginScreen(controller: controller),
+        builder: (context, _) {
+          if (controller.isInitializing) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          return controller.isLoggedIn
+              ? HomeShell(controller: controller)
+              : LoginScreen(controller: controller);
+        },
       ),
     );
   }

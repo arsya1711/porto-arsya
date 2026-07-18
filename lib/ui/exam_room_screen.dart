@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models/models.dart';
 import '../state/app_controller.dart';
@@ -17,18 +20,43 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
     with WidgetsBindingObserver {
   final essayController = TextEditingController();
   bool wasBackgrounded = false;
+  bool navigatedToSummary = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    widget.controller.addListener(_handleControllerChange);
+    if (widget.controller.activeExam?.lockdown ?? false) {
+      unawaited(
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky),
+      );
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    widget.controller.removeListener(_handleControllerChange);
+    unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
     essayController.dispose();
     super.dispose();
+  }
+
+  void _handleControllerChange() {
+    if (!widget.controller.submissionCompleted || navigatedToSummary) return;
+    navigatedToSummary = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final navigator = Navigator.of(context);
+      navigator.popUntil((route) => route is MaterialPageRoute);
+      navigator.pushReplacement(
+        MaterialPageRoute(
+          builder: (_) =>
+              SubmissionSummaryScreen(controller: widget.controller),
+        ),
+      );
+    });
   }
 
   @override
@@ -40,6 +68,11 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
     if (state == AppLifecycleState.resumed && wasBackgrounded) {
       wasBackgrounded = false;
       widget.controller.recordIntegrityEvent();
+      if (widget.controller.activeExam?.lockdown ?? false) {
+        unawaited(
+          SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky),
+        );
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -59,6 +92,11 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
         listenable: widget.controller,
         builder: (context, _) {
           final controller = widget.controller;
+          if (controller.questions.isEmpty) {
+            return const Scaffold(
+              body: Center(child: Text('Soal ujian tidak tersedia.')),
+            );
+          }
           final question = controller.questions[controller.currentQuestion];
           if (question.type == QuestionType.essay &&
               essayController.text != (controller.answers[question.id] ?? '')) {
@@ -196,8 +234,11 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
                             controller: essayController,
                             minLines: 7,
                             maxLines: 12,
-                            onChanged: (value) =>
-                                controller.answer(question.id, value),
+                            onChanged: (value) => controller.answer(
+                              question.id,
+                              value,
+                              debounce: true,
+                            ),
                             decoration: const InputDecoration(
                               hintText: 'Tulis jawabanmu di sini…',
                               alignLabelWithHint: true,
@@ -208,12 +249,16 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
                           children: [
                             Expanded(
                               child: Text(
-                                controller.isOnline
+                                controller.unsyncedCount > 0
+                                    ? '${controller.unsyncedCount} jawaban menunggu sinkronisasi'
+                                    : controller.isOnline
                                     ? 'Tersimpan & tersinkron'
-                                    : 'Tersimpan di perangkat',
+                                    : 'Koneksi ke server terputus',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: controller.isOnline
+                                  color:
+                                      controller.isOnline &&
+                                          controller.unsyncedCount == 0
                                       ? AppColors.green
                                       : AppColors.amber,
                                 ),
@@ -325,12 +370,17 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
         ReviewSheet(controller: widget.controller, onSubmit: _submit),
   );
 
-  void _submit() {
+  Future<void> _submit() async {
     Navigator.of(context).pop();
-    widget.controller.submitExam();
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => SubmissionSummaryScreen(controller: widget.controller),
+    final submitted = await widget.controller.submitExam();
+    if (!mounted || submitted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          widget.controller.operationError ??
+              'Ujian belum dapat dikumpulkan. Silakan coba lagi.',
+        ),
+        backgroundColor: AppColors.red,
       ),
     );
   }
@@ -343,6 +393,7 @@ class _ExamStatusBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final progress =
         (controller.currentQuestion + 1) / controller.questions.length;
+    final synced = controller.isOnline && controller.unsyncedCount == 0;
     return Container(
       color: AppColors.background,
       padding: const EdgeInsets.fromLTRB(18, 11, 18, 10),
@@ -353,31 +404,32 @@ class _ExamStatusBar extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                 decoration: BoxDecoration(
-                  color:
-                      (controller.isOnline ? AppColors.green : AppColors.amber)
-                          .withValues(alpha: .09),
+                  color: (synced ? AppColors.green : AppColors.amber)
+                      .withValues(alpha: .09),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
                   children: [
                     Icon(
-                      controller.isOnline
+                      synced
                           ? Icons.cloud_done_outlined
                           : Icons.cloud_off_outlined,
                       size: 14,
-                      color: controller.isOnline
-                          ? AppColors.green
-                          : AppColors.amber,
+                      color: synced ? AppColors.green : AppColors.amber,
                     ),
                     const SizedBox(width: 5),
                     Text(
-                      controller.isOnline ? 'Tersinkron' : 'Tersimpan lokal',
+                      controller.isSubmitting
+                          ? 'Mengirim…'
+                          : synced
+                          ? 'Tersinkron'
+                          : controller.unsyncedCount > 0
+                          ? '${controller.unsyncedCount} tertunda'
+                          : 'Offline',
                       style: TextStyle(
                         fontSize: 9,
                         fontWeight: FontWeight.w700,
-                        color: controller.isOnline
-                            ? AppColors.green
-                            : AppColors.amber,
+                        color: synced ? AppColors.green : AppColors.amber,
                       ),
                     ),
                   ],
@@ -826,7 +878,6 @@ class SubmissionSummaryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final offline = controller.submittedOffline;
     return PopScope(
       canPop: false,
       child: Scaffold(
@@ -840,29 +891,24 @@ class SubmissionSummaryScreen extends StatelessWidget {
                   width: 92,
                   height: 92,
                   decoration: BoxDecoration(
-                    color: (offline ? AppColors.amber : AppColors.green)
-                        .withValues(alpha: .1),
+                    color: AppColors.green.withValues(alpha: .1),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
-                    offline
-                        ? Icons.cloud_off_outlined
-                        : Icons.check_circle_outline_rounded,
+                  child: const Icon(
+                    Icons.check_circle_outline_rounded,
                     size: 48,
-                    color: offline ? AppColors.amber : AppColors.green,
+                    color: AppColors.green,
                   ),
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  offline ? 'Ujian tersimpan' : 'Ujian berhasil dikirim!',
+                  'Ujian berhasil dikirim!',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.headlineLarge,
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  offline
-                      ? 'Jawabanmu aman di perangkat dan akan dikirim otomatis saat koneksi kembali.'
-                      : 'Semua jawaban sudah diterima server. Nilai akan muncul setelah guru menyelesaikan koreksi.',
+                  'Semua jawaban sudah diterima server. Nilai akan muncul setelah guru menyelesaikan koreksi.',
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: AppColors.muted, height: 1.55),
                 ),
@@ -891,12 +937,8 @@ class SubmissionSummaryScreen extends StatelessWidget {
                         ),
                         _SummaryRow(
                           label: 'Status',
-                          value: offline
-                              ? 'Menunggu sinkronisasi'
-                              : 'Terkirim ke server',
-                          valueColor: offline
-                              ? AppColors.amber
-                              : AppColors.green,
+                          value: 'Terkirim ke server',
+                          valueColor: AppColors.green,
                         ),
                       ],
                     ),

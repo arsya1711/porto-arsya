@@ -22,7 +22,16 @@ class ExamDetailScreen extends StatefulWidget {
 class _ExamDetailScreenState extends State<ExamDetailScreen> {
   final code = TextEditingController();
   bool agreed = false;
+  bool starting = false;
+  late bool requestAccessCode;
   String? codeError;
+  String? startError;
+
+  @override
+  void initState() {
+    super.initState();
+    requestAccessCode = widget.exam.requiresCode;
+  }
 
   @override
   void dispose() {
@@ -119,7 +128,8 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
               Expanded(
                 child: _ExamMetric(
                   icon: Icons.calendar_month_outlined,
-                  value: '${exam.schedule.day} Jul',
+                  value:
+                      '${exam.schedule.day} ${shortMonthName(exam.schedule.month)}',
                   label: 'Tanggal',
                 ),
               ),
@@ -252,7 +262,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
               ],
             ),
           ),
-          if (exam.requiresCode && available) ...[
+          if (requestAccessCode && available) ...[
             const SizedBox(height: 22),
             const Text(
               'Kode akses ujian',
@@ -272,6 +282,21 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
             const Text(
               'Kode diberikan oleh pengawas saat ujian dimulai.',
               style: TextStyle(fontSize: 11, color: AppColors.muted),
+            ),
+          ],
+          if (startError != null) ...[
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFEEEE),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                startError!,
+                style: const TextStyle(fontSize: 11, color: AppColors.red),
+              ),
             ),
           ],
           if (available) ...[
@@ -313,17 +338,33 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ElevatedButton(
-                onPressed: available && agreed ? _start : null,
+                onPressed: available && agreed && !starting ? _start : null,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      available
-                          ? Icons.play_arrow_rounded
-                          : Icons.schedule_rounded,
-                    ),
+                    if (starting)
+                      const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    else
+                      Icon(
+                        available
+                            ? Icons.play_arrow_rounded
+                            : Icons.schedule_rounded,
+                      ),
                     const SizedBox(width: 8),
-                    Text(available ? 'Mulai ujian' : 'Belum tersedia'),
+                    Text(
+                      starting
+                          ? 'Menyiapkan ujian…'
+                          : available
+                          ? 'Mulai ujian'
+                          : 'Belum tersedia',
+                    ),
                   ],
                 ),
               ),
@@ -343,13 +384,31 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     );
   }
 
-  void _start() {
-    if (widget.exam.requiresCode && code.text.trim().toUpperCase() != 'UJIAN') {
-      setState(() => codeError = 'Gunakan kode demo: UJIAN');
+  Future<void> _start() async {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      starting = true;
+      codeError = null;
+      startError = null;
+    });
+    final started = await widget.controller.startExam(
+      widget.exam,
+      accessCode: code.text.trim(),
+    );
+    if (!mounted) return;
+    if (!started) {
+      final message = widget.controller.operationError;
+      setState(() {
+        starting = false;
+        if (message?.toLowerCase().contains('kode akses') ?? false) {
+          requestAccessCode = true;
+          codeError = message;
+        } else {
+          startError = message;
+        }
+      });
       return;
     }
-    FocusScope.of(context).unfocus();
-    widget.controller.startExam(widget.exam);
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (_) => ExamRoomScreen(controller: widget.controller),

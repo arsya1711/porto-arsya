@@ -1,25 +1,63 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
-import 'demo_repository.dart';
 import 'exam_repository.dart';
 
 class SupabaseExamRepository implements ExamRepository {
   SupabaseExamRepository(this.client);
 
   final SupabaseClient client;
-  final DemoRepository _catalogFallback = DemoRepository();
-  StudentProfile? _profile;
+  StudentProfile _profile = const StudentProfile(
+    name: 'Siswa',
+    studentNumber: '-',
+    className: '-',
+    school: 'Sekolah',
+  );
   List<Exam> _exams = const [];
 
   @override
-  StudentProfile get profile => _profile ?? _catalogFallback.profile;
+  StudentProfile get profile => _profile;
 
   @override
   List<Exam> get exams => _exams;
 
   @override
-  List<ExamQuestion> get questions => _catalogFallback.questions;
+  Future<bool> restoreSession() async {
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) return false;
+    try {
+      final profile = await client
+          .from('profiles')
+          .select('full_name,student_number')
+          .eq('id', userId)
+          .eq('role', 'siswa')
+          .eq('active', true)
+          .single();
+      final classMembership = await client
+          .from('class_students')
+          .select('classes(name)')
+          .eq('student_id', userId)
+          .maybeSingle();
+      _profile = StudentProfile(
+        name: profile['full_name'] as String? ?? 'Siswa',
+        studentNumber: profile['student_number'] as String? ?? '-',
+        className: _className(classMembership?['classes']),
+        school: await _loadSchoolName(),
+      );
+      try {
+        await refreshExams();
+      } catch (_) {
+        await client.auth.signOut();
+        throw const AuthenticationException(
+          'Login berhasil, tetapi jadwal ujian belum dapat dimuat.',
+        );
+      }
+      return true;
+    } catch (_) {
+      await signOut();
+      return false;
+    }
+  }
 
   @override
   Future<void> authenticate(String studentNumber, String password) async {
@@ -42,7 +80,7 @@ class SupabaseExamRepository implements ExamRepository {
         name: profile['full_name'] as String? ?? 'Siswa',
         studentNumber: profile['student_number'] as String? ?? studentNumber,
         className: profile['class_name'] as String? ?? '-',
-        school: 'Alhidayah Wattaqwa',
+        school: await _loadSchoolName(),
       );
       await refreshExams();
     } on FunctionException catch (error) {
@@ -60,7 +98,38 @@ class SupabaseExamRepository implements ExamRepository {
       throw const AuthenticationException(
         'Sesi login tidak dapat dibuat. Silakan coba lagi.',
       );
+    } on AuthenticationException {
+      rethrow;
+    } catch (_) {
+      throw const AuthenticationException(
+        'Respons layanan login tidak valid. Silakan coba lagi.',
+      );
     }
+  }
+
+  Future<String> _loadSchoolName() async {
+    try {
+      final row = await client
+          .from('school_profile_settings')
+          .select('school_name')
+          .eq('id', 1)
+          .maybeSingle();
+      final schoolName = row?['school_name'] as String?;
+      if (schoolName != null && schoolName.trim().isNotEmpty) {
+        return schoolName.trim();
+      }
+    } catch (_) {
+      // Nama sekolah tidak boleh menggagalkan login siswa.
+    }
+    return 'Sekolah';
+  }
+
+  String _className(dynamic relation) {
+    if (relation is Map) return relation['name'] as String? ?? '-';
+    if (relation is List && relation.isNotEmpty && relation.first is Map) {
+      return (relation.first as Map)['name'] as String? ?? '-';
+    }
+    return '-';
   }
 
   @override
@@ -72,15 +141,7 @@ class SupabaseExamRepository implements ExamRepository {
     }
 
     final results = await Future.wait([
-      client
-          .from('exams')
-          .select(
-            'id,title,description,starts_at,ends_at,duration_minutes,status,'
-            'access_code,fullscreen_mode,subjects(name,code),'
-            'exam_questions(count)',
-          )
-          .neq('status', 'draft')
-          .order('starts_at'),
+      client.rpc('get_student_exam_catalog'),
       client
           .from('attempts')
           .select('exam_id,status,final_score')
@@ -96,23 +157,23 @@ class SupabaseExamRepository implements ExamRepository {
     _exams = (results[0] as List)
         .map((raw) {
           final row = Map<String, dynamic>.from(raw as Map);
-          final subject = _relation(row['subjects']);
-          final attempt = attempts[row['id']];
+          final examId = row['exam_id'] as String;
+          final attempt = attempts[examId];
           final schedule = DateTime.parse(row['starts_at'] as String).toLocal();
-          final duration = row['duration_minutes'] as int;
+          final duration = (row['duration_minutes'] as num).toInt();
           final endsAt = row['ends_at'] == null
               ? schedule.add(Duration(minutes: duration))
               : DateTime.parse(row['ends_at'] as String).toLocal();
 
           return Exam(
-            id: row['id'] as String,
+            id: examId,
             title: row['title'] as String,
-            subject: subject?['name'] as String? ?? 'Mata pelajaran',
-            subjectCode: subject?['code'] as String? ?? '-',
-            teacher: 'Guru pengampu',
+            subject: row['subject_name'] as String? ?? 'Mata pelajaran',
+            subjectCode: row['subject_code'] as String? ?? '-',
+            teacher: row['teacher_name'] as String? ?? 'Guru pengampu',
             schedule: schedule,
             durationMinutes: duration,
-            questionCount: _relationCount(row['exam_questions']),
+            questionCount: (row['question_count'] as num?)?.toInt() ?? 0,
             state: _examState(
               status: row['status'] as String,
               attemptStatus: attempt?['status'] as String?,
@@ -121,24 +182,197 @@ class SupabaseExamRepository implements ExamRepository {
             ),
             instructions: _instructions(row['description'] as String?),
             score: (attempt?['final_score'] as num?)?.toDouble(),
-            requiresCode: (row['access_code'] as String?)?.isNotEmpty ?? false,
+            requiresCode: row['requires_access_code'] as bool? ?? false,
             lockdown: row['fullscreen_mode'] as bool? ?? true,
           );
         })
         .toList(growable: false);
   }
 
-  Map<String, dynamic>? _relation(dynamic value) {
-    if (value is Map) return Map<String, dynamic>.from(value);
+  @override
+  Future<ExamSession> startExam(String examId, {String? accessCode}) async {
+    try {
+      final startRows = await client.rpc(
+        'start_exam_attempt',
+        params: {
+          'requested_exam_id': examId,
+          'provided_access_code': accessCode?.trim().isEmpty ?? true
+              ? null
+              : accessCode!.trim(),
+        },
+      );
+      final startRow = _firstRow(startRows);
+      if (startRow == null) {
+        throw const ExamOperationException(
+          'Server tidak dapat memulai sesi ujian.',
+        );
+      }
+
+      final attemptId = startRow['attempt_id'] as String?;
+      final startedAtValue = startRow['started_at'] as String?;
+      final deadlineValue = startRow['deadline'] as String?;
+      if (attemptId == null ||
+          startedAtValue == null ||
+          deadlineValue == null) {
+        throw const ExamOperationException('Data sesi ujian tidak lengkap.');
+      }
+
+      final questionRows = await client.rpc(
+        'get_exam_questions',
+        params: {'requested_exam_id': examId},
+      );
+      final questions = (questionRows as List)
+          .map((raw) {
+            final row = Map<String, dynamic>.from(raw as Map);
+            return ExamQuestion(
+              id: row['question_id'] as String,
+              type: row['kind'] == 'essay'
+                  ? QuestionType.essay
+                  : QuestionType.multipleChoice,
+              body: row['body'] as String? ?? '',
+              options: row['options'] is List
+                  ? (row['options'] as List)
+                        .map((option) => option.toString())
+                        .toList(growable: false)
+                  : const [],
+            );
+          })
+          .toList(growable: false);
+
+      if (questions.isEmpty) {
+        throw const ExamOperationException(
+          'Soal ujian belum tersedia atau waktu ujian sudah berakhir.',
+        );
+      }
+
+      final savedAnswers = <String, String>{};
+      for (final raw in questionRows) {
+        final row = Map<String, dynamic>.from(raw);
+        final questionId = row['question_id'] as String?;
+        final value = row['essay_text'] ?? row['selected_option'];
+        if (questionId != null && value != null) {
+          savedAnswers[questionId] = value.toString();
+        }
+      }
+
+      return ExamSession(
+        attemptId: attemptId,
+        startedAt: DateTime.parse(startedAtValue).toLocal(),
+        deadline: DateTime.parse(deadlineValue).toLocal(),
+        questions: questions,
+        savedAnswers: savedAnswers,
+      );
+    } on ExamOperationException {
+      rethrow;
+    } on PostgrestException catch (error) {
+      throw ExamOperationException(_operationMessage(error.message));
+    } catch (_) {
+      throw const ExamOperationException(
+        'Tidak dapat memulai ujian. Periksa koneksi lalu coba lagi.',
+      );
+    }
+  }
+
+  @override
+  Future<void> saveAnswer({
+    required String attemptId,
+    required ExamQuestion question,
+    required String value,
+  }) async {
+    final trimmedValue = value.trim();
+    final selectedOption = question.type == QuestionType.multipleChoice
+        ? int.tryParse(trimmedValue)
+        : null;
+    if (question.type == QuestionType.multipleChoice &&
+        selectedOption == null) {
+      throw const ExamOperationException('Pilihan jawaban tidak valid.');
+    }
+
+    try {
+      await client.rpc(
+        'save_exam_answer',
+        params: {
+          'target_attempt_id': attemptId,
+          'target_question_id': question.id,
+          'target_selected_option': selectedOption,
+          'target_essay_text': question.type == QuestionType.essay
+              ? value
+              : null,
+        },
+      );
+    } on PostgrestException catch (error) {
+      throw ExamOperationException(_operationMessage(error.message));
+    } catch (_) {
+      throw const ExamOperationException(
+        'Jawaban belum tersimpan. Periksa koneksi internet.',
+      );
+    }
+  }
+
+  @override
+  Future<void> submitExam(String attemptId) async {
+    try {
+      await client.rpc(
+        'submit_exam_attempt',
+        params: {'target_attempt_id': attemptId},
+      );
+    } on PostgrestException catch (error) {
+      throw ExamOperationException(_operationMessage(error.message));
+    } catch (_) {
+      throw const ExamOperationException(
+        'Ujian belum dapat dikumpulkan. Periksa koneksi lalu coba lagi.',
+      );
+    }
+  }
+
+  @override
+  Future<void> recordIntegrityEvent({
+    required String attemptId,
+    required String examId,
+    required String eventType,
+  }) async {
+    try {
+      await client.from('integrity_events').insert({
+        'attempt_id': attemptId,
+        'student_id': client.auth.currentUser?.id,
+        'event_type': eventType,
+        'metadata': {'exam_id': examId, 'platform': 'flutter'},
+      });
+    } catch (_) {
+      throw const ExamOperationException(
+        'Aktivitas integritas belum dapat dicatat.',
+      );
+    }
+  }
+
+  Map<String, dynamic>? _firstRow(dynamic value) {
     if (value is List && value.isNotEmpty && value.first is Map) {
       return Map<String, dynamic>.from(value.first as Map);
     }
+    if (value is Map) return Map<String, dynamic>.from(value);
     return null;
   }
 
-  int _relationCount(dynamic value) {
-    final relation = _relation(value);
-    return (relation?['count'] as num?)?.toInt() ?? 0;
+  String _operationMessage(String serverMessage) {
+    final message = serverMessage.trim();
+    final lowerMessage = message.toLowerCase();
+    const safeFragments = [
+      'ujian tidak ditemukan',
+      'ujian belum dapat dimulai',
+      'waktu ujian sudah berakhir',
+      'kode akses ujian tidak sesuai',
+      'ujian ini sudah pernah dikumpulkan',
+      'attempt tidak ditemukan',
+      'attempt sudah dikumpulkan',
+      'attempt tidak aktif',
+      'soal tidak ditemukan',
+      'pilihan jawaban tidak valid',
+      'jawaban essay terlalu panjang',
+    ];
+    for (final fragment in safeFragments) {
+      if (lowerMessage.contains(fragment)) return message;
+    }
+    return 'Permintaan ujian tidak dapat diproses oleh server.';
   }
 
   List<String> _instructions(String? description) {
@@ -158,20 +392,24 @@ class SupabaseExamRepository implements ExamRepository {
     required DateTime startsAt,
     required DateTime endsAt,
   }) {
-    if (const {'submitted', 'grading', 'final'}.contains(attemptStatus) ||
-        status == 'selesai') {
+    if (const {'submitted', 'grading', 'final'}.contains(attemptStatus)) {
       return ExamState.completed;
     }
     if (attemptStatus == 'in_progress') return ExamState.inProgress;
     final now = DateTime.now();
     if (now.isBefore(startsAt)) return ExamState.upcoming;
-    if (now.isAfter(endsAt)) return ExamState.completed;
+    if (status == 'selesai' || now.isAfter(endsAt)) return ExamState.expired;
     return ExamState.available;
   }
 
   @override
   Future<void> signOut() async {
-    _profile = null;
+    _profile = const StudentProfile(
+      name: 'Siswa',
+      studentNumber: '-',
+      className: '-',
+      school: 'Sekolah',
+    );
     _exams = const [];
     await client.auth.signOut();
   }

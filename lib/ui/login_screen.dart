@@ -113,7 +113,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       Text(
-                        'Alhidayah Wattaqwa',
+                        'Aplikasi ujian siswa',
                         style: TextStyle(fontSize: 9, color: AppColors.muted),
                       ),
                     ],

@@ -9,7 +9,7 @@ flutter pub get
 flutter run
 ```
 
-Tanpa konfigurasi Supabase, aplikasi berjalan dalam mode demo. Isi kredensial berikut secara manual:
+Pada build debug, aplikasi berjalan dalam mode demo jika konfigurasi Supabase belum diberikan. Isi kredensial berikut secara manual:
 
 - NIS: `24001`
 - Kata sandi: `siswa123`
@@ -23,14 +23,14 @@ Tanpa konfigurasi Supabase, aplikasi berjalan dalam mode demo. Isi kredensial be
 - Ruang ujian pilihan ganda dan essay
 - Timer, navigasi soal, penanda ragu, dan indikator autosave/sinkronisasi
 - Pencatatan event ketika aplikasi ditinggalkan
-- Review jawaban dan submit online/offline
+- Review jawaban dan submit terverifikasi ke server
 - Riwayat nilai dan profil siswa
 
-Login dapat memakai Supabase, sedangkan katalog ujian dan pertanyaan masih memakai fallback `DemoRepository`. Tahap berikutnya adalah memuat assignment, ujian, pertanyaan, attempt, dan jawaban melalui session Supabase yang sekarang sudah tersedia.
+Mode Supabase memuat assignment, ujian, soal, attempt, jawaban tersimpan, event integritas, dan submit melalui session siswa. Layar sukses hanya ditampilkan setelah jawaban dan attempt diterima server.
 
 ## Login Supabase dengan NIS
 
-Mode Supabase menggunakan Edge Function `student-login` dari backend `porto-arsya`. Function mencari siswa berdasarkan NIS di server, memverifikasi password melalui Supabase Auth, lalu mengembalikan session tanpa membocorkan email siswa atau service-role key.
+Mode Supabase menggunakan Edge Function `student-login` dari backend `porto-arsya`. Function mencari siswa aktif berdasarkan NIS di server, memverifikasi password melalui Supabase Auth, lalu mengembalikan session tanpa membocorkan email siswa atau service-role key.
 
 Deploy function setelah Supabase CLI terautentikasi:
 
@@ -49,7 +49,11 @@ flutter run \
   --dart-define=SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
 ```
 
-Jika kedua `dart-define` tidak tersedia, aplikasi otomatis memakai mode demo. Akun Supabase harus memiliki `role = siswa`, `active = true`, NIS unik pada `profiles.student_number`, serta email/password pada Supabase Auth.
+Jika kedua `dart-define` tidak tersedia, mode demo hanya aktif otomatis pada build debug. Build release akan menolak login agar data demo tidak dipakai tanpa sengaja. Untuk build demo yang disengaja, tambahkan `--dart-define=ALLOW_DEMO=true`.
+
+Akun Supabase harus memiliki `role = siswa`, `active = true`, NIS unik pada `profiles.student_number`, serta email/password pada Supabase Auth. Database juga harus memiliki RPC `start_exam_attempt`, `get_exam_questions`, dan `submit_exam_attempt` dari migrasi backend AWExam.
+
+Sebelum distribusi Android release, salin `android/key.properties.example` menjadi `android/key.properties`, lalu isi lokasi dan kredensial keystore produksi. Project tidak lagi menandatangani release dengan debug key.
 
 ## Verifikasi
 

@@ -25,7 +25,7 @@ class DemoRepository implements ExamRepository {
       requiresCode: true,
       instructions: const [
         'Pastikan perangkat memiliki daya yang cukup dan koneksi stabil saat memulai.',
-        'Kerjakan setiap soal dengan teliti. Jawaban tersimpan otomatis di perangkat.',
+        'Kerjakan setiap soal dengan teliti. Jawaban tersimpan otomatis selama sesi demo.',
         'Keluar dari aplikasi selama ujian akan dicatat sebagai aktivitas integritas.',
         'Periksa kembali jawaban sebelum menekan tombol kumpulkan.',
       ],
@@ -74,7 +74,6 @@ class DemoRepository implements ExamRepository {
     ),
   ];
 
-  @override
   final List<ExamQuestion> questions = const [
     ExamQuestion(
       id: 'q1',
@@ -110,6 +109,9 @@ class DemoRepository implements ExamRepository {
   ];
 
   @override
+  Future<bool> restoreSession() async => false;
+
+  @override
   Future<void> authenticate(String username, String password) async {
     await Future<void>.delayed(const Duration(milliseconds: 650));
     if (username != '24001' || password != 'siswa123') {
@@ -119,6 +121,47 @@ class DemoRepository implements ExamRepository {
 
   @override
   Future<void> refreshExams() async {}
+
+  @override
+  Future<ExamSession> startExam(String examId, {String? accessCode}) async {
+    Exam? exam;
+    for (final item in exams) {
+      if (item.id == examId) {
+        exam = item;
+        break;
+      }
+    }
+    if (exam == null) {
+      throw const ExamOperationException('Ujian tidak ditemukan.');
+    }
+    if (exam.requiresCode && accessCode?.trim().toUpperCase() != 'UJIAN') {
+      throw const ExamOperationException('Kode akses ujian tidak sesuai.');
+    }
+    final startedAt = DateTime.now();
+    return ExamSession(
+      attemptId: 'demo-$examId',
+      startedAt: startedAt,
+      deadline: startedAt.add(Duration(minutes: exam.durationMinutes)),
+      questions: questions,
+    );
+  }
+
+  @override
+  Future<void> saveAnswer({
+    required String attemptId,
+    required ExamQuestion question,
+    required String value,
+  }) async {}
+
+  @override
+  Future<void> submitExam(String attemptId) async {}
+
+  @override
+  Future<void> recordIntegrityEvent({
+    required String attemptId,
+    required String examId,
+    required String eventType,
+  }) async {}
 
   @override
   Future<void> signOut() async {}
