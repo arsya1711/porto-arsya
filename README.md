@@ -1,4 +1,4 @@
-# Ruang Ujian Siswa
+# AWExam
 
 Aplikasi Flutter untuk siswa berdasarkan PRD Aplikasi Ujian Sekolah dan Spesifikasi Mobile v1.1.
 

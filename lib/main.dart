@@ -28,5 +28,5 @@ Future<void> main() async {
     repository = SupabaseExamRepository(Supabase.instance.client);
   }
 
-  runApp(RuangUjianApp(repository: repository));
+  runApp(AWExamApp(repository: repository));
 }

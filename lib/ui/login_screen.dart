@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../state/app_controller.dart';
 import '../theme/app_theme.dart';
+import 'common.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required this.controller});
@@ -97,26 +98,14 @@ class _LoginScreenState extends State<LoginScreen> {
           children: [
             Row(
               children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.blue,
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                  child: const Icon(
-                    Icons.school_rounded,
-                    size: 21,
-                    color: Colors.white,
-                  ),
-                ),
+                const BrandMark(size: 40),
                 const SizedBox(width: 11),
                 const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'RuangUjian',
+                        'AWExam',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
@@ -124,7 +113,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       Text(
-                        'SMP Nusantara',
+                        'Alhidayah Wattaqwa',
                         style: TextStyle(fontSize: 9, color: AppColors.muted),
                       ),
                     ],
@@ -140,13 +129,6 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 24),
             const _LoginArtwork(),
             const SizedBox(height: 28),
-            Text(
-              'Halo, selamat datang 👋',
-              style: Theme.of(
-                context,
-              ).textTheme.headlineLarge?.copyWith(fontSize: 26),
-            ),
-            const SizedBox(height: 7),
             const Text(
               'Masuk untuk melihat jadwal dan mulai ujianmu.',
               style: TextStyle(fontSize: 12, color: AppColors.muted),

@@ -7,7 +7,7 @@ class DemoRepository implements ExamRepository {
     name: 'Alya Putri',
     studentNumber: '24001',
     className: 'IX A',
-    school: 'SMP Nusantara',
+    school: 'Alhidayah Wattaqwa',
   );
 
   @override

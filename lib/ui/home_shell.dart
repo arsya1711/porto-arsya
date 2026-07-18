@@ -477,7 +477,7 @@ class LegacyHomeHeader extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'RUANG UJIAN',
+                            'AWEXAM',
                             style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w800,
@@ -486,7 +486,7 @@ class LegacyHomeHeader extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            'SMP Nusantara',
+                            'Alhidayah Wattaqwa',
                             style: TextStyle(
                               color: Color(0xFFA9B6D0),
                               fontSize: 9,
@@ -1583,7 +1583,7 @@ class ProfilePage extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           const Text(
-            'RuangUjian Student  •  Versi 1.0.0',
+            'AWExam Student  •  Versi 1.0.0',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 9, color: AppColors.muted),
           ),

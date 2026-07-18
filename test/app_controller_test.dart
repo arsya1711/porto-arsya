@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ujianaw/data/demo_repository.dart';
-import 'package:ujianaw/state/app_controller.dart';
+import 'package:awexam/data/demo_repository.dart';
+import 'package:awexam/state/app_controller.dart';
 
 void main() {
   group('AppController login', () {

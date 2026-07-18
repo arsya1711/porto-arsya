@@ -9,17 +9,21 @@ class BrandMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: dark ? Colors.white.withValues(alpha: .1) : AppColors.blue,
-        borderRadius: BorderRadius.circular(size * .28),
-        border: dark
-            ? Border.all(color: Colors.white.withValues(alpha: .15))
-            : null,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(size * .28),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          border: dark
+              ? Border.all(color: Colors.white.withValues(alpha: .15))
+              : null,
+        ),
+        child: Image.asset(
+          'assets/logo-mark-transparent.png',
+          fit: BoxFit.cover,
+        ),
       ),
-      child: Icon(Icons.school_rounded, color: Colors.white, size: size * .52),
     );
   }
 }

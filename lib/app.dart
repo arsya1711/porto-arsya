@@ -7,16 +7,16 @@ import 'theme/app_theme.dart';
 import 'ui/home_shell.dart';
 import 'ui/login_screen.dart';
 
-class RuangUjianApp extends StatefulWidget {
-  const RuangUjianApp({super.key, this.repository});
+class AWExamApp extends StatefulWidget {
+  const AWExamApp({super.key, this.repository});
 
   final ExamRepository? repository;
 
   @override
-  State<RuangUjianApp> createState() => _RuangUjianAppState();
+  State<AWExamApp> createState() => _AWExamAppState();
 }
 
-class _RuangUjianAppState extends State<RuangUjianApp> {
+class _AWExamAppState extends State<AWExamApp> {
   late final AppController controller;
 
   @override
@@ -35,7 +35,7 @@ class _RuangUjianAppState extends State<RuangUjianApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Ruang Ujian Siswa',
+      title: 'AWExam',
       theme: AppTheme.light,
       home: ListenableBuilder(
         listenable: controller,

@@ -42,7 +42,7 @@ class SupabaseExamRepository implements ExamRepository {
         name: profile['full_name'] as String? ?? 'Siswa',
         studentNumber: profile['student_number'] as String? ?? studentNumber,
         className: profile['class_name'] as String? ?? '-',
-        school: 'SMP Nusantara',
+        school: 'Alhidayah Wattaqwa',
       );
       await refreshExams();
     } on FunctionException catch (error) {
