@@ -1,0 +1,33 @@
+.school-mark img,
+.portal-logo > span img,
+.auth-loading span img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  display: block;
+}
+
+.mobile-logo img {
+  width: 23px;
+  height: 23px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex: 0 0 auto;
+}
+
+.runner-brand > img {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: 7px;
+  flex: 0 0 auto;
+}
+
+.student-logo img {
+  width: 25px;
+  height: 25px;
+  object-fit: cover;
+  border-radius: 7px;
+  flex: 0 0 auto;
+}

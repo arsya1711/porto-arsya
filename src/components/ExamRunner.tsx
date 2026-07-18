@@ -7,13 +7,13 @@ import {
   Check,
   ClipboardCheck,
   Clock3,
-  GraduationCap,
   LoaderCircle,
   ShieldCheck,
   Star,
   Wifi,
   WifiOff,
 } from "lucide-react";
+import { BrandLogo } from "./BrandLogo";
 import { loadLocal, saveLocal, supabase } from "../lib/supabase";
 
 type Notify = (text: string, error?: boolean) => void;
@@ -201,7 +201,7 @@ export function RealExamRunner({ notify }: { notify: Notify }) {
   return (
     <div className="runner">
       <header>
-        <div className="runner-brand"><GraduationCap /><span><small>{exam.subject.toUpperCase()} · {exam.className.toUpperCase()}</small><b>{exam.title}</b></span></div>
+        <div className="runner-brand"><BrandLogo /><span><small>{exam.subject.toUpperCase()} · {exam.className.toUpperCase()}</small><b>{exam.title}</b></span></div>
         <div className="runner-stats"><span className={syncing ? "syncing" : ""}>{syncing ? <WifiOff /> : <Wifi />}{syncing ? "Menyimpan…" : "Tersimpan"}</span><p><small>SISA WAKTU</small><b><Clock3 />{formatTime(remaining)}</b></p><button type="button" onClick={() => setSubmitOpen(true)}>Kumpulkan</button></div>
       </header>
       <main>

@@ -14,6 +14,7 @@ import './styles-password.css'
 import './styles-question-bank.css'
 import './styles-dashboards.css'
 import './styles-admin.css'
+import './styles-brand.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

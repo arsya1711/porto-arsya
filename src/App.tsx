@@ -74,6 +74,7 @@ import {
 } from "./components/AssessmentPages";
 import { RealSettingsPage } from "./components/SettingsPage";
 import { PortalTopbar } from "./components/PortalTopbar";
+import { BrandLogo } from "./components/BrandLogo";
 
 type Toast = { text: string; error?: boolean } | null;
 
@@ -118,7 +119,7 @@ function Application() {
     return (
       <div className="auth-loading">
         <span>
-          <GraduationCap />
+          <BrandLogo />
         </span>
         <p>Memuat sesi pengguna…</p>
       </div>
@@ -314,10 +315,10 @@ function Login({
     <main className="login-page">
       <section className="login-brand">
         <div className="school-mark">
-          <GraduationCap />
+          <BrandLogo />
         </div>
         <div className="brand-copy">
-          <span>RUANG UJIAN</span>
+          <span>AWEXAM</span>
           <h1>
             Ujian lebih tertib.
             <br />
@@ -347,12 +348,12 @@ function Login({
             </div>
           </div>
         </div>
-        <small>© 2026 Ruang Ujian</small>
+        <small>© 2026 AWExam</small>
       </section>
       <section className="login-panel">
         <form onSubmit={submit}>
           <div className="mobile-logo">
-            <GraduationCap /> Ruang Ujian
+            <BrandLogo /> AWExam
           </div>
           <p className="overline">PORTAL SEKOLAH</p>
           <h2>Selamat datang</h2>
@@ -488,10 +489,10 @@ function Portal({
       <aside className="portal-sidebar">
         <Link to="/app" className="portal-logo">
           <span>
-            {schoolBrand.logoUrl ? <img src={schoolBrand.logoUrl} alt="Logo sekolah" /> : <GraduationCap />}
+            {schoolBrand.logoUrl ? <img src={schoolBrand.logoUrl} alt="Logo sekolah" /> : <BrandLogo />}
           </span>
           <b>
-            Ruang Ujian<small>{schoolBrand.name}</small>
+            AWExam<small>{schoolBrand.name}</small>
           </b>
         </Link>
         <nav>
@@ -2797,7 +2798,7 @@ function ExamRunner({
     if (remaining === 0 && attemptId) void finish();
   }, [remaining, attemptId, finish]);
   if (loadingExam) {
-    return <div className="auth-loading"><span><GraduationCap /></span><p>Menyiapkan ruang ujian…</p></div>;
+    return <div className="auth-loading"><span><BrandLogo /></span><p>Menyiapkan AWExam…</p></div>;
   }
   if (needsAccessCode) {
     return (
@@ -2839,7 +2840,7 @@ function ExamRunner({
     <div className="runner">
       <header>
         <div className="runner-brand">
-          <GraduationCap />
+          <BrandLogo />
           <span>
             <small>{examMeta.subject.toUpperCase()} · {examMeta.className.toUpperCase()}</small>
             <b>{examMeta.title}</b>

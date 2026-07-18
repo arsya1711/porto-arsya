@@ -10,7 +10,6 @@ import {
   ChevronDown,
   Clock3,
   FileQuestion,
-  GraduationCap,
   LayoutDashboard,
   LogOut,
   Plus,
@@ -20,6 +19,7 @@ import {
   Wifi,
   WifiOff,
 } from "lucide-react";
+import { BrandLogo } from "./BrandLogo";
 import type { Profile } from "../auth/AuthContext";
 import { supabase } from "../lib/supabase";
 import type { ExamStatus } from "../types";
@@ -733,7 +733,7 @@ export function StudentDashboard({
     <div className="student-app">
       <header className="student-header">
         <Link to="/siswa" className="student-logo">
-          <GraduationCap /> <b>Ruang Ujian</b>
+          <BrandLogo /> <b>AWExam</b>
         </Link>
         <div>
           <span className={online ? "" : "offline"}>

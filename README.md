@@ -1,6 +1,10 @@
-# Ruang Ujian
+# AWExam
 
 Website ujian sekolah berbasis React, TypeScript, dan Supabase. Implementasi dibuat dari PRD `Membuat aplikasi ujian sekolah.zip` dan hanya berfokus pada platform web—tanpa aplikasi Flutter.
+
+Dokumen audit lengkap modul dan section tersedia di [`docs/AUDIT_LENGKAP_MODUL.md`](docs/AUDIT_LENGKAP_MODUL.md).
+Suite test scenario dan test case audit tersedia di [`docs/TEST_SCENARIO_DAN_CASE_AUDIT.md`](docs/TEST_SCENARIO_DAN_CASE_AUDIT.md).
+Bug report hasil pengujian tersedia di [`docs/BUG_REPORT_AUDIT_2026-07-17.md`](docs/BUG_REPORT_AUDIT_2026-07-17.md).
 
 ## Cakupan web
 
