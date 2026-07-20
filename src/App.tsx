@@ -314,8 +314,11 @@ function Login({
   return (
     <main className="login-page">
       <section className="login-brand">
-        <div className="school-mark">
-          <BrandLogo />
+        <div className="login-school-brand">
+          <div className="school-mark">
+            <BrandLogo />
+          </div>
+          <span>Mts Alhidayah Wattaqwa</span>
         </div>
         <div className="brand-copy">
           <span>AWEXAM</span>
@@ -353,7 +356,11 @@ function Login({
       <section className="login-panel">
         <form onSubmit={submit}>
           <div className="mobile-logo">
-            <BrandLogo /> AWExam
+            <BrandLogo />
+            <span>
+              AWExam
+              <small>Mts Alhidayah Wattaqwa</small>
+            </span>
           </div>
           <p className="overline">PORTAL SEKOLAH</p>
           <h2>Selamat datang</h2>
