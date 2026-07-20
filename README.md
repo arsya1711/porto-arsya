@@ -41,7 +41,16 @@ supabase link --project-ref pfjtslhsiuejjqoptvbz
 supabase functions deploy student-login
 ```
 
-Jalankan Flutter menggunakan anon/publishable key, bukan service-role key:
+Jalankan Flutter menggunakan anon/publishable key, bukan service-role key. Salin
+`.env.example` menjadi `.env`, isi kedua nilainya, lalu:
+
+```bash
+flutter run --dart-define-from-file=.env
+```
+
+`.env` tidak dibaca oleh kode aplikasi; Flutter memuatnya menjadi `String.fromEnvironment`
+saat kompilasi. File ini sudah masuk `.gitignore`. Nilainya juga bisa diberikan
+satu per satu bila diperlukan:
 
 ```bash
 flutter run \

@@ -1,4 +1,6 @@
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:awexam/data/attempt_draft_store.dart';
 import 'package:awexam/data/demo_repository.dart';
 import 'package:awexam/data/exam_repository.dart';
 import 'package:awexam/models/models.dart';
@@ -95,6 +97,131 @@ void main() {
       expect(repository.submittedAttemptId, 'attempt-1');
     });
   });
+
+  group('AppController countdown', () {
+    test('recomputes the countdown from the server deadline', () async {
+      final base = DateTime(2026, 1, 1, 8);
+      var now = base;
+      final repository = _RecordingRepository(startedAt: base);
+      final controller = AppController(repository, clock: () => now);
+      addTearDown(controller.dispose);
+
+      await controller.startExam(repository.exams.single);
+      expect(controller.remainingSeconds, 3600);
+
+      // Aplikasi disuspensi: timer periodik tidak berjalan, tetapi waktu dinding
+      // tetap maju. Sisa waktu harus mengikuti deadline, bukan jumlah tick.
+      now = base.add(const Duration(minutes: 25));
+      controller.syncRemainingSeconds();
+
+      expect(controller.remainingSeconds, 2100);
+    });
+
+    test('auto-submits when the deadline passes while suspended', () async {
+      final base = DateTime(2026, 1, 1, 8);
+      var now = base;
+      final repository = _RecordingRepository(startedAt: base);
+      final controller = AppController(repository, clock: () => now);
+      addTearDown(controller.dispose);
+
+      await controller.startExam(repository.exams.single);
+      now = base.add(const Duration(hours: 2));
+      controller.syncRemainingSeconds();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(controller.remainingSeconds, 0);
+      expect(repository.submittedAttemptId, 'attempt-1');
+      expect(controller.submissionCompleted, isTrue);
+    });
+
+    test('stops retrying auto-submit and asks for a manual send', () async {
+      fakeAsync((async) {
+        final base = DateTime(2026, 1, 1, 8);
+        var now = base;
+        final repository = _RecordingRepository(
+          startedAt: base,
+          failSubmits: true,
+        );
+        final controller = AppController(repository, clock: () => now);
+
+        controller.startExam(repository.exams.single);
+        async.flushMicrotasks();
+        now = base.add(const Duration(hours: 2));
+        controller.syncRemainingSeconds();
+        async.elapse(const Duration(minutes: 5));
+
+        expect(controller.autoSubmitExhausted, isTrue);
+        expect(controller.submissionCompleted, isFalse);
+        expect(controller.operationError, contains('tombol kumpulkan'));
+        controller.dispose();
+      });
+    });
+  });
+
+  group('AppController offline draft', () {
+    test('keeps unsynced answers when the attempt is resumed', () async {
+      final store = InMemoryAttemptDraftStore();
+      final offline = _RecordingRepository(failSaves: true);
+      final controller = AppController(offline, draftStore: store);
+
+      await controller.startExam(offline.exams.single);
+      controller.answer('question-1', '2');
+      controller.toggleFlag('question-1');
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.unsyncedCount, 1);
+      // Aplikasi ditutup paksa sebelum jawaban sempat tersinkron.
+      controller.dispose();
+
+      final online = _RecordingRepository();
+      final resumed = AppController(online, draftStore: store);
+      addTearDown(resumed.dispose);
+
+      await resumed.startExam(online.exams.single);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(resumed.answers['question-1'], '2');
+      expect(resumed.flagged, contains('question-1'));
+      expect(online.savedAnswers['question-1'], '2');
+      expect(resumed.unsyncedCount, 0);
+    });
+
+    test('prefers the server answer once the draft is synced', () async {
+      final store = InMemoryAttemptDraftStore();
+      final repository = _RecordingRepository(
+        savedServerAnswers: const {'question-1': '1'},
+      );
+      final controller = AppController(repository, draftStore: store);
+      addTearDown(controller.dispose);
+
+      await controller.startExam(repository.exams.single);
+      controller.answer('question-1', '2');
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.unsyncedCount, 0);
+
+      expect(await controller.submitExam(), isTrue);
+      expect(await store.load('attempt-1'), isNull);
+    });
+
+    test('ignores a draft that belongs to another attempt', () async {
+      final store = InMemoryAttemptDraftStore();
+      final first = _RecordingRepository(failSaves: true);
+      final controller = AppController(first, draftStore: store);
+
+      await controller.startExam(first.exams.single);
+      controller.answer('question-1', '2');
+      await Future<void>.delayed(Duration.zero);
+      controller.dispose();
+
+      final other = _RecordingRepository(attemptId: 'attempt-2');
+      final resumed = AppController(other, draftStore: store);
+      addTearDown(resumed.dispose);
+
+      await resumed.startExam(other.exams.single);
+
+      expect(resumed.answers, isEmpty);
+      expect(resumed.unsyncedCount, 0);
+    });
+  });
 }
 
 class _RecordingRepository implements ExamRepository {
@@ -102,11 +229,19 @@ class _RecordingRepository implements ExamRepository {
     this.failSaves = false,
     this.delayedValue,
     this.expiredSession = false,
+    this.failSubmits = false,
+    this.attemptId = 'attempt-1',
+    this.startedAt,
+    this.savedServerAnswers = const {},
   });
 
   final bool failSaves;
   final String? delayedValue;
   final bool expiredSession;
+  final bool failSubmits;
+  final String attemptId;
+  final DateTime? startedAt;
+  final Map<String, String> savedServerAnswers;
   final Map<String, String> savedAnswers = {};
   String? submittedAttemptId;
   int saveCalls = 0;
@@ -146,9 +281,9 @@ class _RecordingRepository implements ExamRepository {
 
   @override
   Future<ExamSession> startExam(String examId, {String? accessCode}) async {
-    final now = DateTime.now();
+    final now = startedAt ?? DateTime.now();
     return ExamSession(
-      attemptId: 'attempt-1',
+      attemptId: attemptId,
       startedAt: now,
       deadline: expiredSession
           ? now.subtract(const Duration(seconds: 1))
@@ -161,6 +296,7 @@ class _RecordingRepository implements ExamRepository {
           options: ['A', 'B', 'C'],
         ),
       ],
+      savedAnswers: savedServerAnswers,
     );
   }
 
@@ -182,6 +318,9 @@ class _RecordingRepository implements ExamRepository {
 
   @override
   Future<void> submitExam(String attemptId) async {
+    if (failSubmits) {
+      throw const ExamOperationException('Server tidak dapat dihubungi.');
+    }
     submittedAttemptId = attemptId;
   }
 

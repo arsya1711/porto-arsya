@@ -67,6 +67,9 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
     }
     if (state == AppLifecycleState.resumed && wasBackgrounded) {
       wasBackgrounded = false;
+      // Timer periodik berhenti selama suspensi, jadi sisa waktu dihitung ulang
+      // dari deadline server sebelum layar dipakai lagi.
+      widget.controller.syncRemainingSeconds();
       widget.controller.recordIntegrityEvent();
       if (widget.controller.activeExam?.lockdown ?? false) {
         unawaited(

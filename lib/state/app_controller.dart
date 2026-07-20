@@ -2,13 +2,25 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../data/attempt_draft_store.dart';
 import '../data/exam_repository.dart';
 import '../models/models.dart';
 
 class AppController extends ChangeNotifier {
-  AppController(this.repository);
+  AppController(
+    this.repository, {
+    AttemptDraftStore? draftStore,
+    DateTime Function()? clock,
+  }) : draftStore = draftStore ?? InMemoryAttemptDraftStore(),
+       _now = clock ?? DateTime.now;
+
+  /// Sumber waktu; dapat diganti pada pengujian untuk mensimulasikan suspensi.
+  final DateTime Function() _now;
+
+  static const _maxAutoSubmitAttempts = 5;
 
   final ExamRepository repository;
+  final AttemptDraftStore draftStore;
   String? authenticationError;
   String? operationError;
   bool isLoggedIn = false;
@@ -17,6 +29,7 @@ class AppController extends ChangeNotifier {
   bool isStartingExam = false;
   bool isSubmitting = false;
   bool submissionCompleted = false;
+  bool autoSubmitExhausted = false;
   bool isOnline = true;
   int homeTab = 0;
   Exam? activeExam;
@@ -31,6 +44,9 @@ class AppController extends ChangeNotifier {
   final Map<String, Future<bool>> _pendingAnswerSaves = {};
   List<ExamQuestion> _questions = const [];
   Timer? _countdownTimer;
+  Timer? _autoSubmitRetryTimer;
+  DateTime? _deadline;
+  int _autoSubmitAttempts = 0;
 
   StudentProfile get profile => repository.profile;
   List<Exam> get exams => repository.exams;
@@ -113,18 +129,21 @@ class AppController extends ChangeNotifier {
         throw const ExamOperationException('Soal ujian belum tersedia.');
       }
 
+      // Dibaca sebelum _resetAttempt agar draft attempt yang sama tidak hilang.
+      final draft = await _loadDraft(session.attemptId);
+
       _resetAttempt();
       activeExam = exam;
       activeAttemptId = session.attemptId;
       _questions = session.questions;
       answers.addAll(session.savedAnswers);
-      remainingSeconds = session.deadline
-          .difference(DateTime.now())
-          .inSeconds
-          .clamp(0, 1 << 31);
+      _restoreDraft(draft);
+      _deadline = session.deadline;
+      remainingSeconds = _computeRemainingSeconds();
       submissionCompleted = false;
       isOnline = true;
       _startCountdown();
+      _flushRecoveredAnswers();
       return true;
     } on ExamOperationException catch (error) {
       operationError = error.message;
@@ -139,18 +158,67 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  int _computeRemainingSeconds() {
+    final deadline = _deadline;
+    if (deadline == null) return 0;
+    return deadline.difference(_now()).inSeconds.clamp(0, 1 << 31);
+  }
+
+  /// Menghitung ulang sisa waktu dari deadline server.
+  ///
+  /// Timer periodik berhenti selama aplikasi disuspensi OS, sehingga hitungan
+  /// lokal bisa tertinggal jauh dari waktu sebenarnya. Dipanggil setiap tick dan
+  /// setiap aplikasi kembali ke foreground.
+  void syncRemainingSeconds() {
+    if (_deadline == null) return;
+    final next = _computeRemainingSeconds();
+    if (next != remainingSeconds) {
+      remainingSeconds = next;
+      notifyListeners();
+    }
+    _autoSubmitIfExpired();
+  }
+
   void _startCountdown() {
     _countdownTimer?.cancel();
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (remainingSeconds > 0) {
-        remainingSeconds--;
-        notifyListeners();
-      }
-      if (remainingSeconds == 0 && !isSubmitting && !submissionCompleted) {
-        _countdownTimer?.cancel();
-        unawaited(submitExam());
-      }
-    });
+    _countdownTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => syncRemainingSeconds(),
+    );
+  }
+
+  void _autoSubmitIfExpired() {
+    if (remainingSeconds > 0 || isSubmitting || submissionCompleted) return;
+    _countdownTimer?.cancel();
+    _countdownTimer = null;
+    unawaited(_runAutoSubmit());
+  }
+
+  /// Auto-submit dengan backoff berbatas agar kegagalan jaringan tidak memicu
+  /// percobaan kirim setiap detik tanpa henti.
+  Future<void> _runAutoSubmit() async {
+    if (_autoSubmitRetryTimer != null ||
+        isSubmitting ||
+        submissionCompleted ||
+        autoSubmitExhausted) {
+      return;
+    }
+    _autoSubmitAttempts++;
+    if (await submitExam()) return;
+    if (_autoSubmitAttempts >= _maxAutoSubmitAttempts) {
+      autoSubmitExhausted = true;
+      operationError =
+          'Ujian belum dapat dikumpulkan otomatis. Periksa koneksi lalu tekan tombol kumpulkan.';
+      notifyListeners();
+      return;
+    }
+    _autoSubmitRetryTimer = Timer(
+      Duration(seconds: 1 << (_autoSubmitAttempts - 1)),
+      () {
+        _autoSubmitRetryTimer = null;
+        unawaited(_runAutoSubmit());
+      },
+    );
   }
 
   void answer(String questionId, String value, {bool debounce = false}) {
@@ -169,6 +237,7 @@ class AppController extends ChangeNotifier {
     } else {
       unawaited(_enqueueAnswerSave(question, value));
     }
+    unawaited(_persistDraft());
     notifyListeners();
   }
 
@@ -210,6 +279,7 @@ class AppController extends ChangeNotifier {
       if (activeAttemptId != attemptId) return false;
       if (answers[question.id] == value) {
         _unsyncedQuestionIds.remove(question.id);
+        unawaited(_persistDraft());
       }
       isOnline = true;
       if (notify) notifyListeners();
@@ -229,6 +299,61 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  Future<AttemptDraft?> _loadDraft(String attemptId) async {
+    try {
+      return await draftStore.load(attemptId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Menimpa jawaban server dengan jawaban lokal yang belum sempat tersinkron.
+  void _restoreDraft(AttemptDraft? draft) {
+    if (draft == null) return;
+    for (final questionId in draft.unsyncedQuestionIds) {
+      final value = draft.answers[questionId];
+      if (value == null || _questionById(questionId) == null) continue;
+      answers[questionId] = value;
+      _unsyncedQuestionIds.add(questionId);
+    }
+    flagged.addAll(draft.flagged.where((id) => _questionById(id) != null));
+  }
+
+  void _flushRecoveredAnswers() {
+    for (final questionId in _unsyncedQuestionIds.toList(growable: false)) {
+      final question = _questionById(questionId);
+      final value = answers[questionId];
+      if (question == null || value == null) continue;
+      unawaited(_enqueueAnswerSave(question, value, notify: false));
+    }
+  }
+
+  /// Draft bersifat best-effort: kegagalan menulis tidak boleh menghentikan ujian.
+  Future<void> _persistDraft() async {
+    final attemptId = activeAttemptId;
+    if (attemptId == null) return;
+    try {
+      await draftStore.save(
+        AttemptDraft(
+          attemptId: attemptId,
+          answers: Map.of(answers),
+          unsyncedQuestionIds: Set.of(_unsyncedQuestionIds),
+          flagged: Set.of(flagged),
+        ),
+      );
+    } catch (_) {
+      // Diabaikan; jawaban tetap tersimpan di memori dan dikirim ke server.
+    }
+  }
+
+  Future<void> _clearDraft() async {
+    try {
+      await draftStore.clear();
+    } catch (_) {
+      // Diabaikan; draft basi akan tersaring oleh pencocokan attemptId.
+    }
+  }
+
   ExamQuestion? _questionById(String questionId) {
     for (final question in _questions) {
       if (question.id == questionId) return question;
@@ -240,6 +365,7 @@ class AppController extends ChangeNotifier {
     flagged.contains(questionId)
         ? flagged.remove(questionId)
         : flagged.add(questionId);
+    unawaited(_persistDraft());
     notifyListeners();
   }
 
@@ -277,6 +403,7 @@ class AppController extends ChangeNotifier {
 
     isSubmitting = true;
     operationError = null;
+    autoSubmitExhausted = false;
     for (final timer in _answerSaveTimers.values) {
       timer.cancel();
     }
@@ -291,9 +418,7 @@ class AppController extends ChangeNotifier {
         for (final entry in answers.entries) {
           final question = _questionById(entry.key);
           if (question != null) {
-            saves.add(
-              _enqueueAnswerSave(question, entry.value, notify: false),
-            );
+            saves.add(_enqueueAnswerSave(question, entry.value, notify: false));
           }
         }
         final saved = await Future.wait(saves);
@@ -306,7 +431,9 @@ class AppController extends ChangeNotifier {
 
       await repository.submitExam(attemptId);
       _countdownTimer?.cancel();
+      _countdownTimer = null;
       _unsyncedQuestionIds.clear();
+      await _clearDraft();
       isOnline = true;
       submissionCompleted = true;
       return true;
@@ -324,6 +451,7 @@ class AppController extends ChangeNotifier {
   }
 
   void closeAttempt() {
+    unawaited(_clearDraft());
     _resetAttempt();
     homeTab = 1;
     notifyListeners();
@@ -332,6 +460,11 @@ class AppController extends ChangeNotifier {
   void _resetAttempt() {
     _countdownTimer?.cancel();
     _countdownTimer = null;
+    _autoSubmitRetryTimer?.cancel();
+    _autoSubmitRetryTimer = null;
+    _autoSubmitAttempts = 0;
+    autoSubmitExhausted = false;
+    _deadline = null;
     for (final timer in _answerSaveTimers.values) {
       timer.cancel();
     }

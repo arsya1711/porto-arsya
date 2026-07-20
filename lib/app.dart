@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'data/attempt_draft_store.dart';
 import 'data/demo_repository.dart';
 import 'data/exam_repository.dart';
 import 'state/app_controller.dart';
@@ -10,9 +11,10 @@ import 'ui/home_shell.dart';
 import 'ui/login_screen.dart';
 
 class AWExamApp extends StatefulWidget {
-  const AWExamApp({super.key, this.repository});
+  const AWExamApp({super.key, this.repository, this.draftStore});
 
   final ExamRepository? repository;
+  final AttemptDraftStore? draftStore;
 
   @override
   State<AWExamApp> createState() => _AWExamAppState();
@@ -24,7 +26,10 @@ class _AWExamAppState extends State<AWExamApp> {
   @override
   void initState() {
     super.initState();
-    controller = AppController(widget.repository ?? DemoRepository());
+    controller = AppController(
+      widget.repository ?? DemoRepository(),
+      draftStore: widget.draftStore,
+    );
     unawaited(controller.initialize());
   }
 

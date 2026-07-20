@@ -3,8 +3,10 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app.dart';
+import 'data/attempt_draft_store.dart';
 import 'data/demo_repository.dart';
 import 'data/exam_repository.dart';
+import 'data/secure_session_storage.dart';
 import 'data/supabase_exam_repository.dart';
 
 Future<void> main() async {
@@ -19,6 +21,9 @@ Future<void> main() async {
     await Supabase.initialize(
       url: supabaseUrl,
       publishableKey: supabaseAnonKey,
+      authOptions: const FlutterAuthClientOptions(
+        localStorage: SecureSessionStorage(),
+      ),
     );
     repository = SupabaseExamRepository(Supabase.instance.client);
   } else if (!kReleaseMode || allowDemo) {
@@ -27,5 +32,10 @@ Future<void> main() async {
     repository = const UnavailableExamRepository();
   }
 
-  runApp(AWExamApp(repository: repository));
+  runApp(
+    AWExamApp(
+      repository: repository,
+      draftStore: const SharedPreferencesAttemptDraftStore(),
+    ),
+  );
 }

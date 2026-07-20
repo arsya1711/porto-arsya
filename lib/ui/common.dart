@@ -44,19 +44,13 @@ class BrandMark extends StatelessWidget {
         width: size,
         height: size,
         decoration: BoxDecoration(
-          color: dark
-              ? Colors.white.withValues(alpha: .08)
-              : AppColors.blue,
           border: dark
               ? Border.all(color: Colors.white.withValues(alpha: .15))
               : null,
         ),
-        child: Padding(
-          padding: EdgeInsets.all(size * .14),
-          child: Image.asset(
-            'assets/logo-mark-white.png',
-            fit: BoxFit.contain,
-          ),
+        child: Image.asset(
+          'assets/logo-mark-transparent.png',
+          fit: BoxFit.cover,
         ),
       ),
     );
