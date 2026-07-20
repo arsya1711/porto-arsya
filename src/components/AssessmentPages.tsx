@@ -29,7 +29,7 @@ type ExamRow = {
   ends_at: string | null;
   duration_minutes: number;
   status: ExamStatus;
-  access_code: string | null;
+  has_access_code: boolean;
   shuffle_questions: boolean;
   shuffle_options: boolean;
   fullscreen_mode: boolean;
@@ -57,6 +57,8 @@ type ExamDraft = {
   startsAt: string;
   duration: number;
   accessCode: string;
+  hadAccessCode: boolean;
+  removeAccessCode: boolean;
   status: "draft" | "terjadwal";
   shuffleQuestions: boolean;
   shuffleOptions: boolean;
@@ -219,7 +221,7 @@ export function RealExamManagement({
     const [examResult, subjectResult, classResult, questionResult, settingsResult] = await Promise.all([
       supabase
         .from("exams")
-        .select("id,title,description,subject_id,class_id,starts_at,ends_at,duration_minutes,status,access_code,shuffle_questions,shuffle_options,fullscreen_mode,record_tab_switches,subjects(name),classes(name),exam_questions(count),exam_assignments(count)")
+        .select("id,title,description,subject_id,class_id,starts_at,ends_at,duration_minutes,status,has_access_code,shuffle_questions,shuffle_options,fullscreen_mode,record_tab_switches,subjects(name),classes(name),exam_questions(count),exam_assignments(count)")
         .order("starts_at", { ascending: false }),
       supabase.from("subjects").select("id,name").order("name"),
       supabase.from("classes").select("id,name").order("name"),
@@ -279,6 +281,8 @@ export function RealExamManagement({
       startsAt: toLocalInput(),
       duration: 90,
       accessCode: "",
+      hadAccessCode: false,
+      removeAccessCode: false,
       status: "draft",
       shuffleQuestions: true,
       shuffleOptions: true,
@@ -306,7 +310,9 @@ export function RealExamManagement({
       classId: exam.class_id ?? "",
       startsAt: toLocalInput(exam.starts_at),
       duration: exam.duration_minutes,
-      accessCode: exam.access_code ?? "",
+      accessCode: "",
+      hadAccessCode: exam.has_access_code,
+      removeAccessCode: false,
       status: exam.status === "draft" ? "draft" : "terjadwal",
       shuffleQuestions: exam.shuffle_questions,
       shuffleOptions: exam.shuffle_options,
@@ -322,6 +328,10 @@ export function RealExamManagement({
       notify("Lengkapi judul, mata pelajaran, kelas, dan pilih minimal satu soal.", true);
       return;
     }
+    if (draft.accessCode.trim() && draft.accessCode.trim().length < 4) {
+      notify("Kode akses minimal terdiri dari 4 karakter.", true);
+      return;
+    }
     setSaving(true);
     const startsAt = new Date(draft.startsAt);
     const { error: saveError } = await supabase.rpc("save_managed_exam", {
@@ -334,7 +344,9 @@ export function RealExamManagement({
       duration_in_minutes: draft.duration,
       target_status: draft.status,
       question_ids: draft.questionIds,
-      access_code_value: draft.accessCode.trim() || null,
+      access_code_value: draft.removeAccessCode
+        ? "__REMOVE__"
+        : draft.accessCode.trim() || (draft.hadAccessCode ? "__KEEP__" : null),
       should_shuffle_questions: draft.shuffleQuestions,
       should_shuffle_options: draft.shuffleOptions,
       should_use_fullscreen: draft.fullscreenMode,
@@ -421,9 +433,10 @@ export function RealExamManagement({
                   <label className="form-field"><span>Kelas peserta</span><select value={draft.classId} onChange={(event) => setDraft({ ...draft, classId: event.target.value })}>{classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
                   <label className="form-field"><span>Mulai</span><input type="datetime-local" value={draft.startsAt} onChange={(event) => setDraft({ ...draft, startsAt: event.target.value })} /></label>
                   <label className="form-field"><span>Durasi (menit)</span><input type="number" min={1} value={draft.duration} onChange={(event) => setDraft({ ...draft, duration: Math.max(1, Number(event.target.value)) })} /></label>
-                  <label className="form-field"><span>Kode akses (opsional)</span><input value={draft.accessCode} onChange={(event) => setDraft({ ...draft, accessCode: event.target.value.toUpperCase() })} /></label>
+                  <label className="form-field"><span>{draft.hadAccessCode ? "Kode akses baru (kosong = pertahankan)" : "Kode akses (opsional)"}</span><input value={draft.accessCode} disabled={draft.removeAccessCode} minLength={4} maxLength={64} autoComplete="off" onChange={(event) => setDraft({ ...draft, accessCode: event.target.value.toUpperCase(), removeAccessCode: false })} /></label>
                   <label className="form-field"><span>Status awal</span><select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as ExamDraft["status"] })}><option value="draft">Draft</option><option value="terjadwal">Terjadwal</option></select></label>
                 </div>
+                {draft.hadAccessCode && <label className="real-remove-access-code"><input type="checkbox" checked={draft.removeAccessCode} onChange={(event) => setDraft({ ...draft, removeAccessCode: event.target.checked, accessCode: "" })} /> Hapus kode akses yang tersimpan</label>}
                 <div className="real-question-picker">
                   <div><b>Pilih soal</b><span>{draft.questionIds.length} dipilih</span></div>
                   {!filteredQuestions.length ? <p>Belum ada soal pada bank soal mata pelajaran ini.</p> : filteredQuestions.map((question) => (

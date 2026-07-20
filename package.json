@@ -7,6 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "test": "node --test tests/*.test.mjs",
+    "check": "npm run lint && npm run test && npm run build",
+    "check:functions": "npx -y deno check supabase/functions/admin-users/index.ts supabase/functions/student-login/index.ts",
     "preview": "vite preview"
   },
   "dependencies": {

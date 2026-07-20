@@ -26,7 +26,6 @@ import {
   CalendarDays,
   Check,
   CheckCircle2,
-  ChevronRight,
   ClipboardCheck,
   Clock3,
   Download,
@@ -34,11 +33,9 @@ import {
   EyeOff,
   FileQuestion,
   Filter,
-  GraduationCap,
   LayoutDashboard,
   LockKeyhole,
   LogOut,
-  MoreHorizontal,
   Pencil,
   Plus,
   Search,
@@ -52,7 +49,7 @@ import {
   Wifi,
   X,
 } from "lucide-react";
-import { type Exam, type Role, type StudentExamCatalogRow } from "./types";
+import { type Role, type StudentExamCatalogRow } from "./types";
 import {
   isSupabaseConfigured,
   loadLocal,
@@ -363,7 +360,6 @@ function Login({
             </span>
           </div>
           <p className="overline">PORTAL SEKOLAH</p>
-          <h2>Selamat datang</h2>
           <p className="subcopy">
             Masuk menggunakan akun yang diberikan oleh admin sekolah.
           </p>
@@ -677,25 +673,6 @@ function getInitials(name: string) {
     .join("")
     .toUpperCase();
 }
-function downloadCsv(
-  filename: string,
-  headers: string[],
-  rows: (string | number)[][],
-) {
-  const escape = (value: string | number) =>
-    `"${String(value).replace(/"/g, '""')}"`;
-  const csv = [headers, ...rows]
-    .map((row) => row.map(escape).join(","))
-    .join("\n");
-  const url = URL.createObjectURL(
-    new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }),
-  );
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
 function Topbar({
   profile,
   logout,
@@ -758,240 +735,6 @@ function PageTitle({
   );
 }
 
-function CardHead({ title, link }: { title: string; link?: string }) {
-  return (
-    <div className="card-head">
-      <h2>{title}</h2>
-      {link && (
-        <button>
-          {link}
-          <ChevronRight />
-        </button>
-      )}
-    </div>
-  );
-}
-function Status({ value }: { value: Exam["status"] }) {
-  const labels = {
-    draft: "Draft",
-    terjadwal: "Terjadwal",
-    berlangsung: "Berlangsung",
-    selesai: "Selesai",
-  };
-  return (
-    <span className={`status ${value}`}>
-      <i />
-      {labels[value]}
-    </span>
-  );
-}
-type ExamDraft = Exam & {
-  subjectId?: string;
-  classId?: string;
-  startsAt?: string;
-  accessCode?: string;
-  shuffleQuestions?: boolean;
-  fullscreenMode?: boolean;
-  questionIds?: string[];
-};
-
-// Legacy demo implementation retained temporarily for visual reference.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function ExamManagement({
-  exams,
-  setExams,
-  notify,
-}: {
-  exams: Exam[];
-  setExams: (v: Exam[]) => void;
-  notify: (text: string, error?: boolean) => void;
-}) {
-  const [create, setCreate] = useState(false);
-  const [query, setQuery] = useState("");
-  const filteredExams = exams.filter((exam) =>
-    [exam.title, exam.subject, exam.className, exam.status]
-      .join(" ")
-      .toLowerCase()
-      .includes(query.trim().toLowerCase()),
-  );
-  const exportExams = () => {
-    downloadCsv(
-      "daftar-ujian.csv",
-      [
-        "Judul",
-        "Mata pelajaran",
-        "Kelas",
-        "Tanggal",
-        "Waktu",
-        "Durasi",
-        "Peserta",
-        "Status",
-      ],
-      filteredExams.map((exam) => [
-        exam.title,
-        exam.subject,
-        exam.className,
-        exam.date,
-        exam.time,
-        exam.duration,
-        exam.participants,
-        exam.status,
-      ]),
-    );
-    notify("Daftar ujian berhasil diekspor");
-  };
-  const advanceStatus = async (exam: Exam) => {
-    const nextStatus: Record<Exam["status"], Exam["status"]> = {
-      draft: "terjadwal",
-      terjadwal: "berlangsung",
-      berlangsung: "selesai",
-      selesai: "selesai",
-    };
-    const status = nextStatus[exam.status];
-    if (status === exam.status) {
-      notify("Ujian ini sudah selesai");
-      return;
-    }
-    try {
-      if (supabase) {
-        const { error } = await supabase
-          .from("exams")
-          .update({ status })
-          .eq("id", exam.id);
-        if (error) throw error;
-      }
-      setExams(exams.map((item) => item.id === exam.id ? { ...item, status } : item));
-      notify(`Status ujian diubah menjadi ${status}`);
-    } catch {
-      notify("Status ujian gagal diperbarui", true);
-    }
-  };
-  const addExam = async (exam: ExamDraft) => {
-    try {
-      if (supabase) {
-        const { data: createdId, error } = await supabase.rpc(
-          "create_scheduled_exam",
-          {
-            exam_title: exam.title,
-            target_subject_id: exam.subjectId,
-            target_class_id: exam.classId,
-            start_time: exam.startsAt,
-            duration_in_minutes: exam.duration,
-            question_ids: exam.questionIds,
-            access_code_value: exam.accessCode || null,
-            should_shuffle_questions: exam.shuffleQuestions,
-            should_use_fullscreen: exam.fullscreenMode,
-          },
-        );
-        if (error) throw error;
-        exam = { ...exam, id: createdId };
-      }
-      setExams([exam, ...exams]);
-      setCreate(false);
-      notify("Ujian berhasil dijadwalkan");
-    } catch (error) {
-      notify(error instanceof Error ? error.message : "Ujian gagal disimpan", true);
-    }
-  };
-  return (
-    <div className="portal-page">
-      <PageTitle
-        eyebrow="MANAJEMEN UJIAN"
-        title="Daftar Ujian"
-        description="Buat, jadwalkan, dan pantau seluruh ujian."
-        action={
-          <button className="primary" onClick={() => setCreate(true)}>
-            <Plus />
-            Buat ujian
-          </button>
-        }
-      />
-      <Toolbar
-        placeholder="Cari judul, mata pelajaran, atau kelas…"
-        value={query}
-        onChange={setQuery}
-        onExport={exportExams}
-      />
-      <div className="table-card">
-        <table>
-          <thead>
-            <tr>
-              <th>UJIAN</th>
-              <th>KELAS</th>
-              <th>JADWAL</th>
-              <th>PESERTA</th>
-              <th>STATUS</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {filteredExams.map((exam) => (
-              <tr key={exam.id}>
-                <td>
-                  <div className="exam-cell">
-                    <span>{exam.subject.slice(0, 2).toUpperCase()}</span>
-                    <p>
-                      <b>{exam.title}</b>
-                      <small>
-                        {exam.subject} · {exam.questions} soal
-                      </small>
-                    </p>
-                  </div>
-                </td>
-                <td>{exam.className}</td>
-                <td>
-                  <b className="table-main">{exam.date}</b>
-                  <small>
-                    {exam.time} · {exam.duration} menit
-                  </small>
-                </td>
-                <td>
-                  <div className="participant">
-                    <div>
-                      <i />
-                      <i />
-                      <i />
-                    </div>
-                    <span>{exam.participants} siswa</span>
-                  </div>
-                </td>
-                <td>
-                  <Status value={exam.status} />
-                </td>
-                <td>
-                  <button
-                    className="more"
-                    title="Majukan status ujian"
-                    aria-label={`Majukan status ${exam.title}`}
-                    onClick={() => void advanceStatus(exam)}
-                  >
-                    <MoreHorizontal />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="table-footer">
-          <span>
-            Menampilkan {filteredExams.length} dari {exams.length} ujian
-          </span>
-          <div>
-            <button disabled>
-              <ArrowLeft />
-            </button>
-            <button className="active">1</button>
-            <button>
-              <ArrowRight />
-            </button>
-          </div>
-        </div>
-      </div>
-      {create && <ExamModal close={() => setCreate(false)} save={addExam} />}
-    </div>
-  );
-}
-
 function Toolbar({
   placeholder,
   value,
@@ -1042,247 +785,6 @@ function Toolbar({
         </button>
       )}
     </div>
-  );
-}
-
-function ExamModal({
-  close,
-  save,
-}: {
-  close: () => void;
-  save: (exam: ExamDraft) => void;
-}) {
-  type Option = { id: string; name: string };
-  type AssignmentOption = { subjectId: string; classId: string; className: string };
-  type QuestionOption = { id: string; body: string; type: string };
-  const [step, setStep] = useState(1);
-  const [title, setTitle] = useState("");
-  const [subjects, setSubjects] = useState<Option[]>([]);
-  const [classes, setClasses] = useState<Option[]>([]);
-  const [assignments, setAssignments] = useState<AssignmentOption[]>([]);
-  const [availableQuestions, setAvailableQuestions] = useState<QuestionOption[]>([]);
-  const [subjectId, setSubjectId] = useState("");
-  const [classId, setClassId] = useState("");
-  const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
-  const [duration, setDuration] = useState(90);
-  const [startsAt, setStartsAt] = useState("");
-  const [accessCode, setAccessCode] = useState("");
-  const [shuffleQuestions, setShuffleQuestions] = useState(true);
-  const [fullscreenMode, setFullscreenMode] = useState(true);
-  useEffect(() => {
-    if (!supabase) {
-      return;
-    }
-    void supabase
-      .from("teacher_subjects")
-      .select("subject_id,class_id,subjects(name),classes(name)")
-      .then(({ data }) => {
-      const assignments = data ?? [];
-      const nextSubjects = Array.from(new Map(assignments.map((item) => [
-        item.subject_id,
-        { id: item.subject_id, name: relationName(item.subjects) },
-      ])).values());
-      const nextClasses = Array.from(new Map(assignments.map((item) => [
-        item.class_id,
-        { id: item.class_id, name: relationName(item.classes) },
-      ])).values());
-      setAssignments(assignments.map((item) => ({
-        subjectId: item.subject_id,
-        classId: item.class_id,
-        className: relationName(item.classes),
-      })));
-      setSubjects(nextSubjects);
-      setClasses(nextClasses);
-      setSubjectId((current) => current || nextSubjects[0]?.id || "");
-      setClassId((current) => current || nextClasses[0]?.id || "");
-      });
-  }, []);
-  useEffect(() => {
-    if (!subjectId || assignments.length === 0) return;
-    const matchingClasses = Array.from(new Map(
-      assignments
-        .filter((item) => item.subjectId === subjectId)
-        .map((item) => [item.classId, { id: item.classId, name: item.className }]),
-    ).values());
-    setClasses(matchingClasses);
-    setClassId((current) => matchingClasses.some((item) => item.id === current)
-      ? current
-      : matchingClasses[0]?.id ?? "");
-  }, [assignments, subjectId]);
-  useEffect(() => {
-    if (!supabase || !subjectId) return;
-    void supabase
-      .from("questions")
-      .select("id,body,type,question_banks!inner(subject_id)")
-      .eq("question_banks.subject_id", subjectId)
-      .eq("archived", false)
-      .order("created_at")
-      .then(({ data }) => setAvailableQuestions((data ?? []).map((item) => ({ id: item.id, body: item.body, type: item.type }))));
-    setSelectedQuestions([]);
-  }, [subjectId]);
-  const subject = subjects.find((item) => item.id === subjectId)?.name ?? "—";
-  const className = classes.find((item) => item.id === classId)?.name ?? "—";
-  const finish = () =>
-    save({
-      id: crypto.randomUUID(),
-      title,
-      subject,
-      className,
-      date: startsAt ? new Date(startsAt).toLocaleDateString("id-ID") : "Belum dijadwalkan",
-      time: startsAt ? new Date(startsAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "—",
-      duration,
-      questions: selectedQuestions.length,
-      status: startsAt ? "terjadwal" : "draft",
-      participants: 0,
-      subjectId,
-      classId,
-      startsAt: startsAt ? new Date(startsAt).toISOString() : undefined,
-      accessCode,
-      shuffleQuestions,
-      fullscreenMode,
-      questionIds: selectedQuestions,
-    });
-  return (
-    <Modal close={close} wide>
-      <div className="wizard">
-        <header>
-          <div>
-            <p>BUAT UJIAN BARU</p>
-            <h2>
-              {
-                [
-                  "Informasi Dasar",
-                  "Pilih Soal",
-                  "Waktu & Keamanan",
-                  "Review Ujian",
-                ][step - 1]
-              }
-            </h2>
-          </div>
-          <button onClick={close}>
-            <X />
-          </button>
-        </header>
-        <div className="stepper">
-          {[1, 2, 3, 4].map((s) => (
-            <span className={step >= s ? "active" : ""} key={s}>
-              <i>{step > s ? <Check /> : s}</i>
-              <b>{["Info Dasar", "Soal", "Pengaturan", "Review"][s - 1]}</b>
-            </span>
-          ))}
-        </div>
-        <div className="wizard-body">
-          {step === 1 && (
-            <>
-              <FormField label="Judul ujian">
-                <input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Contoh: Penilaian Akhir Semester"
-                />
-              </FormField>
-              <div className="form-grid">
-                <FormField label="Mata pelajaran">
-                  <select
-                    value={subjectId}
-                    onChange={(e) => setSubjectId(e.target.value)}
-                  >
-                    {subjects.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
-                  </select>
-                </FormField>
-                <FormField label="Target kelas">
-                  <select
-                    value={classId}
-                    onChange={(e) => setClassId(e.target.value)}
-                  >
-                    {classes.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
-                  </select>
-                </FormField>
-              </div>
-            </>
-          )}
-          {step === 2 && (
-            <div className="wizard-question-list">
-              <p>{selectedQuestions.length} dari {availableQuestions.length} soal dipilih</p>
-              {availableQuestions.length === 0 && <div className="choice-card"><FileQuestion /><div><b>Belum ada soal</b><p>Tambahkan soal pada bank soal untuk mata pelajaran ini.</p></div></div>}
-              {availableQuestions.map((item) => (
-                <label className="choice-card" key={item.id}>
-                  <input
-                    type="checkbox"
-                    checked={selectedQuestions.includes(item.id)}
-                    onChange={(event) => setSelectedQuestions((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))}
-                  />
-                  <div><b>{item.body}</b><p>{item.type === "essay" ? "Essay" : "Pilihan ganda"}</p></div>
-                </label>
-              ))}
-            </div>
-          )}
-          {step === 3 && (
-            <>
-              <div className="form-grid">
-                <FormField label="Durasi (menit)">
-                  <input
-                    type="number"
-                    value={duration}
-                    onChange={(e) => setDuration(Number(e.target.value))}
-                  />
-                </FormField>
-                <FormField label="Mulai ujian">
-                  <input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
-                </FormField>
-                <FormField label="Kode akses (opsional)">
-                  <input value={accessCode} onChange={(e) => setAccessCode(e.target.value.toUpperCase())} placeholder="Contoh: MATH26" />
-                </FormField>
-              </div>
-              <div className="switch-list">
-                <label>
-                  <span>
-                    <b>Acak urutan soal</b>
-                    <small>Urutan berbeda untuk setiap siswa</small>
-                  </span>
-                  <input type="checkbox" checked={shuffleQuestions} onChange={(e) => setShuffleQuestions(e.target.checked)} />
-                </label>
-                <label>
-                  <span>
-                    <b>Mode layar penuh</b>
-                    <small>Catat saat siswa keluar dari ujian</small>
-                  </span>
-                  <input type="checkbox" checked={fullscreenMode} onChange={(e) => setFullscreenMode(e.target.checked)} />
-                </label>
-              </div>
-            </>
-          )}
-          {step === 4 && (
-            <div className="review-box">
-              <CheckCircle2 />
-              <h3>Ujian siap disimpan sebagai draft</h3>
-              <p>
-                <b>{title || "Tanpa judul"}</b> · {subject} · Kelas {className}
-              </p>
-              <span>
-                {duration} menit · {selectedQuestions.length} soal · {startsAt ? new Date(startsAt).toLocaleString("id-ID") : "Belum dijadwalkan"}
-              </span>
-            </div>
-          )}
-        </div>
-        <footer>
-          <button onClick={close}>Batal</button>
-          <div>
-            {step > 1 && (
-              <button onClick={() => setStep(step - 1)}>Kembali</button>
-            )}
-            <button
-              className="primary"
-              disabled={(step === 1 && (!title.trim() || !subjectId || !classId)) || (step === 2 && selectedQuestions.length === 0) || (step === 3 && (!startsAt || duration < 1))}
-              onClick={() => (step < 4 ? setStep(step + 1) : finish())}
-            >
-              {step < 4 ? "Lanjut" : "Jadwalkan ujian"}
-              <ArrowRight />
-            </button>
-          </div>
-        </footer>
-      </div>
-    </Modal>
   );
 }
 
@@ -2068,563 +1570,6 @@ function ResetUserPasswordModal({
   );
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function Grading({ notify }: { notify: (text: string) => void }) {
-  type GradingItem = { id: string; name: string; answer: string; question: string; key: string; weight: number };
-  const [selected, setSelected] = useState(0);
-  const [items, setItems] = useState<GradingItem[]>([]);
-  const [gradingLoading, setGradingLoading] = useState(true);
-  const [scores, setScores] = useState<Record<number, string>>({});
-  const [comments, setComments] = useState<Record<number, string>>({});
-  const [showRubric, setShowRubric] = useState(false);
-  useEffect(() => {
-    if (!supabase) {
-      setGradingLoading(false);
-      return;
-    }
-    void supabase
-      .from("answers")
-      .select("id,essay_text,score,teacher_comment,questions!inner(body,answer_key,weight,type),attempts!inner(status,profiles!attempts_student_id_fkey(full_name))")
-      .eq("questions.type", "essay")
-      .in("attempts.status", ["submitted", "grading"])
-      .order("answered_at")
-      .then(({ data }) => {
-        const loaded = (data ?? []).map((row) => {
-          const question = Array.isArray(row.questions) ? row.questions[0] : row.questions;
-          const attempt = Array.isArray(row.attempts) ? row.attempts[0] : row.attempts;
-          return {
-            id: row.id,
-            name: relationName(attempt?.profiles),
-            answer: row.essay_text ?? "(Tidak ada jawaban)",
-            question: question?.body ?? "—",
-            key: question?.answer_key ?? "Belum ada kunci jawaban.",
-            weight: Number(question?.weight ?? 1),
-          };
-        });
-        setItems(loaded);
-        setScores(Object.fromEntries((data ?? []).map((row, index) => [index, row.score === null ? "" : String(row.score)])));
-        setComments(Object.fromEntries((data ?? []).map((row, index) => [index, row.teacher_comment ?? ""])));
-        setGradingLoading(false);
-      });
-  }, []);
-  if (gradingLoading) {
-    return <div className="portal-page"><div className="card dashboard-empty">Memuat jawaban essay…</div></div>;
-  }
-  const currentItem = items[selected];
-  if (!currentItem) {
-    return <div className="portal-page"><PageTitle eyebrow="PENILAIAN" title="Koreksi Essay" description="Penilaian per soal membantu menjaga konsistensi skor." /><div className="card dashboard-empty">Tidak ada jawaban essay yang menunggu koreksi.</div></div>;
-  }
-  return (
-    <div className="portal-page">
-      <PageTitle
-        eyebrow="PENILAIAN"
-        title="Koreksi Essay"
-        description="Penilaian per soal membantu menjaga konsistensi skor."
-      />
-      <div className="grading-shell">
-        <aside>
-          <div className="grading-progress">
-            <p>
-              <b>Jawaban {selected + 1} dari {items.length}</b>
-              <span>{Object.values(scores).filter(Boolean).length} / {items.length} dinilai</span>
-            </p>
-            <i>
-              <span style={{ width: `${(Object.values(scores).filter(Boolean).length / items.length) * 100}%` }} />
-            </i>
-          </div>
-          <div className="student-answer-list">
-            {items.map((item, i) => (
-              <button
-                onClick={() => setSelected(i)}
-                className={selected === i ? "active" : ""}
-                key={item.id}
-              >
-                <span>
-                  {item.name
-                    .split(" ")
-                    .map((x) => x[0])
-                    .join("")}
-                </span>
-                <p>
-                    <b>{item.name}</b>
-                  <small>
-                    {scores[i] ? `Skor ${scores[i]}/${item.weight}` : "Belum dinilai"}
-                  </small>
-                </p>
-                {scores[i] ? <CheckCircle2 /> : <ChevronRight />}
-              </button>
-            ))}
-          </div>
-        </aside>
-        <main className="grading-main">
-          <div className="question-reference">
-            <small>SOAL ESSAY · BOBOT {currentItem.weight} POIN</small>
-            <h3>
-              {currentItem.question}
-            </h3>
-            <button onClick={() => setShowRubric((value) => !value)}>
-              <BookOpen />
-              {showRubric ? "Tutup rubrik" : "Lihat rubrik & kunci jawaban"}
-            </button>
-            {showRubric && (
-              <div className="rubric-box">
-                <b>Pedoman penilaian</b>
-                <p>{currentItem.key}</p>
-              </div>
-            )}
-          </div>
-          <div className="answer-paper">
-            <div>
-              <span className="avatar sm">
-                {currentItem.name
-                  .split(" ")
-                  .map((x) => x[0])
-                  .join("")}
-              </span>
-              <p>
-                <b>{currentItem.name}</b>
-                <small>Jawaban tersimpan pada sistem</small>
-              </p>
-            </div>
-            <p>{currentItem.answer}</p>
-          </div>
-          <div className="score-panel">
-            <FormField label={`Skor (maks. ${currentItem.weight})`}>
-              <input
-                type="number"
-                min="0"
-                max={currentItem.weight}
-                value={scores[selected] ?? ""}
-                onChange={(e) =>
-                  setScores({ ...scores, [selected]: e.target.value })
-                }
-                placeholder="0"
-              />
-            </FormField>
-            <FormField label="Komentar untuk siswa (opsional)">
-              <input
-                value={comments[selected] ?? ""}
-                onChange={(event) =>
-                  setComments({ ...comments, [selected]: event.target.value })
-                }
-                placeholder="Berikan umpan balik singkat…"
-              />
-            </FormField>
-            <button
-              className="primary"
-              onClick={async () => {
-                const score = Number(scores[selected]);
-                if (scores[selected] === "" || score < 0 || score > currentItem.weight) {
-                  notify(`Masukkan skor antara 0 sampai ${currentItem.weight}`);
-                  return;
-                }
-                if (supabase) {
-                  const { error } = await supabase.rpc("grade_essay_answer", {
-                    target_answer_id: currentItem.id,
-                    awarded_score: score,
-                    feedback: comments[selected] || null,
-                  });
-                  if (error) {
-                    notify(error.message);
-                    return;
-                  }
-                }
-                notify("Nilai berhasil disimpan");
-                if (selected < items.length - 1) setSelected(selected + 1);
-              }}
-            >
-              Simpan & lanjut
-              <ArrowRight />
-            </button>
-          </div>
-        </main>
-      </div>
-    </div>
-  );
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function Reports() {
-  type ReportRow = { name: string; className: string; exam: string; score: number; status: string };
-  const [rows, setRows] = useState<ReportRow[]>([]);
-  useEffect(() => {
-    if (!supabase) return;
-    void supabase
-      .from("attempts")
-      .select("final_score,status,profiles!attempts_student_id_fkey(full_name),exams!inner(title,classes(name))")
-      .in("status", ["submitted", "grading", "final"])
-      .order("submitted_at", { ascending: false })
-      .then(({ data }) => setRows((data ?? []).map((item) => {
-        const exam = Array.isArray(item.exams) ? item.exams[0] : item.exams;
-        return {
-          name: relationName(item.profiles),
-          className: relationName(exam?.classes),
-          exam: String(exam?.title ?? "—"),
-          score: Number(item.final_score ?? 0),
-          status: Number(item.final_score ?? 0) >= 75 ? "Lulus" : "Perlu pendampingan",
-        };
-      })));
-  }, []);
-  const grades = rows.map((item) => item.score);
-  const average = grades.length ? grades.reduce((total, value) => total + value, 0) / grades.length : 0;
-  const highest = grades.length ? Math.max(...grades) : 0;
-  const lowest = grades.length ? Math.min(...grades) : 0;
-  const passed = rows.filter((item) => item.score >= 75).length;
-  const exportReport = () =>
-    downloadCsv(
-      "laporan-hasil-ujian.csv",
-      ["Nama", "Kelas", "Ujian", "Nilai", "Status"],
-      rows.map((item) => [item.name, item.className, item.exam, item.score, item.status]),
-    );
-  return (
-    <div className="portal-page">
-      <PageTitle
-        eyebrow="LAPORAN & ANALITIK"
-        title="Hasil Ujian"
-        description="Analisis capaian kelas dan kualitas soal."
-        action={
-          <button className="outline" onClick={exportReport}>
-            <Download />
-            Ekspor laporan
-          </button>
-        }
-      />
-      <div className="report-stats">
-        <div>
-          <small>RATA-RATA</small>
-          <b>{average.toLocaleString("id-ID", { maximumFractionDigits: 1 })}</b>
-          <span>{rows.length} hasil</span>
-        </div>
-        <div>
-          <small>NILAI TERTINGGI</small>
-          <b>{highest}</b>
-          <span>{rows.find((item) => item.score === highest)?.name ?? "—"}</span>
-        </div>
-        <div>
-          <small>NILAI TERENDAH</small>
-          <b>{lowest}</b>
-          <span>Perlu pendampingan</span>
-        </div>
-        <div>
-          <small>KETUNTASAN</small>
-          <b>{rows.length ? Math.round((passed / rows.length) * 100) : 0}%</b>
-          <span>{passed} dari {rows.length} siswa</span>
-        </div>
-      </div>
-      <div className="report-grid">
-        <section className="card chart-card">
-          <CardHead title="Distribusi nilai" />
-          <div className="grade-chart">
-            {grades.map((v, i) => (
-              <div key={i}>
-                <i style={{ height: `${Math.max(v, 4)}%` }} />
-                <span>{i + 1}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-        <section className="card">
-          <CardHead title="Ringkasan pengerjaan" />
-          <div className="donut-wrap">
-            <div className="donut">
-              <strong>{rows.length}</strong>
-              <span>peserta</span>
-            </div>
-            <ul>
-              <li>
-                <i className="green" />
-                Lulus KKM <b>{passed}</b>
-              </li>
-              <li>
-                <i className="amber" />
-                Di bawah KKM <b>{rows.length - passed}</b>
-              </li>
-              <li>
-                <i className="gray" />
-                Tidak hadir <b>0</b>
-              </li>
-            </ul>
-          </div>
-        </section>
-      </div>
-      <section className="card item-analysis">
-        <CardHead title="Data hasil siswa" />
-        {rows.length === 0 ? (
-          <div className="dashboard-empty">Belum ada hasil ujian yang dapat dianalisis.</div>
-        ) : rows.slice(0, 8).map((item, index) => (
-          <div className="analysis-row" key={`${item.name}-${item.exam}-${index}`}>
-            <span>{String(index + 1).padStart(2, "0")}</span>
-            <p><b>{item.name}</b><small>{item.exam} · {item.className}</small></p>
-            <div><small>NILAI AKHIR</small><b>{item.score}</b></div>
-            <span className={`difficulty ${item.score >= 75 ? "mudah" : "sedang"}`}>
-              {item.status}
-            </span>
-          </div>
-        ))}
-      </section>
-    </div>
-  );
-}
-
-// Legacy settings implementation retained temporarily for migration reference.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function SettingsPage({
-  profile,
-  notify,
-}: {
-  profile: Profile;
-  notify: (text: string, error?: boolean) => void;
-}) {
-  const [tab, setTab] = useState("profile");
-  const [settings, setSettings] = useState(() =>
-    loadLocal("school-settings", {
-      schoolName: "SMP Negeri Harapan Bangsa",
-      npsn: "20123456",
-      address: "Jl. Pendidikan No. 17, Jakarta",
-      academicYear: "2026/2027",
-      examReminder: true,
-      gradingReminder: true,
-      securityAlert: true,
-    }),
-  );
-  const [savingSettings, setSavingSettings] = useState(false);
-  useEffect(() => {
-    if (!supabase || profile.role !== "admin") return;
-    void supabase
-      .from("school_settings")
-      .select("school_name,npsn,address,academic_year,exam_reminder,grading_reminder,security_alert")
-      .eq("id", true)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!data) return;
-        setSettings({
-          schoolName: data.school_name,
-          npsn: data.npsn,
-          address: data.address,
-          academicYear: data.academic_year,
-          examReminder: data.exam_reminder,
-          gradingReminder: data.grading_reminder,
-          securityAlert: data.security_alert,
-        });
-      });
-  }, [profile.role]);
-  const saveSettings = async () => {
-    setSavingSettings(true);
-    try {
-      if (supabase) {
-        const { error } = await supabase.from("school_settings").upsert({
-          id: true,
-          school_name: settings.schoolName,
-          npsn: settings.npsn,
-          address: settings.address,
-          academic_year: settings.academicYear,
-          exam_reminder: settings.examReminder,
-          grading_reminder: settings.gradingReminder,
-          security_alert: settings.securityAlert,
-          updated_at: new Date().toISOString(),
-          updated_by: profile.id,
-        });
-        if (error) throw error;
-      }
-      saveLocal("school-settings", settings);
-      notify("Pengaturan berhasil disimpan");
-    } catch (error) {
-      notify(error instanceof Error ? error.message : "Pengaturan gagal disimpan", true);
-    } finally {
-      setSavingSettings(false);
-    }
-  };
-  if (profile.role === "guru") {
-    return (
-      <div className="portal-page">
-        <PageTitle
-          eyebrow="AKUN SAYA"
-          title="Profil Guru"
-          description="Informasi akun pengajar yang terhubung ke sekolah."
-        />
-        <div className="card settings-form">
-          <h2>Informasi akun</h2>
-          <p>Hubungi Admin jika nama atau email perlu diperbarui.</p>
-          <div className="form-grid">
-            <FormField label="Nama lengkap">
-              <input value={profile.full_name} readOnly />
-            </FormField>
-            <FormField label="Email">
-              <input value={profile.email} readOnly />
-            </FormField>
-          </div>
-          <div className="settings-save">
-            <span>Hak akses: Guru · Konten dan penilaian akademik</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className="portal-page">
-      <PageTitle
-        eyebrow="KONFIGURASI"
-        title="Pengaturan"
-        description="Kelola profil dan preferensi aplikasi."
-      />
-      <div className="settings-grid">
-        <aside>
-          <button
-            className={tab === "profile" ? "active" : ""}
-            onClick={() => setTab("profile")}
-          >
-            Profil sekolah
-          </button>
-          <button
-            className={tab === "security" ? "active" : ""}
-            onClick={() => setTab("security")}
-          >
-            Keamanan
-          </button>
-          <button
-            className={tab === "academic" ? "active" : ""}
-            onClick={() => setTab("academic")}
-          >
-            Tahun ajaran
-          </button>
-          <button
-            className={tab === "notifications" ? "active" : ""}
-            onClick={() => setTab("notifications")}
-          >
-            Notifikasi
-          </button>
-        </aside>
-        <div className="card settings-form">
-          {tab === "profile" && (
-            <>
-              <h2>Profil sekolah</h2>
-              <p>Informasi ini digunakan pada laporan dan halaman siswa.</p>
-              <div className="school-logo">
-                <span>
-                  <GraduationCap />
-                </span>
-              </div>
-              <div className="form-grid">
-                <FormField label="Nama sekolah">
-                  <input
-                    value={settings.schoolName}
-                    onChange={(e) =>
-                      setSettings({ ...settings, schoolName: e.target.value })
-                    }
-                  />
-                </FormField>
-                <FormField label="NPSN">
-                  <input
-                    value={settings.npsn}
-                    onChange={(e) =>
-                      setSettings({ ...settings, npsn: e.target.value })
-                    }
-                  />
-                </FormField>
-              </div>
-              <FormField label="Alamat">
-                <textarea
-                  rows={3}
-                  value={settings.address}
-                  onChange={(e) =>
-                    setSettings({ ...settings, address: e.target.value })
-                  }
-                />
-              </FormField>
-            </>
-          )}
-          {tab === "security" && (
-            <>
-              <h2>Keamanan akun</h2>
-              <p>Informasi akses administrator yang sedang aktif.</p>
-              <div className="form-grid">
-                <FormField label="Administrator">
-                  <input value={profile.full_name} readOnly />
-                </FormField>
-                <FormField label="Email akun">
-                  <input value={profile.email} readOnly />
-                </FormField>
-              </div>
-              <div className="dashboard-error">
-                <ShieldCheck /> Sesi dan hak akses dikelola oleh Supabase Auth.
-                Jangan bagikan akun administrator.
-              </div>
-            </>
-          )}
-          {tab === "academic" && (
-            <>
-              <h2>Tahun ajaran aktif</h2>
-              <p>
-                Digunakan sebagai periode bawaan saat membuat ujian dan laporan.
-              </p>
-              <FormField label="Tahun ajaran">
-                <input
-                  value={settings.academicYear}
-                  onChange={(e) =>
-                    setSettings({ ...settings, academicYear: e.target.value })
-                  }
-                  placeholder="2026/2027"
-                />
-              </FormField>
-            </>
-          )}
-          {tab === "notifications" && (
-            <>
-              <h2>Preferensi notifikasi</h2>
-              <p>
-                Pilih informasi penting yang ingin ditampilkan kepada
-                administrator.
-              </p>
-              <label className="checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={settings.examReminder}
-                  onChange={(e) =>
-                    setSettings({ ...settings, examReminder: e.target.checked })
-                  }
-                />{" "}
-                Pengingat ujian yang akan dimulai
-              </label>
-              <label className="checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={settings.gradingReminder}
-                  onChange={(e) =>
-                    setSettings({
-                      ...settings,
-                      gradingReminder: e.target.checked,
-                    })
-                  }
-                />{" "}
-                Pengingat jawaban yang belum dikoreksi
-              </label>
-              <label className="checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={settings.securityAlert}
-                  onChange={(e) =>
-                    setSettings({
-                      ...settings,
-                      securityAlert: e.target.checked,
-                    })
-                  }
-                />{" "}
-                Peringatan aktivitas keamanan
-              </label>
-            </>
-          )}
-          <div className="settings-save">
-              <button className="primary" disabled={savingSettings} onClick={() => void saveSettings()}>
-                {savingSettings ? "Menyimpan…" : "Simpan perubahan"}
-            </button>
-            <span>Anda masuk sebagai Admin.</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function ExamRunner({
   notify,
 }: {
@@ -2712,12 +1657,49 @@ function ExamRunner({
       }
       const startedAttempt = startResult.data?.[0];
       if (!startedAttempt) {
-        setExamError("Server tidak dapat memulai attempt ujian.");
+        if (examRow.requires_access_code) {
+          setNeedsAccessCode(true);
+          setExamError(submittedAccessCode ? "Kode akses salah atau batas percobaan telah tercapai." : "");
+        } else {
+          setExamError("Server tidak dapat memulai attempt ujian.");
+        }
         setLoadingExam(false);
         return;
       }
       setAttemptId(startedAttempt.attempt_id);
       setNeedsAccessCode(false);
+      const deadlineTime = new Date(startedAttempt.deadline).getTime();
+      if (deadlineTime <= Date.now()) {
+        const localAnswers = loadLocal<Record<string, number | string>>(`answers:${examId}`, {});
+        const localAnswerEntries = Object.entries(localAnswers);
+        let expiredSaveFailed = localAnswerEntries.length > 0 && Date.now() - deadlineTime > 10_000;
+        if (Date.now() - deadlineTime <= 10_000) {
+          const expiredSaves = await Promise.all(localAnswerEntries.map(([questionId, value]) =>
+            client.rpc("save_exam_answer", {
+              target_attempt_id: startedAttempt.attempt_id,
+              target_question_id: questionId,
+              target_selected_option: typeof value === "number" ? value : null,
+              target_essay_text: typeof value === "string" ? value : null,
+            }),
+          ));
+          expiredSaveFailed = expiredSaves.some(({ error }) => Boolean(error));
+        }
+        const expiredSubmit = await client.rpc("submit_exam_attempt", { target_attempt_id: startedAttempt.attempt_id });
+        if (!expiredSubmit.error) {
+          if (!expiredSaveFailed) {
+            localStorage.removeItem(`ruang-ujian:answers:${examId}`);
+          }
+          localStorage.removeItem(`ruang-ujian:marked:${examId}`);
+          notify(
+            expiredSaveFailed
+              ? "Waktu ujian berakhir. Sebagian jawaban lokal tidak dapat disinkronkan; salinannya tetap tersimpan di perangkat ini."
+              : "Waktu ujian berakhir. Jawaban yang tersimpan telah dikumpulkan.",
+            expiredSaveFailed,
+          );
+          navigate("/siswa");
+          return;
+        }
+      }
       const questionResult = await client.rpc("get_exam_questions", {
         requested_exam_id: examId,
       });
@@ -2757,7 +1739,7 @@ function ExamRunner({
         fullscreen: examRow.fullscreen_mode ?? true,
         recordTabSwitches: examRow.record_tab_switches ?? true,
       });
-      setRemaining(Math.max(0, Math.floor((new Date(startedAttempt.deadline).getTime() - Date.now()) / 1000)));
+      setRemaining(Math.max(0, Math.floor((deadlineTime - Date.now()) / 1000)));
       const localAnswers = loadLocal<Record<string, number | string>>(
         `answers:${examId}`,
         {},
@@ -2892,6 +1874,14 @@ function ExamRunner({
       essaySaveTimer.current = null;
     }, 600);
   };
+  useEffect(() => {
+    if (remaining > 3 || !pendingEssay.current || !attemptId) return;
+    if (essaySaveTimer.current !== null) window.clearTimeout(essaySaveTimer.current);
+    const pending = pendingEssay.current;
+    pendingEssay.current = null;
+    essaySaveTimer.current = null;
+    void persistAnswer(pending.questionId, pending.value);
+  }, [attemptId, persistAnswer, remaining]);
   const toggleMarked = (questionId: string) => {
     setMarked((currentMarked) => {
       const nextMarked = currentMarked.includes(questionId)
@@ -2907,27 +1897,23 @@ function ExamRunner({
     setSubmittingExam(true);
     try {
       if (!supabase || !attemptId) throw new Error("Attempt belum siap.");
-      const timeExpired = remaining === 0;
-      if (!timeExpired && pendingEssay.current) {
+      if (pendingEssay.current) {
         if (essaySaveTimer.current !== null) window.clearTimeout(essaySaveTimer.current);
         const synced = await persistAnswer(pendingEssay.current.questionId, pendingEssay.current.value);
         if (!synced) throw new Error("Jawaban essay terakhir belum tersimpan. Periksa koneksi lalu coba kembali.");
         pendingEssay.current = null;
         essaySaveTimer.current = null;
       }
-      if (timeExpired) {
-        await Promise.allSettled(Object.values(answerSaveQueue.current));
-      } else {
-        const finalSaves = await Promise.all(
-          Object.entries(answers).map(([questionId, value]) =>
-            persistAnswer(questionId, value),
-          ),
+      await Promise.allSettled(Object.values(answerSaveQueue.current));
+      const finalSaves = await Promise.all(
+        Object.entries(answers).map(([questionId, value]) =>
+          persistAnswer(questionId, value),
+        ),
+      );
+      if (finalSaves.some((saved) => !saved)) {
+        throw new Error(
+          "Masih ada jawaban yang belum tersimpan. Periksa koneksi lalu coba kembali.",
         );
-        if (finalSaves.some((saved) => !saved)) {
-          throw new Error(
-            "Masih ada jawaban yang belum tersimpan. Periksa koneksi lalu coba kembali.",
-          );
-        }
       }
       const { error } = await supabase.rpc("submit_exam_attempt", {
         target_attempt_id: attemptId,
@@ -2943,7 +1929,7 @@ function ExamRunner({
       setSubmittingExam(false);
       notify(error instanceof Error ? error.message : "Jawaban gagal dikumpulkan. Coba lagi sebelum meninggalkan halaman.", true);
     }
-  }, [answers, attemptId, examId, navigate, notify, persistAnswer, remaining]);
+  }, [answers, attemptId, examId, navigate, notify, persistAnswer]);
   useEffect(() => () => {
     if (essaySaveTimer.current !== null) window.clearTimeout(essaySaveTimer.current);
   }, []);
@@ -2957,7 +1943,7 @@ function ExamRunner({
     return (
       <div className="auth-loading">
         <span><LockKeyhole /></span>
-        <p>Masukkan kode akses yang diberikan pengawas.</p>
+        <p>{examError || "Masukkan kode akses yang diberikan pengawas."}</p>
         <form
           onSubmit={(event) => {
             event.preventDefault();

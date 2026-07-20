@@ -2,10 +2,7 @@
 
 Website ujian sekolah berbasis React, TypeScript, dan Supabase. Implementasi dibuat dari PRD `Membuat aplikasi ujian sekolah.zip` dan hanya berfokus pada platform web—tanpa aplikasi Flutter.
 
-Dokumen audit lengkap modul dan section tersedia di [`docs/AUDIT_LENGKAP_MODUL.md`](docs/AUDIT_LENGKAP_MODUL.md).
-Suite test scenario dan test case audit tersedia di [`docs/TEST_SCENARIO_DAN_CASE_AUDIT.md`](docs/TEST_SCENARIO_DAN_CASE_AUDIT.md).
-Bug report hasil pengujian tersedia di [`docs/BUG_REPORT_AUDIT_2026-07-17.md`](docs/BUG_REPORT_AUDIT_2026-07-17.md).
-Status remediasi terbaru tersedia di [`docs/REMEDIATION_STATUS_2026-07-19.md`](docs/REMEDIATION_STATUS_2026-07-19.md).
+Audit dan status remediasi terbaru tersedia di [`docs/AUDIT_PORTO_ARSYA_2026-07-20.md`](docs/AUDIT_PORTO_ARSYA_2026-07-20.md).
 Panduan varian logo putih tersedia di [`docs/PANDUAN_LOGO_PUTIH.md`](docs/PANDUAN_LOGO_PUTIH.md).
 
 ## Cakupan web
@@ -31,7 +28,7 @@ Prasyarat: Node.js 20 atau lebih baru.
 
 ```bash
 npm install
-copy .env.example .env.local
+cp .env.example .env.local
 npm run dev
 ```
 
@@ -54,6 +51,7 @@ npm run dev
    - `supabase/migrations/012_admin_experience_settings.sql`
    - `supabase/migrations/013_safe_subject_deletion.sql`
    - `supabase/migrations/014_student_exam_contract.sql`
+   - `supabase/migrations/015_exam_security_and_branding.sql`
 3. Isi `.env.local`:
 
 ```env
@@ -78,6 +76,7 @@ npx supabase login
 npx supabase link --project-ref PROJECT_REF
 npx supabase functions deploy admin-users
 npx supabase functions deploy student-login
+npx supabase secrets set APP_ORIGIN=https://domain-sekolah.example
 ```
 
 6. Tambahkan URL website ke Authentication → URL Configuration → Redirect URLs agar tautan reset kata sandi kembali ke aplikasi dengan benar.
@@ -89,12 +88,14 @@ Seluruh role diambil dari profil pengguna terautentikasi, bukan dari `localStora
 ```bash
 npm run build
 npm run lint
+npm test
 ```
 
 ## Checklist go-live
 
-- Jalankan seluruh migration `001` sampai `014` secara berurutan pada project Supabase tujuan.
+- Jalankan seluruh migration `001` sampai `015` secara berurutan pada project Supabase tujuan.
 - Deploy Edge Function `admin-users` dan `student-login`, lalu pastikan secret service role hanya berada di Supabase.
+- Isi secret `APP_ORIGIN` dengan origin web production. Pisahkan beberapa origin menggunakan koma, misalnya origin production dan staging.
 - Isi `.env` deployment dengan URL dan anon key project production; jangan pernah memakai service-role key di Vite.
 - Atur Site URL dan Redirect URLs untuk domain production pada Supabase Auth.
 - Nonaktifkan public user signup pada Supabase Auth; semua akun dibuat melalui Edge Function admin.

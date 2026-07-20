@@ -39,9 +39,35 @@ type AuditRow = {
   actor_id: string | null;
   action: string;
   entity_type: string | null;
+  entity_id: string | null;
   metadata: Record<string, unknown> | null;
   created_at: string;
 };
+
+type IntegrityRow = {
+  id: string;
+  event_type: string;
+  metadata: Record<string, unknown> | null;
+  occurred_at: string;
+  student_id: string;
+  profiles: unknown;
+  attempts: unknown;
+};
+
+function relatedName(value: unknown, fallback = "—") {
+  if (Array.isArray(value)) return String(value[0]?.full_name ?? value[0]?.title ?? fallback);
+  if (value && typeof value === "object") {
+    const row = value as Record<string, unknown>;
+    return String(row.full_name ?? row.title ?? fallback);
+  }
+  return fallback;
+}
+
+function integrityExamName(value: unknown) {
+  const attempt = Array.isArray(value) ? value[0] : value;
+  if (!attempt || typeof attempt !== "object") return "—";
+  return relatedName((attempt as Record<string, unknown>).exams);
+}
 
 function AdminPageTitle({
   eyebrow,
@@ -377,6 +403,7 @@ function auditLabel(action: string) {
 export function AuditSecurityPage({ notify }: { notify: Notify }) {
   const [audits, setAudits] = useState<AuditRow[]>([]);
   const [actorNames, setActorNames] = useState<Record<string, string>>({});
+  const [integrityEvents, setIntegrityEvents] = useState<IntegrityRow[]>([]);
   const [integrityCount, setIntegrityCount] = useState(0);
   const [activeUsers, setActiveUsers] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -388,18 +415,22 @@ export function AuditSecurityPage({ notify }: { notify: Notify }) {
     const [auditResult, integrityResult, usersResult] = await Promise.all([
       supabase
         .from("audit_logs")
-        .select("id,actor_id,action,entity_type,metadata,created_at")
+        .select("id,actor_id,action,entity_type,entity_id,metadata,created_at")
         .order("created_at", { ascending: false })
         .limit(100),
       supabase
         .from("integrity_events")
-        .select("id", { count: "exact", head: true }),
+        .select("id,event_type,metadata,occurred_at,student_id,profiles(full_name),attempts(exams(title))", { count: "exact" })
+        .order("occurred_at", { ascending: false })
+        .limit(100),
       supabase
         .from("profiles")
         .select("id", { count: "exact", head: true })
         .eq("active", true),
     ]);
-    if (auditResult.error) notify(auditResult.error.message, true);
+    const requestError = auditResult.error ?? integrityResult.error ?? usersResult.error;
+    if (requestError) notify(requestError.message, true);
+    if (auditResult.error) setAudits([]);
     else {
       const rows = (auditResult.data ?? []) as AuditRow[];
       setAudits(rows);
@@ -409,6 +440,7 @@ export function AuditSecurityPage({ notify }: { notify: Notify }) {
         setActorNames(Object.fromEntries((data ?? []).map((actor) => [actor.id, actor.full_name])));
       } else setActorNames({});
     }
+    setIntegrityEvents(integrityResult.error ? [] : (integrityResult.data ?? []) as unknown as IntegrityRow[]);
     setIntegrityCount(integrityResult.count ?? 0);
     setActiveUsers(usersResult.count ?? 0);
     setLoading(false);
@@ -457,11 +489,32 @@ export function AuditSecurityPage({ notify }: { notify: Notify }) {
                 <td>{new Date(audit.created_at).toLocaleString("id-ID")}</td>
                 <td><b className="table-main">{actorNames[audit.actor_id ?? ""] ?? "Sistem"}</b></td>
                 <td>{auditLabel(audit.action)}</td>
-                <td><span className="subject-code">{audit.entity_type ?? "—"}</span></td>
+                <td><span className="subject-code">{audit.entity_type ?? "—"}</span>{audit.entity_id ? <small>{audit.entity_id.slice(0, 8)}</small> : null}</td>
               </tr>
             ))}
           </tbody>
         </table>
+      </div>
+      <div className="table-card audit-table integrity-table">
+        <table>
+          <thead><tr><th>WAKTU</th><th>SISWA</th><th>UJIAN</th><th>EVENT</th><th>DETAIL</th></tr></thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={5}>Memuat event integritas…</td></tr>
+            ) : integrityEvents.length === 0 ? (
+              <tr><td colSpan={5}>Belum ada event integritas.</td></tr>
+            ) : integrityEvents.map((event) => (
+              <tr key={event.id}>
+                <td>{new Date(event.occurred_at).toLocaleString("id-ID")}</td>
+                <td><b className="table-main">{relatedName(event.profiles)}</b></td>
+                <td>{integrityExamName(event.attempts)}</td>
+                <td><span className="subject-code">{event.event_type.replace(/_/g, " ")}</span></td>
+                <td><small>{event.metadata ? JSON.stringify(event.metadata) : "—"}</small></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="table-footer"><span>Menampilkan maksimal 100 event terbaru</span></div>
       </div>
     </div>
   );
