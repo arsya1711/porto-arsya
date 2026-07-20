@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app.dart';
@@ -32,10 +33,15 @@ Future<void> main() async {
     repository = const UnavailableExamRepository();
   }
 
+  // Dibaca dari paket terpasang, bukan konstanta terpisah, agar tidak melenceng
+  // dari `version:` di pubspec.yaml.
+  final packageInfo = await PackageInfo.fromPlatform();
+
   runApp(
     AWExamApp(
       repository: repository,
       draftStore: const SharedPreferencesAttemptDraftStore(),
+      currentVersion: packageInfo.version,
     ),
   );
 }

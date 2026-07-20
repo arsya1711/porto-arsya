@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 abstract final class AppColors {
   static const navy = Color(0xFF20213D);
@@ -18,6 +17,10 @@ abstract final class AppColors {
 }
 
 abstract final class AppTheme {
+  /// Keduanya di-bundle di assets/fonts; lihat bagian `fonts` pada pubspec.yaml.
+  static const sansFamily = 'DM Sans';
+  static const displayFamily = 'Manrope';
+
   static ThemeData get light {
     final scheme = ColorScheme.fromSeed(
       seedColor: AppColors.blue,
@@ -25,40 +28,47 @@ abstract final class AppTheme {
       surface: Colors.white,
       error: AppColors.red,
     );
-    final baseText = GoogleFonts.dmSansTextTheme();
+    final baseText = ThemeData.light().textTheme.apply(fontFamily: sansFamily);
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
+      fontFamily: sansFamily,
       scaffoldBackgroundColor: AppColors.background,
       textTheme: baseText.copyWith(
-        headlineLarge: GoogleFonts.manrope(
+        headlineLarge: const TextStyle(
+          fontFamily: displayFamily,
           fontSize: 28,
           fontWeight: FontWeight.w800,
           letterSpacing: -1,
           color: AppColors.navy,
         ),
-        headlineMedium: GoogleFonts.manrope(
+        headlineMedium: const TextStyle(
+          fontFamily: displayFamily,
           fontSize: 22,
           fontWeight: FontWeight.w800,
           letterSpacing: -.7,
           color: AppColors.navy,
         ),
-        titleLarge: GoogleFonts.manrope(
+        titleLarge: const TextStyle(
+          fontFamily: displayFamily,
           fontSize: 18,
           fontWeight: FontWeight.w800,
           color: AppColors.navy,
         ),
-        titleMedium: GoogleFonts.manrope(
+        titleMedium: const TextStyle(
+          fontFamily: displayFamily,
           fontSize: 15,
           fontWeight: FontWeight.w700,
           color: AppColors.text,
         ),
-        bodyMedium: GoogleFonts.dmSans(
+        bodyMedium: const TextStyle(
+          fontFamily: sansFamily,
           fontSize: 14,
           height: 1.45,
           color: AppColors.text,
         ),
-        bodySmall: GoogleFonts.dmSans(
+        bodySmall: const TextStyle(
+          fontFamily: sansFamily,
           fontSize: 12,
           height: 1.4,
           color: AppColors.muted,
@@ -68,7 +78,8 @@ abstract final class AppTheme {
         elevation: 0,
         centerTitle: false,
         surfaceTintColor: Colors.transparent,
-        titleTextStyle: GoogleFonts.manrope(
+        titleTextStyle: const TextStyle(
+          fontFamily: displayFamily,
           fontSize: 17,
           fontWeight: FontWeight.w800,
           color: AppColors.navy,
@@ -103,7 +114,8 @@ abstract final class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          textStyle: GoogleFonts.dmSans(
+          textStyle: const TextStyle(
+            fontFamily: sansFamily,
             fontSize: 14,
             fontWeight: FontWeight.w700,
           ),

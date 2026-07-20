@@ -7,6 +7,9 @@ abstract interface class ExamRepository {
   Future<bool> restoreSession();
   Future<void> authenticate(String studentNumber, String password);
   Future<void> refreshExams();
+
+  /// Versi minimum yang masih dilayani server, atau null bila tidak diatur.
+  Future<String?> minimumSupportedVersion();
   Future<ExamSession> startExam(String examId, {String? accessCode});
   Future<void> saveAnswer({
     required String attemptId,
@@ -69,6 +72,9 @@ class UnavailableExamRepository implements ExamRepository {
   Future<void> refreshExams() {
     throw const ExamOperationException(_configurationMessage);
   }
+
+  @override
+  Future<String?> minimumSupportedVersion() async => null;
 
   @override
   Future<ExamSession> startExam(String examId, {String? accessCode}) {

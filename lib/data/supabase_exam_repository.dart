@@ -107,6 +107,21 @@ class SupabaseExamRepository implements ExamRepository {
     }
   }
 
+  @override
+  Future<String?> minimumSupportedVersion() async {
+    try {
+      // Lewat RPC, bukan select tabel: pemeriksaan berjalan sebelum siswa login
+      // sedangkan RLS school_profile_settings hanya melayani `authenticated`.
+      final version = await client.rpc('get_minimum_app_version');
+      if (version is String && version.trim().isNotEmpty) {
+        return version.trim();
+      }
+    } catch (_) {
+      // RPC belum terpasang atau server tidak terjangkau: jangan blokir siswa.
+    }
+    return null;
+  }
+
   Future<String> _loadSchoolName() async {
     try {
       final row = await client

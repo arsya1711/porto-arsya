@@ -9,12 +9,19 @@ import 'state/app_controller.dart';
 import 'theme/app_theme.dart';
 import 'ui/home_shell.dart';
 import 'ui/login_screen.dart';
+import 'ui/update_required_screen.dart';
 
 class AWExamApp extends StatefulWidget {
-  const AWExamApp({super.key, this.repository, this.draftStore});
+  const AWExamApp({
+    super.key,
+    this.repository,
+    this.draftStore,
+    this.currentVersion,
+  });
 
   final ExamRepository? repository;
   final AttemptDraftStore? draftStore;
+  final String? currentVersion;
 
   @override
   State<AWExamApp> createState() => _AWExamAppState();
@@ -29,6 +36,7 @@ class _AWExamAppState extends State<AWExamApp> {
     controller = AppController(
       widget.repository ?? DemoRepository(),
       draftStore: widget.draftStore,
+      currentVersion: widget.currentVersion,
     );
     unawaited(controller.initialize());
   }
@@ -51,6 +59,12 @@ class _AWExamAppState extends State<AWExamApp> {
           if (controller.isInitializing) {
             return const Scaffold(
               body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          if (controller.updateRequired) {
+            return UpdateRequiredScreen(
+              currentVersion: widget.currentVersion ?? '-',
+              minimumVersion: controller.minimumVersion,
             );
           }
           return controller.isLoggedIn

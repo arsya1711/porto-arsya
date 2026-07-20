@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Jawaban ujian, draft offline, dan sesi Supabase tidak boleh keluar dari
+  perangkat. Aturan ini menutup jalur cadangan cloud maupun transfer antarperangkat
+  pada Android 12+; android:allowBackup="false" menutup jalur yang sama di versi
+  sebelumnya.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" />
+        <exclude domain="database" />
+        <exclude domain="file" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" />
+        <exclude domain="database" />
+        <exclude domain="file" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>

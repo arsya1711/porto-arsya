@@ -1,10 +1,10 @@
-import 'package:fake_async/fake_async.dart';
-import 'package:flutter_test/flutter_test.dart';
 import 'package:awexam/data/attempt_draft_store.dart';
 import 'package:awexam/data/demo_repository.dart';
-import 'package:awexam/data/exam_repository.dart';
-import 'package:awexam/models/models.dart';
 import 'package:awexam/state/app_controller.dart';
+import 'package:fake_async/fake_async.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'support/fake_exam_repository.dart';
 
 void main() {
   group('AppController login', () {
@@ -29,7 +29,7 @@ void main() {
     test(
       'loads server session, saves answers, and submits the attempt',
       () async {
-        final repository = _RecordingRepository();
+        final repository = FakeExamRepository();
         final controller = AppController(repository);
         addTearDown(controller.dispose);
 
@@ -56,7 +56,7 @@ void main() {
     );
 
     test('does not submit while an answer cannot be synchronized', () async {
-      final repository = _RecordingRepository(failSaves: true);
+      final repository = FakeExamRepository(failSaves: true);
       final controller = AppController(repository);
       addTearDown(controller.dispose);
 
@@ -71,7 +71,7 @@ void main() {
     });
 
     test('serializes rapid changes so the latest answer wins', () async {
-      final repository = _RecordingRepository(delayedValue: '0');
+      final repository = FakeExamRepository(delayedValue: '0');
       final controller = AppController(repository);
       addTearDown(controller.dispose);
 
@@ -85,7 +85,7 @@ void main() {
     });
 
     test('finalizes an expired attempt without sending late answers', () async {
-      final repository = _RecordingRepository(expiredSession: true);
+      final repository = FakeExamRepository(expiredSession: true);
       final controller = AppController(repository);
       addTearDown(controller.dispose);
 
@@ -102,7 +102,7 @@ void main() {
     test('recomputes the countdown from the server deadline', () async {
       final base = DateTime(2026, 1, 1, 8);
       var now = base;
-      final repository = _RecordingRepository(startedAt: base);
+      final repository = FakeExamRepository(startedAt: base);
       final controller = AppController(repository, clock: () => now);
       addTearDown(controller.dispose);
 
@@ -120,7 +120,7 @@ void main() {
     test('auto-submits when the deadline passes while suspended', () async {
       final base = DateTime(2026, 1, 1, 8);
       var now = base;
-      final repository = _RecordingRepository(startedAt: base);
+      final repository = FakeExamRepository(startedAt: base);
       final controller = AppController(repository, clock: () => now);
       addTearDown(controller.dispose);
 
@@ -138,7 +138,7 @@ void main() {
       fakeAsync((async) {
         final base = DateTime(2026, 1, 1, 8);
         var now = base;
-        final repository = _RecordingRepository(
+        final repository = FakeExamRepository(
           startedAt: base,
           failSubmits: true,
         );
@@ -161,7 +161,7 @@ void main() {
   group('AppController offline draft', () {
     test('keeps unsynced answers when the attempt is resumed', () async {
       final store = InMemoryAttemptDraftStore();
-      final offline = _RecordingRepository(failSaves: true);
+      final offline = FakeExamRepository(failSaves: true);
       final controller = AppController(offline, draftStore: store);
 
       await controller.startExam(offline.exams.single);
@@ -172,7 +172,7 @@ void main() {
       // Aplikasi ditutup paksa sebelum jawaban sempat tersinkron.
       controller.dispose();
 
-      final online = _RecordingRepository();
+      final online = FakeExamRepository();
       final resumed = AppController(online, draftStore: store);
       addTearDown(resumed.dispose);
 
@@ -187,7 +187,7 @@ void main() {
 
     test('prefers the server answer once the draft is synced', () async {
       final store = InMemoryAttemptDraftStore();
-      final repository = _RecordingRepository(
+      final repository = FakeExamRepository(
         savedServerAnswers: const {'question-1': '1'},
       );
       final controller = AppController(repository, draftStore: store);
@@ -204,7 +204,7 @@ void main() {
 
     test('ignores a draft that belongs to another attempt', () async {
       final store = InMemoryAttemptDraftStore();
-      final first = _RecordingRepository(failSaves: true);
+      final first = FakeExamRepository(failSaves: true);
       final controller = AppController(first, draftStore: store);
 
       await controller.startExam(first.exams.single);
@@ -212,7 +212,7 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       controller.dispose();
 
-      final other = _RecordingRepository(attemptId: 'attempt-2');
+      final other = FakeExamRepository(attemptId: 'attempt-2');
       final resumed = AppController(other, draftStore: store);
       addTearDown(resumed.dispose);
 
@@ -222,115 +222,4 @@ void main() {
       expect(resumed.unsyncedCount, 0);
     });
   });
-}
-
-class _RecordingRepository implements ExamRepository {
-  _RecordingRepository({
-    this.failSaves = false,
-    this.delayedValue,
-    this.expiredSession = false,
-    this.failSubmits = false,
-    this.attemptId = 'attempt-1',
-    this.startedAt,
-    this.savedServerAnswers = const {},
-  });
-
-  final bool failSaves;
-  final String? delayedValue;
-  final bool expiredSession;
-  final bool failSubmits;
-  final String attemptId;
-  final DateTime? startedAt;
-  final Map<String, String> savedServerAnswers;
-  final Map<String, String> savedAnswers = {};
-  String? submittedAttemptId;
-  int saveCalls = 0;
-
-  @override
-  StudentProfile get profile => const StudentProfile(
-    name: 'Siswa Uji',
-    studentNumber: '1001',
-    className: 'IX A',
-    school: 'AWExam',
-  );
-
-  @override
-  List<Exam> get exams => [
-    Exam(
-      id: 'exam-1',
-      title: 'Ujian Uji',
-      subject: 'Matematika',
-      subjectCode: 'MTK',
-      teacher: 'Guru',
-      schedule: DateTime.now(),
-      durationMinutes: 60,
-      questionCount: 1,
-      state: ExamState.available,
-      instructions: const [],
-    ),
-  ];
-
-  @override
-  Future<bool> restoreSession() async => false;
-
-  @override
-  Future<void> authenticate(String studentNumber, String password) async {}
-
-  @override
-  Future<void> refreshExams() async {}
-
-  @override
-  Future<ExamSession> startExam(String examId, {String? accessCode}) async {
-    final now = startedAt ?? DateTime.now();
-    return ExamSession(
-      attemptId: attemptId,
-      startedAt: now,
-      deadline: expiredSession
-          ? now.subtract(const Duration(seconds: 1))
-          : now.add(const Duration(hours: 1)),
-      questions: const [
-        ExamQuestion(
-          id: 'question-1',
-          type: QuestionType.multipleChoice,
-          body: 'Pilih jawaban.',
-          options: ['A', 'B', 'C'],
-        ),
-      ],
-      savedAnswers: savedServerAnswers,
-    );
-  }
-
-  @override
-  Future<void> saveAnswer({
-    required String attemptId,
-    required ExamQuestion question,
-    required String value,
-  }) async {
-    saveCalls++;
-    if (failSaves) {
-      throw const ExamOperationException('Jawaban belum tersimpan.');
-    }
-    if (value == delayedValue) {
-      await Future<void>.delayed(const Duration(milliseconds: 20));
-    }
-    savedAnswers[question.id] = value;
-  }
-
-  @override
-  Future<void> submitExam(String attemptId) async {
-    if (failSubmits) {
-      throw const ExamOperationException('Server tidak dapat dihubungi.');
-    }
-    submittedAttemptId = attemptId;
-  }
-
-  @override
-  Future<void> recordIntegrityEvent({
-    required String attemptId,
-    required String examId,
-    required String eventType,
-  }) async {}
-
-  @override
-  Future<void> signOut() async {}
 }

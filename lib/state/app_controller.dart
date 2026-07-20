@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../data/app_version.dart';
 import '../data/attempt_draft_store.dart';
 import '../data/exam_repository.dart';
 import '../models/models.dart';
@@ -11,8 +12,12 @@ class AppController extends ChangeNotifier {
     this.repository, {
     AttemptDraftStore? draftStore,
     DateTime Function()? clock,
+    this.currentVersion,
   }) : draftStore = draftStore ?? InMemoryAttemptDraftStore(),
        _now = clock ?? DateTime.now;
+
+  /// Versi aplikasi yang sedang berjalan; null berarti gerbang versi dilewati.
+  final String? currentVersion;
 
   /// Sumber waktu; dapat diganti pada pengujian untuk mensimulasikan suspensi.
   final DateTime Function() _now;
@@ -25,6 +30,8 @@ class AppController extends ChangeNotifier {
   String? operationError;
   bool isLoggedIn = false;
   bool isInitializing = false;
+  bool updateRequired = false;
+  String? minimumVersion;
   bool isAuthenticating = false;
   bool isStartingExam = false;
   bool isSubmitting = false;
@@ -59,10 +66,28 @@ class AppController extends ChangeNotifier {
     isInitializing = true;
     notifyListeners();
     try {
+      await _checkSupportedVersion();
+      if (updateRequired) return;
       isLoggedIn = await repository.restoreSession();
     } finally {
       isInitializing = false;
       notifyListeners();
+    }
+  }
+
+  /// Gerbang versi sengaja gagal terbuka: kegagalan jaringan atau konfigurasi
+  /// yang tidak valid tidak boleh menghalangi siswa mengikuti ujian.
+  Future<void> _checkSupportedVersion() async {
+    final version = currentVersion;
+    if (version == null) return;
+    try {
+      minimumVersion = await repository.minimumSupportedVersion();
+      updateRequired = isUpdateRequired(
+        currentVersion: version,
+        minimumVersion: minimumVersion,
+      );
+    } catch (_) {
+      updateRequired = false;
     }
   }
 
