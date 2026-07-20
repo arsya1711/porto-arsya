@@ -8,7 +8,9 @@ import {
 } from "react";
 import {
   BookOpen,
+  FileUp,
   FileQuestion,
+  ListChecks,
   Pencil,
   Plus,
   Search,
@@ -18,7 +20,11 @@ import {
 } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { supabase } from "../lib/supabase";
+import type { ParsedPdfQuestion } from "../lib/pdf-question-parser";
+import { findSimilarQuestion, normalizeQuestion } from "../lib/question-similarity";
 import { type Question } from "../types";
+import { PdfQuestionImportModal } from "./PdfQuestionImportModal";
+import { QuestionBulkToolsModal } from "./QuestionBulkToolsModal";
 
 type Notify = (text: string, error?: boolean) => void;
 type SubjectOption = { id: string; name: string };
@@ -75,6 +81,9 @@ export function QuestionBank({ notify }: { notify: Notify }) {
   const [subjects, setSubjects] = useState<SubjectOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [createQuestion, setCreateQuestion] = useState(false);
+  const [importPdf, setImportPdf] = useState(false);
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<Set<string>>(new Set());
+  const [bulkTools, setBulkTools] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [createBank, setCreateBank] = useState(false);
   const [editingBank, setEditingBank] = useState<Bank | null>(null);
@@ -148,6 +157,7 @@ export function QuestionBank({ notify }: { notify: Notify }) {
 
     setSubjects(subjectResult.data ?? []);
     setQuestions(normalizedQuestions);
+    setSelectedQuestionIds(new Set());
     setBanks(normalizedBanks);
     setLoading(false);
   }, [notify]);
@@ -224,6 +234,130 @@ export function QuestionBank({ notify }: { notify: Notify }) {
         error instanceof Error ? error.message : "Soal gagal disimpan",
         true,
       );
+      return false;
+    }
+  };
+
+  const importQuestions = async (
+    bankId: string,
+    importedQuestions: ParsedPdfQuestion[],
+  ) => {
+    try {
+      if (!supabase || !profile?.id) {
+        throw new Error("Sesi guru tidak tersedia. Silakan masuk kembali.");
+      }
+      if (!banks.some((bank) => bank.id === bankId)) {
+        throw new Error("Bank soal tujuan tidak ditemukan.");
+      }
+      if (!importedQuestions.length || importedQuestions.length > 100) {
+        throw new Error("Pilih antara 1 sampai 100 soal untuk diimpor.");
+      }
+
+      const payload = importedQuestions.map((question) => ({
+        bank_id: bankId,
+        body: question.text.trim(),
+        type:
+          question.type === "Pilihan Ganda" ? "multiple_choice" : "essay",
+        options:
+          question.type === "Pilihan Ganda"
+            ? question.options.map((option) => option.trim())
+            : null,
+        correct_option:
+          question.type === "Pilihan Ganda" ? question.correctOption : null,
+        answer_key:
+          question.type === "Essay" ? question.answerKey.trim() : null,
+        difficulty: question.difficulty.toLowerCase(),
+        weight: question.weight,
+        created_by: profile.id,
+      }));
+      const { error } = await supabase.from("questions").insert(payload);
+      if (error) throw error;
+
+      await loadData();
+      setSelectedBank(bankId);
+      setImportPdf(false);
+      notify(`${payload.length} soal dari PDF berhasil diimpor`);
+      return true;
+    } catch (error) {
+      notify(
+        error instanceof Error ? error.message : "Soal dari PDF gagal diimpor",
+        true,
+      );
+      return false;
+    }
+  };
+
+  const selectedQuestions = questions.filter((question) =>
+    selectedQuestionIds.has(question.id),
+  );
+
+  const copySelectedQuestions = async (targetBankId: string) => {
+    try {
+      if (!supabase || !profile?.id) throw new Error("Sesi guru tidak tersedia.");
+      const targetBodies = questions
+        .filter((question) => question.bankId === targetBankId)
+        .map((question) => question.text);
+      const copied: Question[] = [];
+      let skipped = 0;
+      for (const question of selectedQuestions) {
+        const exact = targetBodies.some(
+          (body) => normalizeQuestion(body) === normalizeQuestion(question.text),
+        );
+        if (exact || findSimilarQuestion(question.text, targetBodies)) {
+          skipped++;
+          continue;
+        }
+        copied.push(question);
+        targetBodies.push(question.text);
+      }
+      if (!copied.length) throw new Error("Semua soal sudah ada atau sangat mirip di bank tujuan.");
+      const { error } = await supabase.from("questions").insert(
+        copied.map((question) => ({
+          bank_id: targetBankId,
+          body: question.text,
+          type: question.type === "Pilihan Ganda" ? "multiple_choice" : "essay",
+          options: question.type === "Pilihan Ganda" ? question.options : null,
+          correct_option: question.type === "Pilihan Ganda" ? question.correctOption : null,
+          answer_key: question.type === "Essay" ? question.answerKey : null,
+          difficulty: question.difficulty.toLowerCase(),
+          weight: question.weight ?? 1,
+          created_by: profile.id,
+        })),
+      );
+      if (error) throw error;
+      await loadData();
+      setBulkTools(false);
+      notify(`${copied.length} soal disalin${skipped ? `, ${skipped} duplikat dilewati` : ""}`);
+      return true;
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Soal gagal disalin", true);
+      return false;
+    }
+  };
+
+  const updateSelectedQuestions = async (update: {
+    bankId?: string;
+    difficulty?: Question["difficulty"];
+    weight?: number;
+  }) => {
+    try {
+      if (!supabase || !selectedQuestions.length) throw new Error("Tidak ada soal yang dipilih.");
+      const payload: Record<string, string | number> = {};
+      if (update.bankId) payload.bank_id = update.bankId;
+      if (update.difficulty) payload.difficulty = update.difficulty.toLowerCase();
+      if (update.weight !== undefined) payload.weight = update.weight;
+      if (!Object.keys(payload).length) throw new Error("Pilih perubahan yang akan diterapkan.");
+      const { error } = await supabase
+        .from("questions")
+        .update(payload)
+        .in("id", selectedQuestions.map((question) => question.id));
+      if (error) throw error;
+      await loadData();
+      setBulkTools(false);
+      notify(`${selectedQuestions.length} soal berhasil diperbarui`);
+      return true;
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Perubahan massal gagal", true);
       return false;
     }
   };
@@ -393,6 +527,18 @@ export function QuestionBank({ notify }: { notify: Notify }) {
             <BookOpen /> Bank baru
           </button>
           <button
+            onClick={() => setImportPdf(true)}
+            disabled={!banks.length}
+            title={!banks.length ? "Buat bank soal terlebih dahulu" : undefined}
+          >
+            <FileUp /> Impor soal
+          </button>
+          {selectedQuestionIds.size > 0 && (
+            <button onClick={() => setBulkTools(true)}>
+              <ListChecks /> Kelola {selectedQuestionIds.size}
+            </button>
+          )}
+          <button
             className="primary"
             onClick={() => setCreateQuestion(true)}
             disabled={!banks.length}
@@ -490,6 +636,21 @@ export function QuestionBank({ notify }: { notify: Notify }) {
           <table>
             <thead>
               <tr>
+                <th className="question-select-column">
+                  <input
+                    type="checkbox"
+                    aria-label="Pilih semua soal yang tampil"
+                    checked={visibleQuestions.length > 0 && visibleQuestions.every((question) => selectedQuestionIds.has(question.id))}
+                    onChange={(event) => setSelectedQuestionIds((current) => {
+                      const next = new Set(current);
+                      for (const question of visibleQuestions) {
+                        if (event.target.checked) next.add(question.id);
+                        else next.delete(question.id);
+                      }
+                      return next;
+                    })}
+                  />
+                </th>
                 <th>SOAL</th>
                 <th>TIPE</th>
                 <th>TINGKAT</th>
@@ -504,6 +665,19 @@ export function QuestionBank({ notify }: { notify: Notify }) {
               ) : visibleQuestions.length ? (
                 visibleQuestions.map((question) => (
                   <tr key={question.id}>
+                    <td className="question-select-column">
+                      <input
+                        type="checkbox"
+                        aria-label={`Pilih soal ${question.text}`}
+                        checked={selectedQuestionIds.has(question.id)}
+                        onChange={(event) => setSelectedQuestionIds((current) => {
+                          const next = new Set(current);
+                          if (event.target.checked) next.add(question.id);
+                          else next.delete(question.id);
+                          return next;
+                        })}
+                      />
+                    </td>
                     <td>
                       <div className="question-cell">
                         <small>
@@ -575,6 +749,24 @@ export function QuestionBank({ notify }: { notify: Notify }) {
           save={saveQuestion}
         />
       )}
+      {importPdf && (
+        <PdfQuestionImportModal
+          banks={banks}
+          existingQuestions={questions}
+          initialBankId={selectedBank === "all" ? undefined : selectedBank}
+          close={() => setImportPdf(false)}
+          save={importQuestions}
+        />
+      )}
+      {bulkTools && selectedQuestions.length > 0 && (
+        <QuestionBulkToolsModal
+          questions={selectedQuestions}
+          banks={banks}
+          close={() => setBulkTools(false)}
+          copyQuestions={copySelectedQuestions}
+          updateQuestions={updateSelectedQuestions}
+        />
+      )}
       {(createBank || editingBank) && (
         <BankModal
           subjects={subjects}
@@ -613,7 +805,7 @@ function Summary({
 function EmptyRow({ text }: { text: string }) {
   return (
     <tr>
-      <td colSpan={6} className="question-empty">
+      <td colSpan={7} className="question-empty">
         {text}
       </td>
     </tr>

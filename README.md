@@ -11,7 +11,7 @@ Panduan varian logo putih tersedia di [`docs/PANDUAN_LOGO_PUTIH.md`](docs/PANDUA
 - Manajemen akun admin: buat akun, aktif/nonaktif, dan reset kata sandi sementara
 - Dashboard aktivitas sekolah
 - Daftar ujian dan wizard pembuatan ujian
-- Bank soal pilihan ganda/essay
+- Bank soal pilihan ganda/essay, termasuk impor massal dari PDF
 - Manajemen kelas dan siswa
 - Koreksi essay per siswa
 - Laporan nilai dan analisis butir soal
@@ -82,6 +82,51 @@ npx supabase secrets set APP_ORIGIN=https://domain-sekolah.example
 6. Tambahkan URL website ke Authentication → URL Configuration → Redirect URLs agar tautan reset kata sandi kembali ke aplikasi dengan benar.
 
 Seluruh role diambil dari profil pengguna terautentikasi, bukan dari `localStorage`.
+
+## Impor dan pengelolaan soal massal
+
+Pada halaman **Bank Soal**, pilih **Impor soal**, tentukan bank tujuan, kemudian
+gunakan salah satu sumber berikut:
+
+- PDF berbasis teks/searchable PDF;
+- teks yang ditempel dari Word, WhatsApp, atau dokumen lain;
+- dokumen Word `.docx`;
+- teks Moodle GIFT;
+- paket QTI `.xml` atau `.zip`.
+
+Ukuran berkas dibatasi 10 MB dan maksimal 100 soal per proses. PDF hasil
+scan/gambar perlu diubah menjadi searchable PDF terlebih dahulu.
+
+Gunakan format berikut di Word atau Google Docs, kemudian ekspor sebagai PDF:
+
+```text
+SOAL 1
+TIPE: PG
+PERTANYAAN: Hasil dari 2 + 3 adalah ...
+A. 4
+B. 5
+C. 6
+D. 7
+KUNCI: B
+KESULITAN: Mudah
+BOBOT: 1
+
+SOAL 2
+TIPE: ESSAY
+PERTANYAAN: Jelaskan proses fotosintesis.
+JAWABAN: Tumbuhan mengubah air dan karbon dioksida menjadi glukosa dengan bantuan cahaya.
+KESULITAN: Sedang
+BOBOT: 2
+```
+
+Preview akan menandai format tidak valid dan soal yang sudah ada di bank tujuan.
+Deteksi duplikat juga mengenali pertanyaan dengan perubahan teks kecil. Hanya
+soal valid yang dipilih pengguna yang dikirim ke Supabase.
+
+Gunakan checkbox pada tabel untuk memilih banyak soal. Tombol **Kelola** dapat
+menyalin soal ke bank lain atau mengubah bank, kesulitan, dan bobot secara
+massal. Soal pada ujian terjadwal atau yang sudah dikerjakan tetap dilindungi
+oleh trigger database dan tidak dapat diubah.
 
 ## Verifikasi
 
