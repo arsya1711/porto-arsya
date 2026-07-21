@@ -11,7 +11,7 @@ Panduan varian logo putih tersedia di [`docs/PANDUAN_LOGO_PUTIH.md`](docs/PANDUA
 - Manajemen akun admin: buat akun, aktif/nonaktif, dan reset kata sandi sementara
 - Dashboard aktivitas sekolah
 - Daftar ujian dan wizard pembuatan ujian
-- Bank soal pilihan ganda/essay, termasuk impor massal dari PDF
+- Bank soal pilihan ganda/essay, termasuk impor massal dari PDF dan foto/OCR
 - Manajemen kelas dan siswa
 - Koreksi essay per siswa
 - Laporan nilai dan analisis butir soal
@@ -89,13 +89,16 @@ Pada halaman **Bank Soal**, pilih **Impor soal**, tentukan bank tujuan, kemudian
 gunakan salah satu sumber berikut:
 
 - PDF berbasis teks/searchable PDF;
+- foto soal JPG, PNG, atau WebP dengan OCR bahasa Indonesia;
 - teks yang ditempel dari Word, WhatsApp, atau dokumen lain;
 - dokumen Word `.docx`;
 - teks Moodle GIFT;
 - paket QTI `.xml` atau `.zip`.
 
-Ukuran berkas dibatasi 10 MB dan maksimal 100 soal per proses. PDF hasil
-scan/gambar perlu diubah menjadi searchable PDF terlebih dahulu.
+Ukuran berkas dibatasi 10 MB dan maksimal 100 soal per proses. Impor foto
+menerima maksimal lima gambar per proses. OCR berjalan di browser; saat pertama
+kali digunakan, browser mengunduh mesin dan data bahasa OCR lalu menyimpannya
+ke cache. Foto tidak dikirim ke backend AWExam.
 
 Gunakan format berikut di Word atau Google Docs, kemudian ekspor sebagai PDF:
 

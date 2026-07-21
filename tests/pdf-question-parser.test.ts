@@ -3,6 +3,10 @@ import test from "node:test";
 import { parsePdfQuestions } from "../src/lib/pdf-question-parser";
 import { parseGiftQuestions } from "../src/lib/question-import-formats";
 import { questionSimilarity } from "../src/lib/question-similarity";
+import {
+  normalizeOcrQuestionText,
+  validateImageFiles,
+} from "../src/lib/image-question-ocr";
 
 test("parser PDF membaca soal pilihan ganda dan essay", () => {
   const result = parsePdfQuestions(`
@@ -100,4 +104,55 @@ test("deteksi kemiripan mengenali soal dengan perubahan kecil", () => {
   );
   assert.ok(score >= 0.88);
   assert.ok(questionSimilarity("Berapakah 2 + 2?", "Sebutkan ibu kota Indonesia") < 0.5);
+});
+
+test("normalisasi OCR mengubah nomor soal dan memperbaiki penanda umum", () => {
+  const normalized = normalizeOcrQuestionText(`
+1. Hasil dari 2 + 3 adalah ...
+A. 4
+B. 5
+cC. 6
+D. 7
+KUNC1: B
+
+2) Sebutkan ibu kota Indonesia.
+JAWABAN: Jakarta
+`);
+
+  assert.match(normalized, /SOAL 1\nPERTANYAAN: Hasil dari 2 \+ 3/);
+  assert.match(normalized, /KUNCI: B/);
+  assert.match(normalized, /SOAL 2\nPERTANYAAN: Sebutkan ibu kota/);
+
+  const parsed = parsePdfQuestions(normalized);
+  assert.equal(parsed.questions.length, 2);
+  assert.equal(parsed.questions[0].correctOption, 1);
+  assert.equal(parsed.questions[1].answerKey, "Jakarta");
+});
+
+test("validasi foto membatasi format, ukuran, dan jumlah berkas", () => {
+  assert.deepEqual(
+    validateImageFiles([
+      { name: "soal.jpg", type: "image/jpeg", size: 1024 },
+      { name: "soal.webp", type: "image/webp", size: 2048 },
+    ]),
+    [],
+  );
+  assert.match(
+    validateImageFiles([{ name: "soal.gif", type: "image/gif", size: 1 }])[0],
+    /JPG, PNG, atau WebP/,
+  );
+  assert.match(
+    validateImageFiles([{ name: "besar.png", type: "image/png", size: 11 * 1024 * 1024 }])[0],
+    /10 MB/,
+  );
+  assert.match(
+    validateImageFiles(
+      Array.from({ length: 6 }, (_, index) => ({
+        name: `${index}.jpg`,
+        type: "image/jpeg",
+        size: 1,
+      })),
+    )[0],
+    /Maksimal 5 foto/,
+  );
 });

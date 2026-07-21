@@ -16,6 +16,10 @@ import {
   extractQtiQuestions,
   parseGiftQuestions,
 } from "../lib/question-import-formats";
+import {
+  extractImageQuestions,
+  type ImageOcrProgress,
+} from "../lib/image-question-ocr";
 import type { Question } from "../types";
 import { findSimilarQuestion, normalizeQuestion } from "../lib/question-similarity";
 
@@ -41,7 +45,7 @@ export function PdfQuestionImportModal({
   save,
 }: Props) {
   const [source, setSource] = useState<
-    "pdf" | "paste" | "docx" | "gift" | "qti"
+    "pdf" | "image" | "paste" | "docx" | "gift" | "qti"
   >("pdf");
   const [bankId, setBankId] = useState(initialBankId ?? banks[0]?.id ?? "");
   const [sourceText, setSourceText] = useState("");
@@ -52,6 +56,7 @@ export function PdfQuestionImportModal({
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [parsing, setParsing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState<ImageOcrProgress | null>(null);
 
   const existingBodies = useMemo(
     () =>
@@ -106,6 +111,7 @@ export function PdfQuestionImportModal({
     setQuestions([]);
     setSelected(new Set());
     setParseErrors([]);
+    setOcrProgress(null);
   };
 
   const choosePdf = async (file?: File) => {
@@ -158,6 +164,34 @@ export function PdfQuestionImportModal({
     }
   };
 
+  const chooseImages = async (fileList?: FileList | null) => {
+    const files = Array.from(fileList ?? []);
+    if (!files.length) return;
+    setParsing(true);
+    resetResult();
+    try {
+      const result = await extractImageQuestions(files, setOcrProgress);
+      setSourceText(result.text);
+      applyResult(
+        result.parsed,
+        files.length === 1 ? files[0].name : `${files.length} foto`,
+        files.length,
+      );
+      setOcrProgress({
+        current: files.length,
+        total: files.length,
+        progress: 1,
+        status: "OCR selesai",
+      });
+    } catch (error) {
+      setParseErrors([
+        error instanceof Error ? error.message : "Foto tidak dapat diproses.",
+      ]);
+    } finally {
+      setParsing(false);
+    }
+  };
+
   const parseTextSource = () => {
     resetResult();
     if (!sourceText.trim()) {
@@ -168,7 +202,12 @@ export function PdfQuestionImportModal({
       source === "gift"
         ? parseGiftQuestions(sourceText)
         : parsePdfQuestions(sourceText),
-      source === "gift" ? "Teks GIFT" : "Teks yang ditempel",
+      source === "gift"
+        ? "Teks GIFT"
+        : source === "image"
+          ? fileName || "Hasil OCR foto"
+          : "Teks yang ditempel",
+      source === "image" ? pageCount : 0,
     );
   };
 
@@ -218,6 +257,7 @@ export function PdfQuestionImportModal({
             <div className="question-import-tabs">
               {([
                 ["pdf", "PDF"],
+                ["image", "Foto/OCR"],
                 ["paste", "Tempel teks"],
                 ["docx", "Word/DOCX"],
                 ["gift", "GIFT"],
@@ -259,6 +299,51 @@ export function PdfQuestionImportModal({
                 <input type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" disabled={parsing || saving} onChange={(event) => void chooseDocx(event.target.files?.[0])} />
               </label>
             )}
+            {source === "image" && (
+              <>
+                <label className={`pdf-file-picker ${parsing ? "disabled" : ""}`}>
+                  <Upload />
+                  <span>
+                    <b>{parsing ? "Membaca foto…" : "Pilih atau ambil foto soal"}</b>
+                    <small>JPG, PNG, atau WebP · maksimal 5 foto, masing-masing 10 MB</small>
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    disabled={parsing || saving}
+                    onChange={(event) => void chooseImages(event.target.files)}
+                  />
+                </label>
+                {ocrProgress && (
+                  <div className="ocr-progress" aria-live="polite">
+                    <div>
+                      <span>{ocrProgress.status}</span>
+                      <b>{Math.round(ocrProgress.progress * 100)}%</b>
+                    </div>
+                    <progress value={ocrProgress.progress} max={1} />
+                    <small>
+                      Foto {ocrProgress.current} dari {ocrProgress.total}. Pemrosesan dilakukan di perangkat ini.
+                    </small>
+                  </div>
+                )}
+                {sourceText && (
+                  <div className="question-paste-source ocr-text-review">
+                    <label htmlFor="ocr-question-text">Periksa dan koreksi hasil OCR</label>
+                    <textarea
+                      id="ocr-question-text"
+                      rows={10}
+                      value={sourceText}
+                      disabled={parsing || saving}
+                      onChange={(event) => setSourceText(event.target.value)}
+                    />
+                    <button type="button" className="primary" disabled={parsing || saving} onClick={parseTextSource}>
+                      Perbarui preview
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
             {source === "qti" && (
               <label className={`pdf-file-picker ${parsing ? "disabled" : ""}`}>
                 <Upload />
@@ -278,11 +363,13 @@ export function PdfQuestionImportModal({
               </div>
             )}
 
-            {(source === "pdf" || source === "paste" || source === "docx") && <details className="pdf-format-guide">
+            {(source === "pdf" || source === "image" || source === "paste" || source === "docx") && <details className="pdf-format-guide">
               <summary>Format teks yang didukung</summary>
               <p>
                 Buat dokumen di Word/Google Docs dengan format berikut, lalu
-                simpan sebagai PDF. PDF hasil scan gambar belum didukung.
+                simpan sebagai PDF, unggah DOCX, atau foto dokumennya. Untuk
+                hasil OCR foto, periksa kembali teks dan tambahkan KUNCI atau
+                JAWABAN jika belum tercetak pada foto.
               </p>
               <pre>{`SOAL 1
 TIPE: PG

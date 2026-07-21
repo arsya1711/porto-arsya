@@ -75,6 +75,15 @@ import { BrandLogo } from "./components/BrandLogo";
 
 type Toast = { text: string; error?: boolean } | null;
 
+const DEFAULT_SCHOOL_NAME = "Mts Alhidayah Wattaqwa";
+
+function formatSchoolName(name?: string | null) {
+  const cleanName = name?.trim() || DEFAULT_SCHOOL_NAME;
+  return /^mts(?:\s|$)/i.test(cleanName)
+    ? cleanName.replace(/^mts\b/i, "Mts")
+    : `Mts ${cleanName}`;
+}
+
 function App() {
   return (
     <AuthProvider>
@@ -315,7 +324,7 @@ function Login({
           <div className="school-mark">
             <BrandLogo />
           </div>
-          <span>Mts Alhidayah Wattaqwa</span>
+          <span>{DEFAULT_SCHOOL_NAME}</span>
         </div>
         <div className="brand-copy">
           <span>AWEXAM</span>
@@ -356,7 +365,7 @@ function Login({
             <BrandLogo />
             <span>
               AWExam
-              <small>Mts Alhidayah Wattaqwa</small>
+              <small>{DEFAULT_SCHOOL_NAME}</small>
             </span>
           </div>
           <p className="overline">PORTAL SEKOLAH</p>
@@ -424,12 +433,12 @@ function Portal({
   const location = useLocation();
   const role = profile.role;
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
-  const [schoolBrand, setSchoolBrand] = useState({ name: "Portal Sekolah", logoUrl: "" });
+  const [schoolBrand, setSchoolBrand] = useState({ name: DEFAULT_SCHOOL_NAME, logoUrl: "" });
   useEffect(() => {
     const loadBrand = async () => {
       if (!supabase) return;
       const { data } = await supabase.from("school_profile_settings").select("school_name,logo_url").eq("id", 1).maybeSingle();
-      if (data) setSchoolBrand({ name: data.school_name || "Portal Sekolah", logoUrl: data.logo_url || "" });
+      if (data) setSchoolBrand({ name: formatSchoolName(data.school_name), logoUrl: data.logo_url || "" });
     };
     void loadBrand();
     window.addEventListener("school-settings-updated", loadBrand);
