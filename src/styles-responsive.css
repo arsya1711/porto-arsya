@@ -92,8 +92,8 @@ img {
   display: none;
 }
 
-/* Tablet: a fixed 236px sidebar leaves too little room on portrait screens. */
-@media (max-width: 1180px) {
+/* Compact layouts and large touch tablets use the drawer navigation. */
+@media (max-width: 1180px), (min-width: 1181px) and (max-width: 1366px) and (pointer: coarse) {
   .portal-sidebar {
     display: none;
   }
@@ -143,6 +143,13 @@ img {
 
   .mobile-menu {
     display: grid;
+  }
+
+  .mobile-menu,
+  .top-actions > button,
+  .top-actions .top-action-wrap > button {
+    width: 44px;
+    height: 44px;
   }
 
   .portal-mobile-nav {
@@ -211,7 +218,7 @@ img {
   display: none;
 }
 
-@media (max-width: 1365px) {
+@media (max-width: 1366px) {
   .question-layout {
     display: block;
   }
@@ -251,31 +258,69 @@ img {
   }
 }
 
+@media (max-width: 1366px) and (pointer: coarse) {
+  .student-header > div > button,
+  .runner-stats > button,
+  .question-top button,
+  .question-area > footer button,
+  .school-logo .logo-upload {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .modal {
+    max-height: calc(100dvh - 40px);
+    overscroll-behavior: contain;
+  }
+
+  .simple-modal > header,
+  .wizard > header {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: #fff;
+  }
+
+  .simple-modal > footer,
+  .wizard > footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    background: #fff;
+  }
+
+  .real-exam-modal .modal-content,
+  .real-exam-modal .real-question-picker {
+    max-height: none;
+    overflow: visible;
+  }
+}
+
 /* Question/exam tables need a little more room than other data tables. */
 @media (min-width: 761px) and (max-width: 860px) {
-  :is(.question-table, .exam-management-table).responsive-card-table {
+  :is(.question-table, .exam-management-table, .users-table).responsive-card-table {
     overflow: visible;
     border: 0;
     border-radius: 0;
     background: transparent;
   }
 
-  :is(.question-table, .exam-management-table).responsive-card-table table {
+  :is(.question-table, .exam-management-table, .users-table).responsive-card-table table {
     display: block;
     width: 100%;
     min-width: 0;
   }
 
-  :is(.question-table, .exam-management-table).responsive-card-table thead {
+  :is(.question-table, .exam-management-table, .users-table).responsive-card-table thead {
     display: none;
   }
 
-  :is(.question-table, .exam-management-table).responsive-card-table tbody {
+  :is(.question-table, .exam-management-table, .users-table).responsive-card-table tbody {
     display: grid;
     gap: 10px;
   }
 
-  :is(.question-table, .exam-management-table).responsive-card-table tbody tr {
+  :is(.question-table, .exam-management-table, .users-table).responsive-card-table tbody tr {
     display: block;
     overflow: hidden;
     border: 1px solid #e4e8ef;
@@ -284,7 +329,7 @@ img {
     box-shadow: 0 4px 14px rgba(23, 35, 60, 0.04);
   }
 
-  :is(.question-table, .exam-management-table).responsive-card-table tbody td {
+  :is(.question-table, .exam-management-table, .users-table).responsive-card-table tbody td {
     display: grid;
     grid-template-columns: minmax(110px, 26%) minmax(0, 1fr);
     align-items: center;
@@ -298,11 +343,11 @@ img {
     overflow-wrap: anywhere;
   }
 
-  :is(.question-table, .exam-management-table).responsive-card-table tbody td:last-child {
+  :is(.question-table, .exam-management-table, .users-table).responsive-card-table tbody td:last-child {
     border-bottom: 0;
   }
 
-  :is(.question-table, .exam-management-table).responsive-card-table tbody td::before {
+  :is(.question-table, .exam-management-table, .users-table).responsive-card-table tbody td::before {
     content: attr(data-label);
     color: #8b95a7;
     font-size: 10px;
@@ -317,16 +362,30 @@ img {
     text-align: left !important;
   }
 
+  :is(.question-table, .exam-management-table, .users-table).responsive-card-table tbody td[colspan] {
+    display: block;
+    padding: 28px 16px;
+    text-align: center;
+  }
+
+  :is(.question-table, .exam-management-table, .users-table).responsive-card-table tbody td[colspan]::before {
+    content: none;
+  }
+
   .question-table.responsive-card-table .question-cell,
   .question-table.responsive-card-table .question-cell b,
   .exam-management-table.responsive-card-table .exam-cell,
-  .exam-management-table.responsive-card-table .exam-cell p {
+  .exam-management-table.responsive-card-table .exam-cell p,
+  .users-table.responsive-card-table .student-cell,
+  .users-table.responsive-card-table .student-cell p {
     min-width: 0;
     white-space: normal;
   }
 
   .question-table.responsive-card-table .question-actions,
-  .exam-management-table.responsive-card-table .row-actions {
+  .exam-management-table.responsive-card-table .row-actions,
+  .users-table.responsive-card-table .user-actions {
+    flex-wrap: wrap;
     justify-content: flex-start;
   }
 }
@@ -529,6 +588,40 @@ img {
     padding-inline: 14px;
   }
 
+  .student-header > div > span {
+    display: flex;
+    min-height: 44px;
+    align-items: center;
+    white-space: nowrap;
+  }
+
+  .student-header > div > span svg {
+    width: 16px;
+  }
+
+  .student-header > div > button {
+    min-width: 44px;
+    height: 44px;
+    padding: 0;
+  }
+
+  .student-header > div > button:not(.student-profile) {
+    display: grid;
+    place-items: center;
+  }
+
+  .student-profile {
+    justify-content: center;
+  }
+
+  .student-profile > span {
+    margin-right: 0;
+  }
+
+  .student-header > div > button:not(.student-profile) > svg {
+    width: 18px;
+  }
+
   .student-columns,
   .dashboard-columns,
   .report-grid {
@@ -576,7 +669,11 @@ img {
 
   .simple-modal > header,
   .wizard > header {
+    position: sticky;
+    top: 0;
+    z-index: 3;
     gap: 12px;
+    background: #fff;
   }
 
   .simple-modal > header > div,
@@ -598,6 +695,12 @@ img {
   }
 
   .pdf-import-modal .pdf-question-list {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .real-exam-modal .modal-content,
+  .real-exam-modal .real-question-picker {
     max-height: none;
     overflow: visible;
   }
@@ -641,6 +744,36 @@ img {
 
   .runner-stats p {
     flex: 0 0 auto;
+  }
+
+  .runner-stats > span {
+    display: flex;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    align-items: center;
+    justify-content: center;
+    font-size: 0;
+  }
+
+  .runner-stats > span svg {
+    width: 17px;
+  }
+
+  .runner-stats > button,
+  .question-top button,
+  .question-area > footer button {
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  .question-area > footer > span {
+    display: block;
+    max-width: 118px;
+    font-size: 11px;
+    line-height: 1.25;
+    text-align: center;
   }
 
   .number-grid {
@@ -1262,6 +1395,12 @@ img {
 @media (max-width: 360px) {
   .portal-page {
     padding-inline: 10px;
+  }
+
+  .student-header > div > span {
+    width: 44px;
+    justify-content: center;
+    font-size: 0;
   }
 
   .stats-grid,

@@ -713,7 +713,7 @@ export function StudentDashboard({
           <BrandLogo /> <b>AWExam</b>
         </Link>
         <div>
-          <span className={online ? "" : "offline"}>
+          <span className={online ? "" : "offline"} role="status" aria-live="polite" title={online ? "Online" : "Offline"}>
             {online ? <Wifi /> : <WifiOff />}
             {online ? "Online" : "Offline"}
           </span>

@@ -1985,6 +1985,9 @@ function ExamRunner({
       </div>
     );
   }
+  const saveStatus = pendingSaves > 0
+    ? `Menyimpan ${pendingSaves} jawaban…`
+    : "Semua jawaban tersimpan";
   return (
     <div className="runner">
       <header>
@@ -1996,9 +1999,9 @@ function ExamRunner({
           </span>
         </div>
         <div className="runner-stats">
-          <span>
+          <span className={pendingSaves > 0 ? "syncing" : "synced"} role="status" aria-live="polite" title={saveStatus}>
             <Wifi />
-            {pendingSaves > 0 ? `Menyimpan ${pendingSaves}…` : "Tersimpan"}
+            {saveStatus}
           </span>
           <p>
             <small>SISA WAKTU</small>
@@ -2115,7 +2118,7 @@ function ExamRunner({
               <ArrowLeft />
               Sebelumnya
             </button>
-            <span>Jawaban tersimpan otomatis</span>
+            <span role="status" aria-live="polite">{saveStatus}</span>
             {current < questions.length - 1 ? (
               <button className="next" onClick={() => setCurrent(current + 1)}>
                 Selanjutnya
