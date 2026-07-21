@@ -324,8 +324,12 @@ img {
   }
 }
 
-/* Question/exam tables need a little more room than other data tables. */
-@media (min-width: 761px) and (max-width: 860px) {
+/*
+ * Question/exam tables cannot keep their desktop minimum width on phones.
+ * This used to start at 761px, leaving narrower screens with an 810px table
+ * that looked like an empty white area below the filters.
+ */
+@media (max-width: 860px) {
   :is(.question-table, .exam-management-table, .users-table).responsive-card-table {
     overflow: visible;
     border: 0;
@@ -1123,11 +1127,23 @@ img {
   }
 
   .bank-summary {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(3, minmax(128px, 1fr));
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
   }
 
   .bank-summary > div:last-child {
     display: flex;
+  }
+
+  .bank-summary > div {
+    min-width: 0;
+    padding: 12px;
+  }
+
+  .bank-summary > div > span {
+    flex: 0 0 auto;
   }
 
   .donut-wrap {
@@ -1228,6 +1244,15 @@ img {
 }
 
 @media (max-width: 480px) {
+  .bank-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: visible;
+  }
+
+  .bank-summary > div:last-child {
+    display: none;
+  }
+
   .login-panel {
     padding-inline: 20px;
   }

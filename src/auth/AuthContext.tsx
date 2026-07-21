@@ -44,21 +44,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!supabase) { setLoading(false); return }
     const client = supabase
-    client.auth.getSession().then(async ({ data }) => {
-      setSession(data.session)
-      if (data.session) {
-        try { setProfile(await fetchProfile(data.session.user.id)) }
-        catch { await client.auth.signOut(); setProfile(null) }
-      }
+    let active = true
+    let profileRequest = 0
+
+    const clearSession = () => {
+      profileRequest += 1
+      if (!active) return
+      setSession(null)
+      setProfile(null)
       setLoading(false)
-    })
-    const { data: listener } = client.auth.onAuthStateChange((event, nextSession) => {
+    }
+
+    const loadSessionProfile = (nextSession: Session) => {
+      const request = ++profileRequest
+      if (!active) return
       setSession(nextSession)
+      setProfile((current) => current?.id === nextSession.user.id ? current : null)
+
+      // Jangan menunggu query Supabase lain di dalam callback Auth karena
+      // keduanya memakai lock yang sama. Request lama juga tidak boleh
+      // menghidupkan kembali profil setelah sesi sudah keluar atau berganti.
+      window.setTimeout(() => {
+        void fetchProfile(nextSession.user.id)
+          .then((nextProfile) => {
+            if (!active || request !== profileRequest) return
+            setProfile(nextProfile)
+            setLoading(false)
+          })
+          .catch(() => {
+            if (!active || request !== profileRequest) return
+            clearSession()
+            // Bersihkan browser ini tanpa bergantung pada refresh token yang
+            // mungkin sudah kedaluwarsa atau dicabut.
+            void client.auth.signOut({ scope: 'local' })
+          })
+      }, 0)
+    }
+
+    // onAuthStateChange selalu mengirim INITIAL_SESSION. Bila refresh token
+    // ditolak (HTTP 400), Supabase mengirim sesi null dan UI kembali ke login,
+    // bukan tertahan di layar putih/loading.
+    const { data: listener } = client.auth.onAuthStateChange((event, nextSession) => {
       if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true)
-      if (!nextSession) { setProfile(null); return }
-      window.setTimeout(() => fetchProfile(nextSession.user.id).then(setProfile).catch(async() => { setProfile(null); await client.auth.signOut() }), 0)
+      if (!nextSession) {
+        clearSession()
+        return
+      }
+      loadSessionProfile(nextSession)
     })
-    return () => listener.subscription.unsubscribe()
+
+    return () => {
+      active = false
+      profileRequest += 1
+      listener.subscription.unsubscribe()
+    }
   }, [fetchProfile])
 
   const value = useMemo<AuthContextValue>(() => ({
@@ -73,12 +112,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) throw error
       let nextProfile: Profile
       try { nextProfile = await fetchProfile(data.user.id) }
-      catch (error) { await supabase.auth.signOut(); throw error }
+      catch (error) { await supabase.auth.signOut({ scope: 'local' }); throw error }
       if (!nextProfile) throw new Error('Profil pengguna tidak ditemukan.')
       setSession(data.session); setProfile(nextProfile)
       return nextProfile
     },
-    logout: async () => { await supabase?.auth.signOut(); setSession(null); setProfile(null) },
+    logout: async () => {
+      try { await supabase?.auth.signOut({ scope: 'local' }) }
+      finally { setSession(null); setProfile(null) }
+    },
     resetPassword: async (email) => {
       if (!supabase) throw new Error('Supabase belum dikonfigurasi.')
       const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/` })

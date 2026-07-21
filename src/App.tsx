@@ -73,6 +73,10 @@ import {
 import { RealSettingsPage } from "./components/SettingsPage";
 import { PortalTopbar } from "./components/PortalTopbar";
 import { BrandLogo } from "./components/BrandLogo";
+import {
+  isAnsweredValue,
+  normalizeStoredAnswers,
+} from "./lib/exam-answer-state";
 
 type Toast = { text: string; error?: boolean } | null;
 
@@ -1596,7 +1600,7 @@ function ExamRunner({
   };
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number | string>>(() =>
-    loadLocal(`answers:${examId}`, {}),
+    normalizeStoredAnswers(loadLocal<unknown>(`answers:${examId}`, {})),
   );
   const [marked, setMarked] = useState<string[]>(() =>
     loadLocal(`marked:${examId}`, []),
@@ -1750,9 +1754,8 @@ function ExamRunner({
         recordTabSwitches: examRow.record_tab_switches ?? true,
       });
       setRemaining(Math.max(0, Math.floor((deadlineTime - Date.now()) / 1000)));
-      const localAnswers = loadLocal<Record<string, number | string>>(
-        `answers:${examId}`,
-        {},
+      const localAnswers = normalizeStoredAnswers(
+        loadLocal<unknown>(`answers:${examId}`, {}),
       );
       setAnswers({ ...remoteAnswers, ...localAnswers });
       setLoadingExam(false);
@@ -1799,7 +1802,12 @@ function ExamRunner({
     if (!examMeta.fullscreen || !attemptId) return;
     const enterFullscreen = () => {
       if (!document.fullscreenElement) {
-        void document.documentElement.requestFullscreen().catch(() => {
+        const requestFullscreen = document.documentElement.requestFullscreen;
+        if (typeof requestFullscreen !== "function") {
+          notify("Browser ini tidak mendukung mode layar penuh.", true);
+          return;
+        }
+        void requestFullscreen.call(document.documentElement).catch(() => {
           notify("Mode layar penuh belum aktif. Izinkan fullscreen pada browser.", true);
         });
       }
@@ -1825,9 +1833,7 @@ function ExamRunner({
     };
   }, [attemptId, examId, examMeta.fullscreen, notify, studentId]);
   const answeredCount = useMemo(
-    () => Object.values(answers).filter((value) =>
-      typeof value === "number" || value.trim().length > 0,
-    ).length,
+    () => Object.values(answers).filter(isAnsweredValue).length,
     [answers],
   );
   const time = useMemo(
@@ -2100,7 +2106,7 @@ function ExamRunner({
                   <button
                     onClick={() => void answer(i)}
                     className={answers[question.id] === i ? "selected" : ""}
-                    key={option}
+                    key={`${question.id}-${i}`}
                   >
                     <span>{String.fromCharCode(65 + i)}</span>
                     <b>{option}</b>

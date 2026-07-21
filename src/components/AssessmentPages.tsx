@@ -379,6 +379,16 @@ export function RealExamManagement({
     return question.subjectId === draft.subjectId;
   });
 
+  const toggleQuestion = (questionId: string, checked: boolean) => {
+    setDraft((currentDraft) => {
+      if (!currentDraft) return currentDraft;
+      const questionIds = new Set(currentDraft.questionIds);
+      if (checked) questionIds.add(questionId);
+      else questionIds.delete(questionId);
+      return { ...currentDraft, questionIds: [...questionIds] };
+    });
+  };
+
   return (
     <div className="portal-page">
       <PageHeader
@@ -441,7 +451,7 @@ export function RealExamManagement({
                   <div><b>Pilih soal</b><span>{draft.questionIds.length} dipilih</span></div>
                   {!filteredQuestions.length ? <p>Belum ada soal pada bank soal mata pelajaran ini.</p> : filteredQuestions.map((question) => (
                     <label key={question.id}>
-                      <input type="checkbox" checked={draft.questionIds.includes(question.id)} onChange={(event) => setDraft({ ...draft, questionIds: event.target.checked ? [...draft.questionIds, question.id] : draft.questionIds.filter((id) => id !== question.id) })} />
+                      <input type="checkbox" checked={draft.questionIds.includes(question.id)} onChange={(event) => toggleQuestion(question.id, event.target.checked)} />
                       <span><b>{question.body}</b><small>{question.bank} · {question.type === "essay" ? "Essay" : "Pilihan Ganda"}</small></span>
                     </label>
                   ))}

@@ -12,5 +12,12 @@ export function loadLocal<T>(key: string, fallback: T): T {
 }
 
 export function saveLocal<T>(key: string, value: T) {
-  localStorage.setItem(`ruang-ujian:${key}`, JSON.stringify(value))
+  try {
+    localStorage.setItem(`ruang-ujian:${key}`, JSON.stringify(value))
+    return true
+  } catch {
+    // Storage dapat ditolak dalam mode privat atau ketika kuota penuh. Data
+    // tetap hidup di state dan masih akan dikirim ke server oleh pemanggil.
+    return false
+  }
 }

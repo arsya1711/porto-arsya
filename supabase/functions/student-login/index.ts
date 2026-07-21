@@ -5,11 +5,21 @@ const allowedOrigins = () => (Deno.env.get('APP_ORIGIN') ?? '')
   .map((origin) => origin.trim())
   .filter(Boolean)
 
+const isAllowedOrigin = (origin: string | null) => {
+  if (!origin || allowedOrigins().includes(origin)) return true
+  try {
+    const url = new URL(origin)
+    return url.protocol === 'http:'
+      && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
+  } catch {
+    return false
+  }
+}
+
 const corsHeaders = (request: Request) => {
   const origin = request.headers.get('origin')
-  const allowed = allowedOrigins()
   return {
-    ...(origin && allowed.includes(origin) ? { 'Access-Control-Allow-Origin': origin } : {}),
+    ...(origin && isAllowedOrigin(origin) ? { 'Access-Control-Allow-Origin': origin } : {}),
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Cache-Control': 'no-store',
@@ -18,8 +28,7 @@ const corsHeaders = (request: Request) => {
 }
 
 const originAllowed = (request: Request) => {
-  const origin = request.headers.get('origin')
-  return !origin || allowedOrigins().includes(origin)
+  return isAllowedOrigin(request.headers.get('origin'))
 }
 
 const json = (request: Request, body: unknown, status = 200) => new Response(JSON.stringify(body), {
