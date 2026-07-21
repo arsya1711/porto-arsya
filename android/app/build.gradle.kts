@@ -24,7 +24,9 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.awexam.student"
+        // Berbeda dari `namespace` di atas: nama paket ini sudah terdaftar
+        // permanen di Play Console dan tidak dapat diubah setelah terbit.
+        applicationId = "awexam.com"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

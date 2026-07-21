@@ -8,7 +8,7 @@
         android:fullBackupContent="false"
         android:dataExtractionRules="@xml/data_extraction_rules">
         <activity
-            android:name=".MainActivity"
+            android:name="com.awexam.student.MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""

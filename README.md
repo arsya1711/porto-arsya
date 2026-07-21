@@ -109,6 +109,41 @@ Aplikasi ini menargetkan Android saja. Sebelum distribusi release, salin
 dan kredensial keystore produksi. Project tidak lagi menandatangani release dengan
 debug key.
 
+### Rilis ke Play Store
+
+Play Store menerima Android App Bundle, bukan APK:
+
+```bash
+flutter build appbundle --release --dart-define-from-file=.env
+```
+
+Hasilnya di `build/app/outputs/bundle/release/app-release.aab`.
+
+Buat upload key sekali saja, simpan di luar repo, dan **cadangkan** — kehilangan
+berkas ini berarti harus mengurus reset upload key ke Google:
+
+```bash
+keytool -genkey -v -keystore ~/awexam-upload.jks \
+  -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+```
+
+Lalu salin `android/key.properties.example` menjadi `android/key.properties`
+(sudah masuk `.gitignore`) dan isi `storeFile`, `storePassword`, `keyAlias`,
+`keyPassword`. Tanpa berkas ini `signingConfig` bernilai null dan hasil build
+**tidak tertandatangani** — `apksigner verify` akan menjawab `DOES NOT VERIFY`
+dan Play Console menolaknya. Verifikasi sebelum unggah:
+
+```bash
+~/Library/Android/sdk/build-tools/*/apksigner verify --print-certs \
+  build/app/outputs/flutter-apk/app-release.apk
+```
+
+Naikkan `version:` di `pubspec.yaml` setiap unggahan. Angka setelah `+` adalah
+`versionCode` dan **wajib naik** di tiap rilis; Play Console menolak versionCode
+yang sudah pernah dipakai.
+
+### Distribusi langsung (di luar Play Store)
+
 Bangun APK terpisah per arsitektur, bukan APK gabungan:
 
 ```bash
