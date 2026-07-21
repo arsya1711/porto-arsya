@@ -20,6 +20,7 @@ import {
   extractImageQuestions,
   type ImageOcrProgress,
 } from "../lib/image-question-ocr";
+import { extractQuestionsWithAi } from "../lib/ai-question-import";
 import type { Question } from "../types";
 import { findSimilarQuestion, normalizeQuestion } from "../lib/question-similarity";
 
@@ -120,8 +121,11 @@ export function PdfQuestionImportModal({
     resetResult();
     try {
       const extracted = await extractPdfText(file);
+      // Teks disimpan agar guru dapat memeriksanya dan menjalankan ulang
+      // ekstraksi dengan cara lain tanpa memilih berkas ulang.
+      setSourceText(extracted.text);
       applyResult(
-        parsePdfQuestions(extracted.text),
+        await extractQuestionsWithAi(extracted.text),
         file.name,
         extracted.pageCount,
       );
@@ -129,6 +133,24 @@ export function PdfQuestionImportModal({
       setParseErrors([
         error instanceof Error ? error.message : "PDF tidak dapat diproses.",
       ]);
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  /// Menjalankan ulang ekstraksi pada teks yang sudah dimuat — dipakai ketika
+  /// hasil AI meleset, atau untuk naskah yang sudah berformat `SOAL 1`.
+  const reparseSource = async (mode: "ai" | "format") => {
+    if (!sourceText.trim() || parsing) return;
+    setParsing(true);
+    try {
+      applyResult(
+        mode === "ai"
+          ? await extractQuestionsWithAi(sourceText)
+          : parsePdfQuestions(sourceText),
+        fileName || "Teks yang dimuat",
+        pageCount,
+      );
     } finally {
       setParsing(false);
     }
@@ -278,19 +300,42 @@ export function PdfQuestionImportModal({
             </div>
 
             {source === "pdf" && (
-              <label className={`pdf-file-picker ${parsing ? "disabled" : ""}`}>
-                <Upload />
-                <span>
-                  <b>{parsing ? "Membaca PDF…" : "Pilih berkas PDF"}</b>
-                  <small>Maksimal 10 MB dan 100 halaman</small>
-                </span>
-                <input
-                  type="file"
-                  accept="application/pdf,.pdf"
-                  disabled={parsing || saving}
-                  onChange={(event) => void choosePdf(event.target.files?.[0])}
-                />
-              </label>
+              <>
+                <label className={`pdf-file-picker ${parsing ? "disabled" : ""}`}>
+                  <Upload />
+                  <span>
+                    <b>{parsing ? "Membaca PDF…" : "Pilih berkas PDF"}</b>
+                    <small>
+                      Soal dikenali otomatis oleh AI. Maksimal 10 MB dan 100 halaman.
+                    </small>
+                  </span>
+                  <input
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    disabled={parsing || saving}
+                    onChange={(event) => void choosePdf(event.target.files?.[0])}
+                  />
+                </label>
+                {sourceText.trim() && (
+                  <div className="question-import-retry">
+                    <span>Hasil belum tepat?</span>
+                    <button
+                      type="button"
+                      disabled={parsing || saving}
+                      onClick={() => void reparseSource("ai")}
+                    >
+                      Coba AI lagi
+                    </button>
+                    <button
+                      type="button"
+                      disabled={parsing || saving}
+                      onClick={() => void reparseSource("format")}
+                    >
+                      Baca sebagai format SOAL 1
+                    </button>
+                  </div>
+                )}
+              </>
             )}
             {source === "docx" && (
               <label className={`pdf-file-picker ${parsing ? "disabled" : ""}`}>

@@ -160,9 +160,9 @@ function PageHeader({
   return (
     <div className="page-title">
       <div>
-        <span>{eyebrow}</span>
+        <p>{eyebrow}</p>
         <h1>{title}</h1>
-        <p>{description}</p>
+        <span>{description}</span>
       </div>
       {action}
     </div>

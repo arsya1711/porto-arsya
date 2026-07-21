@@ -16,6 +16,7 @@ import './styles-dashboards.css'
 import './styles-admin.css'
 import './styles-brand.css'
 import './styles-mobile-nav.css'
+import './styles-responsive.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

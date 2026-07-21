@@ -1,0 +1,914 @@
+/*
+ * Responsive rules are kept last in the cascade so every portal surface uses
+ * the same breakpoints. Component-specific files remain responsible for the
+ * desktop presentation.
+ */
+
+html {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+body,
+#root,
+.login-page,
+.login-panel,
+.portal-shell,
+.portal-main,
+.portal-page,
+.student-app,
+.student-home,
+.runner,
+.runner > main,
+.question-area {
+  min-width: 0;
+  max-width: 100%;
+}
+
+body {
+  width: 100%;
+}
+
+img {
+  max-width: 100%;
+}
+
+.login-panel form,
+.input-box input,
+.password-control,
+.page-title > div,
+.title-actions,
+.toolbar,
+.toolbar > div,
+.card,
+.table-card,
+.exam-cell,
+.exam-cell p,
+.schedule-copy,
+.feature-copy,
+.upcoming-card p,
+.result-card p,
+.settings-functional-layout,
+.settings-form,
+.admin-master-layout,
+.grading-shell,
+.grading-main {
+  min-width: 0;
+}
+
+.input-box input,
+.password-control > input {
+  width: 100%;
+}
+
+.table-card {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-card th,
+.table-card td {
+  white-space: nowrap;
+}
+
+.table-card .question-cell,
+.table-card .question-cell b,
+.integrity-table td,
+.integrity-table td small {
+  white-space: normal;
+}
+
+.topbar-popover {
+  width: min(330px, calc(100vw - 28px));
+}
+
+.search-results {
+  width: min(520px, calc(100vw - 28px));
+}
+
+/* Tablet: a fixed 236px sidebar leaves too little room on portrait screens. */
+@media (max-width: 1080px) {
+  .portal-sidebar {
+    display: none;
+  }
+
+  .portal-sidebar.mobile-open {
+    display: flex;
+    width: min(300px, 86vw);
+    overflow-y: auto;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  }
+
+  .portal-main {
+    margin-left: 0;
+    padding-bottom: calc(62px + env(safe-area-inset-bottom));
+  }
+
+  .mobile-menu {
+    display: grid;
+  }
+
+  .portal-mobile-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 50;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    height: calc(60px + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+    border-top: 1px solid #e1e4eb;
+    background: rgba(255, 255, 255, 0.97);
+    box-shadow: 0 -8px 24px rgba(23, 35, 60, 0.06);
+    backdrop-filter: blur(12px);
+  }
+
+  .portal-mobile-nav a {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    color: #7e899b;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .portal-mobile-nav svg {
+    width: 18px;
+  }
+
+  .portal-page {
+    padding-inline: clamp(16px, 3vw, 28px);
+  }
+
+  .admin-master-layout,
+  .settings-functional-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-functional-layout > aside {
+    position: static;
+    display: flex;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+  }
+
+  .settings-functional-layout > aside button {
+    min-width: max-content;
+  }
+}
+
+@media (max-width: 760px) {
+  .login-page {
+    display: block;
+  }
+
+  .login-panel {
+    display: flex;
+    min-height: 100dvh;
+    align-items: center;
+    justify-content: center;
+    padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+    overflow: hidden;
+  }
+
+  .login-panel form {
+    width: min(400px, 100%);
+    max-width: 100%;
+  }
+
+  .mobile-logo {
+    margin-bottom: clamp(32px, 8vh, 56px);
+  }
+
+  .input-box input,
+  .input-box > .password-control {
+    min-width: 0;
+  }
+
+  .login-help {
+    min-width: 0;
+    gap: 12px;
+  }
+
+  .login-help label,
+  .login-help button {
+    min-width: 0;
+    white-space: nowrap;
+  }
+
+  .topbar {
+    padding-inline: 14px;
+  }
+
+  .top-actions {
+    min-width: 0;
+  }
+
+  .portal-page {
+    padding: 24px 14px calc(76px + env(safe-area-inset-bottom));
+  }
+
+  .page-title {
+    gap: 16px;
+  }
+
+  .page-title > div > span {
+    display: block;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .toolbar > div:first-child {
+    width: 100%;
+    max-width: none;
+    flex-basis: 100%;
+  }
+
+  .toolbar > button,
+  .toolbar-filter {
+    min-width: 0;
+  }
+
+  .toolbar-filter {
+    flex: 1 1 150px;
+  }
+
+  .toolbar-filter select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .report-filter {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+
+  .report-filter select {
+    min-width: 0;
+    flex: 1 1 180px;
+  }
+
+  .report-filter button {
+    min-height: 38px;
+  }
+
+  .settings-real-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .academic-setting-card,
+  .school-logo {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .school-logo .logo-upload,
+  .academic-setting-card > a {
+    margin-left: 0;
+  }
+
+  .real-dashboard .schedule-copy small {
+    max-width: min(48vw, 220px);
+  }
+
+  .student-home {
+    padding-inline: 14px;
+  }
+
+  .student-columns,
+  .dashboard-columns,
+  .report-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .exam-feature {
+    padding: 18px;
+  }
+
+  .feature-icon {
+    flex: 0 0 auto;
+  }
+
+  .feature-copy {
+    min-width: 0;
+  }
+
+  .feature-copy h2,
+  .upcoming-card b,
+  .result-card b {
+    overflow-wrap: anywhere;
+  }
+
+  .grading-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .student-answer-list {
+    overscroll-behavior-inline: contain;
+  }
+
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 10px;
+  }
+
+  .modal,
+  .modal.wide,
+  .pdf-import-modal {
+    width: 100%;
+    max-height: calc(100dvh - 20px);
+    border-radius: 14px;
+  }
+
+  .simple-modal > header,
+  .wizard > header {
+    gap: 12px;
+  }
+
+  .simple-modal > header > div,
+  .wizard > header > div {
+    min-width: 0;
+  }
+
+  .simple-modal h2,
+  .wizard h2 {
+    overflow-wrap: anywhere;
+  }
+
+  .simple-modal > footer,
+  .wizard > footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    background: #fff;
+  }
+
+  .runner {
+    min-height: 100dvh;
+  }
+
+  .runner > main {
+    min-height: calc(100dvh - 62px);
+  }
+
+  .runner-stats p {
+    flex: 0 0 auto;
+  }
+
+  .number-grid {
+    padding-bottom: 2px;
+    overscroll-behavior-inline: contain;
+  }
+
+  .question-area article,
+  .answer-options button > b {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  /* Admin data tables become readable records instead of miniature tables. */
+  .role-admin .admin-master-table,
+  .role-admin .users-table,
+  .role-admin .audit-table {
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .role-admin .admin-master-table table,
+  .role-admin .users-table table,
+  .role-admin .audit-table table {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .role-admin .admin-master-table thead,
+  .role-admin .users-table thead,
+  .role-admin .audit-table thead {
+    display: none;
+  }
+
+  .role-admin .admin-master-table tbody,
+  .role-admin .users-table tbody,
+  .role-admin .audit-table tbody {
+    display: grid;
+    gap: 10px;
+  }
+
+  .role-admin .admin-master-table tbody tr,
+  .role-admin .users-table tbody tr,
+  .role-admin .audit-table tbody tr {
+    display: block;
+    overflow: hidden;
+    border: 1px solid #e4e8ef;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 4px 14px rgba(23, 35, 60, 0.04);
+  }
+
+  .role-admin .admin-master-table tbody td,
+  .role-admin .users-table tbody td,
+  .role-admin .audit-table tbody td {
+    display: grid;
+    grid-template-columns: minmax(96px, 32%) minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 13px;
+    border-bottom: 1px solid #eef0f4;
+    color: #4f5b70;
+    white-space: normal;
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+
+  .role-admin .admin-master-table tbody td:last-child,
+  .role-admin .users-table tbody td:last-child,
+  .role-admin .audit-table tbody td:last-child {
+    border-bottom: 0;
+  }
+
+  .role-admin .admin-master-table tbody td::before,
+  .role-admin .users-table tbody td::before,
+  .role-admin .audit-table tbody td::before {
+    content: attr(data-label);
+    color: #8b95a7;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.55px;
+    text-transform: uppercase;
+  }
+
+  .role-admin .admin-master-table tbody td[colspan],
+  .role-admin .users-table tbody td[colspan],
+  .role-admin .audit-table tbody td[colspan] {
+    display: block;
+    padding: 28px 16px;
+    text-align: center;
+  }
+
+  .role-admin .admin-master-table tbody td[colspan]::before,
+  .role-admin .users-table tbody td[colspan]::before,
+  .role-admin .audit-table tbody td[colspan]::before {
+    content: none;
+  }
+
+  .role-admin .users-table .student-cell,
+  .role-admin .users-table .student-cell p {
+    min-width: 0;
+  }
+
+  .role-admin .users-table .student-cell small {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .role-admin .master-actions,
+  .role-admin .user-actions {
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .role-admin .integrity-table td small {
+    max-width: none;
+    overflow-wrap: anywhere;
+  }
+
+  .role-admin .integrity-table {
+    margin-top: 14px;
+  }
+
+  .role-admin .analysis-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 4px 9px;
+    align-items: center;
+    padding: 13px;
+  }
+
+  .role-admin .analysis-row > span:first-child {
+    margin-right: 0;
+  }
+
+  .role-admin .analysis-row > p {
+    min-width: 0;
+  }
+
+  .role-admin .analysis-row > p b {
+    overflow-wrap: anywhere;
+  }
+
+  .role-admin .analysis-row > div {
+    grid-column: 2 / 4;
+    display: flex;
+    width: auto;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+}
+
+@media (max-width: 640px) {
+  .global-search {
+    display: none;
+  }
+
+  .page-title {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    margin-bottom: 20px;
+  }
+
+  .title-actions,
+  .page-title > .primary,
+  .page-title > button,
+  .page-title > a {
+    align-self: stretch;
+  }
+
+  .title-actions {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .title-actions > button,
+  .title-actions > a {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .page-title > .primary,
+  .page-title > button,
+  .page-title > a {
+    justify-content: center;
+  }
+
+  .audit-summary {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .report-stats {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .report-stats > div:nth-child(even) {
+    border-right: 0;
+  }
+
+  .report-stats > div:nth-child(-n + 2) {
+    border-bottom: 1px solid #e9ecf1;
+  }
+
+  .bank-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .bank-summary > div:last-child {
+    display: flex;
+  }
+
+  .donut-wrap {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .donut {
+    margin-inline: auto;
+  }
+
+  .settings-toggle-list label,
+  .switch-list label {
+    gap: 12px;
+  }
+
+  .settings-toggle-list label > span,
+  .switch-list label > span {
+    min-width: 0;
+  }
+
+  .settings-toggle-list small,
+  .switch-list small {
+    overflow-wrap: anywhere;
+  }
+
+  .student-header {
+    padding-inline: 14px;
+  }
+
+  .student-logo b small {
+    display: none;
+  }
+
+  .exam-note {
+    align-items: flex-start;
+  }
+
+  .upcoming-card,
+  .result-card {
+    min-width: 0;
+  }
+
+  .upcoming-card > div,
+  .result-card > strong,
+  .passed,
+  .grading-badge {
+    flex: 0 0 auto;
+  }
+
+  .stepper {
+    padding-inline: 16px;
+  }
+
+  .wizard-body,
+  .modal-content,
+  .settings-form,
+  .admin-quick-form,
+  .grading-main {
+    padding-inline: 16px;
+  }
+
+  .role-admin .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .role-admin .admin-quick-form {
+    padding: 18px;
+  }
+
+  .role-admin .settings-functional-layout > aside {
+    gap: 5px;
+    padding: 5px;
+    scrollbar-width: none;
+  }
+
+  .role-admin .settings-functional-layout > aside::-webkit-scrollbar {
+    display: none;
+  }
+
+  .role-admin .settings-functional-layout > aside button {
+    padding: 9px 11px;
+  }
+
+  .role-admin .chart-card {
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+  }
+
+  .role-admin .chart-card .card-head {
+    position: sticky;
+    left: 0;
+  }
+
+  .role-admin .grade-chart {
+    min-width: 460px;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-panel {
+    padding-inline: 20px;
+  }
+
+  .login-help label,
+  .login-help button {
+    font-size: 13px;
+  }
+
+  .top-actions {
+    gap: 0;
+  }
+
+  .top-actions .top-action-wrap > button,
+  .top-actions > button,
+  .mobile-menu {
+    width: 32px;
+  }
+
+  .top-actions .top-action-wrap > .avatar {
+    margin-left: 2px;
+  }
+
+  .topbar-popover,
+  .search-results {
+    position: fixed;
+    top: 62px;
+    right: 10px;
+    left: 10px;
+    width: auto;
+    max-height: calc(100dvh - 76px);
+  }
+
+  .stats-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .stat-card {
+    min-width: 0;
+  }
+
+  .stat-card > div,
+  .stat-card strong,
+  .stat-card p {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .title-actions > button:first-child {
+    display: flex;
+  }
+
+  .table-footer {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .table-footer > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .form-grid,
+  .question-form-grid,
+  .pdf-import-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .class-tabs {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .class-tabs button {
+    flex: 0 0 auto;
+  }
+
+  .simple-modal > footer,
+  .wizard > footer,
+  .submit-modal footer {
+    gap: 8px;
+  }
+
+  .simple-modal > footer button,
+  .wizard > footer button,
+  .submit-modal footer button {
+    min-width: 0;
+  }
+
+  .academic-setting-card > div {
+    min-width: 0;
+    flex-basis: calc(100% - 66px);
+  }
+
+  .academic-setting-card > a,
+  .school-logo .logo-upload {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .runner > header {
+    gap: 8px;
+  }
+
+  .runner-brand {
+    min-width: 24px;
+  }
+
+  .runner-stats {
+    min-width: 0;
+  }
+
+  .runner-stats > button {
+    white-space: nowrap;
+  }
+
+  .question-top {
+    gap: 10px;
+  }
+
+  .question-top > span {
+    min-width: 0;
+  }
+
+  .question-top button {
+    flex: 0 0 auto;
+  }
+
+  .answer-options button {
+    padding-inline: 10px;
+  }
+
+  .submit-modal {
+    padding-inline: 16px;
+  }
+
+  .role-admin .stats-grid,
+  .role-admin .audit-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .role-admin .stat-card {
+    display: flex;
+  }
+
+  .role-admin .stat-card > span {
+    width: 36px;
+    height: 36px;
+    margin-bottom: 0;
+    flex: 0 0 auto;
+  }
+
+  .role-admin .title-actions > button,
+  .role-admin .title-actions > a {
+    width: 100%;
+    flex-basis: 100%;
+  }
+
+  .role-admin .toolbar > button,
+  .role-admin .toolbar > .toolbar-filter {
+    flex: 1 1 calc(50% - 4px);
+    justify-content: center;
+  }
+
+  .role-admin .report-filter select,
+  .role-admin .report-filter button {
+    width: 100%;
+    flex-basis: 100%;
+  }
+
+  .role-admin .settings-save .primary {
+    width: 100%;
+  }
+
+  .role-admin .dashboard-status-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 360px) {
+  .portal-page {
+    padding-inline: 10px;
+  }
+
+  .stats-grid,
+  .audit-summary,
+  .report-stats,
+  .question-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .report-stats > div {
+    border-right: 0;
+    border-bottom: 1px solid #e9ecf1;
+  }
+
+  .report-stats > div:last-child {
+    border-bottom: 0;
+  }
+
+  .toolbar > button {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .runner-stats p {
+    padding-inline: 6px;
+  }
+
+  .runner-stats > button {
+    padding-inline: 7px;
+    font-size: 12px;
+  }
+
+  .question-top button {
+    padding-inline: 8px;
+    font-size: 11px;
+  }
+
+  .role-admin .admin-master-table tbody td,
+  .role-admin .users-table tbody td,
+  .role-admin .audit-table tbody td {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+  }
+
+  .role-admin .dashboard-status-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

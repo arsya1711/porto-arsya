@@ -207,13 +207,13 @@ export function AcademicYearsPage({ notify }: { notify: Notify }) {
                 <tr><td colSpan={3}>Belum ada tahun ajaran.</td></tr>
               ) : years.map((year) => (
                 <tr key={year.id}>
-                  <td><b className="table-main">{year.name}</b></td>
-                  <td>
+                  <td data-label="Tahun ajaran"><b className="table-main">{year.name}</b></td>
+                  <td data-label="Status">
                     <span className={`master-status ${year.active ? "active" : ""}`}>
                       <i /> {year.active ? "Aktif" : "Tidak aktif"}
                     </span>
                   </td>
-                  <td>
+                  <td data-label="Aksi">
                     <div className="master-actions">
                       {!year.active && <button onClick={() => activateYear(year)}>Aktifkan</button>}
                       <button title="Ubah nama" onClick={() => renameYear(year)}><Pencil /></button>
@@ -358,9 +358,9 @@ export function SubjectsPage({ notify }: { notify: Notify }) {
                 <tr><td colSpan={3}>Belum ada mata pelajaran.</td></tr>
               ) : subjects.map((subject) => (
                 <tr key={subject.id}>
-                  <td><b className="table-main">{subject.name}</b></td>
-                  <td><span className="subject-code">{subject.code || "—"}</span></td>
-                  <td>
+                  <td data-label="Mata pelajaran"><b className="table-main">{subject.name}</b></td>
+                  <td data-label="Kode"><span className="subject-code">{subject.code || "—"}</span></td>
+                  <td data-label="Aksi">
                     <div className="master-actions">
                       <button title="Edit" onClick={() => editSubject(subject)}><Pencil /></button>
                       <button className="danger" title="Hapus" onClick={() => deleteSubject(subject)}><Trash2 /></button>
@@ -486,10 +486,10 @@ export function AuditSecurityPage({ notify }: { notify: Notify }) {
               <tr><td colSpan={4}>Belum ada aktivitas yang cocok.</td></tr>
             ) : filteredAudits.map((audit) => (
               <tr key={audit.id}>
-                <td>{new Date(audit.created_at).toLocaleString("id-ID")}</td>
-                <td><b className="table-main">{actorNames[audit.actor_id ?? ""] ?? "Sistem"}</b></td>
-                <td>{auditLabel(audit.action)}</td>
-                <td><span className="subject-code">{audit.entity_type ?? "—"}</span>{audit.entity_id ? <small>{audit.entity_id.slice(0, 8)}</small> : null}</td>
+                <td data-label="Waktu">{new Date(audit.created_at).toLocaleString("id-ID")}</td>
+                <td data-label="Aktor"><b className="table-main">{actorNames[audit.actor_id ?? ""] ?? "Sistem"}</b></td>
+                <td data-label="Tindakan">{auditLabel(audit.action)}</td>
+                <td data-label="Entitas"><span className="subject-code">{audit.entity_type ?? "—"}</span>{audit.entity_id ? <small>{audit.entity_id.slice(0, 8)}</small> : null}</td>
               </tr>
             ))}
           </tbody>
@@ -505,11 +505,11 @@ export function AuditSecurityPage({ notify }: { notify: Notify }) {
               <tr><td colSpan={5}>Belum ada event integritas.</td></tr>
             ) : integrityEvents.map((event) => (
               <tr key={event.id}>
-                <td>{new Date(event.occurred_at).toLocaleString("id-ID")}</td>
-                <td><b className="table-main">{relatedName(event.profiles)}</b></td>
-                <td>{integrityExamName(event.attempts)}</td>
-                <td><span className="subject-code">{event.event_type.replace(/_/g, " ")}</span></td>
-                <td><small>{event.metadata ? JSON.stringify(event.metadata) : "—"}</small></td>
+                <td data-label="Waktu">{new Date(event.occurred_at).toLocaleString("id-ID")}</td>
+                <td data-label="Siswa"><b className="table-main">{relatedName(event.profiles)}</b></td>
+                <td data-label="Ujian">{integrityExamName(event.attempts)}</td>
+                <td data-label="Event"><span className="subject-code">{event.event_type.replace(/_/g, " ")}</span></td>
+                <td data-label="Detail"><small>{event.metadata ? JSON.stringify(event.metadata) : "—"}</small></td>
               </tr>
             ))}
           </tbody>

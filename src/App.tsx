@@ -512,7 +512,7 @@ function Portal({
     return () => { cancelled = true; animation?.kill(); };
   }, [location.pathname]);
   return (
-    <div className="portal-shell">
+    <div className={`portal-shell role-${role}`}>
       {mobileNavigationOpen && (
         <button
           type="button"
@@ -1176,7 +1176,7 @@ function UserManagement({
             ) : (
               filteredUsers.map((user) => (
                 <tr key={user.id}>
-                  <td>
+                  <td data-label="Pengguna">
                     <div className="student-cell">
                       <span>{getInitials(user.full_name)}</span>
                       <p>
@@ -1185,7 +1185,7 @@ function UserManagement({
                       </p>
                     </div>
                   </td>
-                  <td>
+                  <td data-label={roleFilter === "siswa" ? "Kelas" : "Peran"}>
                     {roleFilter === "siswa" ? (
                       user.class_name || "Belum ditempatkan"
                     ) : (
@@ -1194,8 +1194,8 @@ function UserManagement({
                       </span>
                     )}
                   </td>
-                  {roleFilter === "siswa" && <td>{user.student_number || "—"}</td>}
-                  <td>
+                  {roleFilter === "siswa" && <td data-label="NIS">{user.student_number || "—"}</td>}
+                  <td data-label="Status">
                     <span
                       className={`user-status ${user.active ? "active" : ""}`}
                     >
@@ -1203,10 +1203,10 @@ function UserManagement({
                       {user.active ? "Aktif" : "Nonaktif"}
                     </span>
                   </td>
-                  <td>
+                  <td data-label="Dibuat">
                     {new Date(user.created_at).toLocaleDateString("id-ID")}
                   </td>
-                  <td>
+                  <td data-label="Aksi">
                     {canManage && (
                       <div className="user-actions">
                         <button
