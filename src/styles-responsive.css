@@ -29,6 +29,29 @@ body {
   width: 100%;
 }
 
+.portal-main {
+  display: flex;
+  min-height: 100vh;
+  min-height: 100dvh;
+  flex-direction: column;
+}
+
+.portal-main > .portal-page {
+  width: 100%;
+}
+
+.user-management-page {
+  display: flex;
+  min-height: calc(100vh - 62px);
+  min-height: calc(100dvh - 62px);
+  flex-direction: column;
+}
+
+.user-management-page > .users-table {
+  min-height: 260px;
+  flex: 1 1 auto;
+}
+
 img {
   max-width: 100%;
 }
@@ -93,7 +116,7 @@ img {
 }
 
 /* Compact layouts and large touch tablets use the drawer navigation. */
-@media (max-width: 1180px), (min-width: 1181px) and (max-width: 1366px) and (pointer: coarse) {
+@media (max-width: 1180px), (min-width: 1181px) and (max-width: 1366px) and (any-pointer: coarse) {
   .portal-sidebar {
     display: none;
   }
@@ -196,6 +219,11 @@ img {
     padding-inline: clamp(16px, 3vw, 28px);
   }
 
+  .user-management-page {
+    min-height: calc(100vh - 124px);
+    min-height: calc(100dvh - 124px - env(safe-area-inset-bottom));
+  }
+
   .admin-master-layout,
   .settings-functional-layout {
     grid-template-columns: minmax(0, 1fr);
@@ -258,7 +286,7 @@ img {
   }
 }
 
-@media (max-width: 1366px) and (pointer: coarse) {
+@media (max-width: 1366px) and (any-pointer: coarse) {
   .student-header > div > button,
   .runner-stats > button,
   .question-top button,

@@ -1097,7 +1097,7 @@ function UserManagement({
     URL.revokeObjectURL(url);
   };
   return (
-    <div className="portal-page">
+    <div className="portal-page user-management-page">
       <PageTitle
         eyebrow="ADMINISTRASI AKUN"
         title={title}
