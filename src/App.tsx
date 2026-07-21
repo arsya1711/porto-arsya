@@ -886,6 +886,7 @@ type ManagedUser = Profile & {
   class_name: string | null;
 };
 type ClassOption = { id: string; name: string };
+type SubjectOption = { id: string; name: string };
 
 function UserManagement({
   notify,
@@ -905,8 +906,10 @@ function UserManagement({
   const [create, setCreate] = useState(false);
   const [editing, setEditing] = useState<ManagedUser | null>(null);
   const [resetting, setResetting] = useState<ManagedUser | null>(null);
+  const [assigning, setAssigning] = useState<ManagedUser | null>(null);
   const [query, setQuery] = useState("");
   const [classes, setClasses] = useState<ClassOption[]>([]);
+  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
   const [classFilter, setClassFilter] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
   const loadUsers = useCallback(async () => {
@@ -920,12 +923,17 @@ function UserManagement({
       .eq("role", roleFilter)
       .order("created_at", { ascending: false });
     const classQuery =
-      roleFilter === "siswa"
+      roleFilter === "siswa" || roleFilter === "guru"
         ? supabase.from("classes").select("id,name").order("name")
         : Promise.resolve({ data: [] as ClassOption[], error: null });
-    const [profileResult, classResult] = await Promise.all([
+    const subjectQuery =
+      roleFilter === "guru"
+        ? supabase.from("subjects").select("id,name").order("name")
+        : Promise.resolve({ data: [] as SubjectOption[], error: null });
+    const [profileResult, classResult, subjectResult] = await Promise.all([
       profileQuery,
       classQuery,
+      subjectQuery,
     ]);
     if (profileResult.error) notify(profileResult.error.message, true);
     else {
@@ -946,6 +954,8 @@ function UserManagement({
     }
     if (classResult.error) notify(classResult.error.message, true);
     else setClasses((classResult.data ?? []) as ClassOption[]);
+    if (subjectResult.error) notify(subjectResult.error.message, true);
+    else setSubjects((subjectResult.data ?? []) as SubjectOption[]);
     setLoading(false);
   }, [notify, roleFilter]);
   useEffect(() => {
@@ -1251,6 +1261,16 @@ function UserManagement({
                         >
                           <LockKeyhole />
                         </button>
+                        {roleFilter === "guru" && (
+                          <button
+                            className="assignment-button"
+                            onClick={() => setAssigning(user)}
+                            title="Atur penugasan guru"
+                            aria-label={`Atur penugasan ${user.full_name}`}
+                          >
+                            <BookOpen /> Penugasan
+                          </button>
+                        )}
                         <button onClick={() => toggleUser(user)}>
                           {user.active ? "Nonaktifkan" : "Aktifkan"}
                         </button>
@@ -1294,9 +1314,208 @@ function UserManagement({
           save={(password) => resetUser(resetting, password)}
         />
       )}
+      {assigning && (
+        <TeacherAssignmentsModal
+          teacher={assigning}
+          classes={classes}
+          subjects={subjects}
+          close={() => setAssigning(null)}
+          notify={notify}
+        />
+      )}
     </div>
   );
 }
+
+type TeacherAssignmentRow = {
+  teacher_id: string;
+  subject_id: string;
+  class_id: string;
+  subjects: unknown;
+  classes: unknown;
+};
+
+function TeacherAssignmentsModal({
+  teacher,
+  classes,
+  subjects,
+  close,
+  notify,
+}: {
+  teacher: ManagedUser;
+  classes: ClassOption[];
+  subjects: SubjectOption[];
+  close: () => void;
+  notify: (text: string, error?: boolean) => void;
+}) {
+  const [assignments, setAssignments] = useState<TeacherAssignmentRow[]>([]);
+  const [subjectId, setSubjectId] = useState(subjects[0]?.id ?? "");
+  const [classId, setClassId] = useState(classes[0]?.id ?? "");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const loadAssignments = useCallback(async () => {
+    if (!supabase) return;
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("teacher_subjects")
+      .select("teacher_id,subject_id,class_id,subjects(name),classes(name)")
+      .eq("teacher_id", teacher.id)
+      .order("subject_id");
+    if (error) notify(error.message, true);
+    else setAssignments((data ?? []) as unknown as TeacherAssignmentRow[]);
+    setLoading(false);
+  }, [notify, teacher.id]);
+
+  useEffect(() => {
+    void loadAssignments();
+  }, [loadAssignments]);
+
+  const addAssignment = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!supabase || !subjectId || !classId || saving) return;
+    if (
+      assignments.some(
+        (item) => item.subject_id === subjectId && item.class_id === classId,
+      )
+    ) {
+      notify("Penugasan tersebut sudah tersedia.", true);
+      return;
+    }
+    setSaving(true);
+    const { error } = await supabase.from("teacher_subjects").insert({
+      teacher_id: teacher.id,
+      subject_id: subjectId,
+      class_id: classId,
+    });
+    setSaving(false);
+    if (error) {
+      notify(error.message, true);
+      return;
+    }
+    notify("Guru berhasil ditugaskan ke mata pelajaran dan kelas.");
+    await loadAssignments();
+  };
+
+  const removeAssignment = async (assignment: TeacherAssignmentRow) => {
+    if (!supabase || saving) return;
+    const subjectName = relationName(assignment.subjects);
+    const className = relationName(assignment.classes);
+    if (
+      !window.confirm(
+        `Hapus penugasan ${subjectName} di ${className} dari ${teacher.full_name}?`,
+      )
+    )
+      return;
+    setSaving(true);
+    const { error } = await supabase
+      .from("teacher_subjects")
+      .delete()
+      .eq("teacher_id", teacher.id)
+      .eq("subject_id", assignment.subject_id)
+      .eq("class_id", assignment.class_id);
+    setSaving(false);
+    if (error) {
+      notify(error.message, true);
+      return;
+    }
+    notify("Penugasan guru berhasil dihapus.");
+    await loadAssignments();
+  };
+
+  const missingMasterData = !subjects.length || !classes.length;
+
+  return (
+    <Modal close={close} wide>
+      <div className="simple-modal teacher-assignment-modal">
+        <header>
+          <div>
+            <p>PENUGASAN GURU</p>
+            <h2>{teacher.full_name}</h2>
+          </div>
+          <button type="button" onClick={close} aria-label="Tutup penugasan">
+            <X />
+          </button>
+        </header>
+        <div className="modal-content">
+          <p className="teacher-assignment-intro">
+            Pilih pasangan mata pelajaran dan kelas yang boleh dikelola guru.
+            Penugasan ini diperlukan sebelum guru dapat membuat ujian.
+          </p>
+          {missingMasterData ? (
+            <p className="question-form-error">
+              {!subjects.length
+                ? "Buat mata pelajaran terlebih dahulu."
+                : "Buat kelas terlebih dahulu melalui menu Kelas & Siswa."}
+            </p>
+          ) : (
+            <form className="teacher-assignment-form" onSubmit={addAssignment}>
+              <label className="form-field">
+                <span>Mata pelajaran</span>
+                <select
+                  value={subjectId}
+                  onChange={(event) => setSubjectId(event.target.value)}
+                >
+                  {subjects.map((subject) => (
+                    <option key={subject.id} value={subject.id}>
+                      {subject.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="form-field">
+                <span>Kelas</span>
+                <select
+                  value={classId}
+                  onChange={(event) => setClassId(event.target.value)}
+                >
+                  {classes.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button className="primary" disabled={saving}>
+                <Plus /> {saving ? "Menyimpan…" : "Tambahkan penugasan"}
+              </button>
+            </form>
+          )}
+          <section className="teacher-assignment-list" aria-live="polite">
+            <h3>Penugasan aktif</h3>
+            {loading ? (
+              <p>Memuat penugasan…</p>
+            ) : assignments.length ? (
+              assignments.map((assignment) => (
+                <article key={`${assignment.subject_id}:${assignment.class_id}`}>
+                  <span>
+                    <b>{relationName(assignment.subjects)}</b>
+                    <small>{relationName(assignment.classes)}</small>
+                  </span>
+                  <button
+                    type="button"
+                    className="danger"
+                    disabled={saving}
+                    onClick={() => void removeAssignment(assignment)}
+                    aria-label={`Hapus penugasan ${relationName(assignment.subjects)} ${relationName(assignment.classes)}`}
+                  >
+                    <Trash2 />
+                  </button>
+                </article>
+              ))
+            ) : (
+              <p>Guru belum mempunyai penugasan.</p>
+            )}
+          </section>
+        </div>
+        <footer>
+          <button type="button" onClick={close}>Selesai</button>
+        </footer>
+      </div>
+    </Modal>
+  );
+}
+
 function CreateUserModal({
   close,
   save,

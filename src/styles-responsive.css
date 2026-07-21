@@ -918,6 +918,12 @@ img {
     justify-content: flex-start;
   }
 
+  .responsive-card-table .user-actions .assignment-button {
+    width: auto;
+    min-width: 0;
+    padding-inline: 12px;
+  }
+
   /* Admin data tables become readable records instead of miniature tables. */
   .role-admin .admin-master-table,
   .role-admin .users-table,

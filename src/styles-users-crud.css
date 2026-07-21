@@ -1,1 +1,21 @@
 .user-actions button:has(svg){width:29px;height:29px;display:grid;place-items:center;padding:0}.user-actions button.danger{color:#d84b55;border-color:#f0cbd0;background:#fff8f8}.user-actions button.danger:hover{background:#feecee}.user-actions button:hover{border-color:#bfc7d4;background:#f8f9fb}.users-table tbody tr{transition:background .15s}.users-table td[colspan]{text-align:center;padding:40px;color:#919aa9}.users-table .toolbar-empty{font-size:10px}
+
+.teacher-assignment-intro{margin:0 0 16px;color:#778296;font-size:13px;line-height:1.6}
+.teacher-assignment-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;align-items:end;gap:10px;margin-bottom:20px}
+.teacher-assignment-form .form-field{min-width:0;margin:0}
+.teacher-assignment-form>button{min-height:40px;border:0;border-radius:8px;padding:9px 13px;display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;font-size:13px;font-weight:700}
+.teacher-assignment-form>button svg{width:14px}
+.teacher-assignment-form>button:disabled,.teacher-assignment-list button:disabled{opacity:.55;cursor:wait}
+.teacher-assignment-list{overflow:hidden;border:1px solid #e1e5ec;border-radius:10px}
+.teacher-assignment-list h3{margin:0;padding:11px 13px;border-bottom:1px solid #e8ebf1;background:#f8f9fc;color:#344055;font-size:12px}
+.teacher-assignment-list>p{margin:0;padding:20px 13px;color:#929baa;text-align:center;font-size:12px}
+.teacher-assignment-list article{display:flex;align-items:center;gap:12px;padding:10px 13px;border-bottom:1px solid #edf0f4}
+.teacher-assignment-list article:last-child{border-bottom:0}
+.teacher-assignment-list article>span{min-width:0;flex:1}
+.teacher-assignment-list b,.teacher-assignment-list small{display:block}
+.teacher-assignment-list b{color:#344055;font-size:13px}
+.teacher-assignment-list small{margin-top:3px;color:#9099a9;font-size:11px}
+.teacher-assignment-list button{width:36px;height:36px;flex:0 0 auto;border:1px solid #f0cbd0;border-radius:8px;display:grid;place-items:center;background:#fff8f8;color:#d84b55}
+.teacher-assignment-list button svg{width:14px}
+.user-actions .assignment-button{width:auto;height:29px;padding:6px 9px;display:flex;gap:5px}
+@media(max-width:640px){.teacher-assignment-form{grid-template-columns:minmax(0,1fr)}.teacher-assignment-form>button{min-height:44px}}
