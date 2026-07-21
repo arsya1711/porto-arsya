@@ -1152,7 +1152,7 @@ function UserManagement({
         onFilterChange={setActiveFilter}
         onExport={exportUsers}
       />
-      <div className="table-card users-table">
+      <div className="table-card users-table responsive-card-table">
         <table>
           <thead>
             <tr>

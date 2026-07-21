@@ -67,6 +67,13 @@ export function PdfQuestionImportModal({
     [bankId, existingQuestions],
   );
 
+  /// Soal tanpa kunci boleh masuk bank, tetapi ditolak saat menyusun ujian —
+  /// tanpa kunci, penilaian otomatis menilai semua jawaban siswa salah.
+  const needsAnswerKey = (question: ParsedPdfQuestion) =>
+    question.type === "Pilihan Ganda"
+      ? question.correctOption === null
+      : !question.answerKey.trim();
+
   const errorsFor = (question: ParsedPdfQuestion) => {
     const errors = [...question.errors];
     const exact = existingBodies.some(
@@ -502,6 +509,9 @@ BOBOT: 2`}</pre>
                             <small>
                               SOAL {question.sourceNumber} · {question.type} ·{" "}
                               {question.difficulty} · bobot {question.weight}
+                              {needsAnswerKey(question) && (
+                                <b className="needs-key"> · kunci belum diisi</b>
+                              )}
                             </small>
                             <b>{question.text || "Pertanyaan kosong"}</b>
                             {question.type === "Pilihan Ganda" && (

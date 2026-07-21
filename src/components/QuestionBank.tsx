@@ -515,12 +515,12 @@ export function QuestionBank({ notify }: { notify: Notify }) {
     <div className="portal-page">
       <div className="page-title">
         <div>
-          <span>KONTEN PEMBELAJARAN</span>
+          <p>KONTEN PEMBELAJARAN</p>
           <h1>Bank Soal</h1>
-          <p>
+          <span>
             {questions.length} soal aktif dari{" "}
             {new Set(questions.map((q) => q.subject)).size} mata pelajaran.
-          </p>
+          </span>
         </div>
         <div className="title-actions">
           <button onClick={() => setCreateBank(true)}>
@@ -599,6 +599,21 @@ export function QuestionBank({ notify }: { notify: Notify }) {
         </div>
       </div>
 
+      <label className="mobile-bank-filter">
+        <span>Bank soal</span>
+        <select
+          value={selectedBank}
+          onChange={(event) => setSelectedBank(event.target.value)}
+        >
+          <option value="all">Semua soal ({questions.length})</option>
+          {banks.map((bank) => (
+            <option value={bank.id} key={bank.id}>
+              {bank.name} — {bank.questionCount} soal
+            </option>
+          ))}
+        </select>
+      </label>
+
       <div className="question-layout">
         <aside className="bank-list">
           <h3>
@@ -632,7 +647,7 @@ export function QuestionBank({ notify }: { notify: Notify }) {
           ))}
         </aside>
 
-        <div className="table-card question-table">
+        <div className="table-card question-table responsive-card-table">
           <table>
             <thead>
               <tr>
@@ -665,7 +680,7 @@ export function QuestionBank({ notify }: { notify: Notify }) {
               ) : visibleQuestions.length ? (
                 visibleQuestions.map((question) => (
                   <tr key={question.id}>
-                    <td className="question-select-column">
+                    <td className="question-select-column" data-label="Pilih">
                       <input
                         type="checkbox"
                         aria-label={`Pilih soal ${question.text}`}
@@ -678,7 +693,7 @@ export function QuestionBank({ notify }: { notify: Notify }) {
                         })}
                       />
                     </td>
-                    <td>
+                    <td data-label="Soal">
                       <div className="question-cell">
                         <small>
                           {question.bank} · {question.subject}
@@ -686,19 +701,19 @@ export function QuestionBank({ notify }: { notify: Notify }) {
                         <b title={question.text}>{question.text}</b>
                       </div>
                     </td>
-                    <td>
+                    <td data-label="Tipe">
                       <span className="type-badge">{question.type}</span>
                     </td>
-                    <td>
+                    <td data-label="Tingkat">
                       <span
                         className={`difficulty ${question.difficulty.toLowerCase()}`}
                       >
                         {question.difficulty}
                       </span>
                     </td>
-                    <td>{question.weight ?? 1}</td>
-                    <td>{question.used} ujian</td>
-                    <td>
+                    <td data-label="Bobot">{question.weight ?? 1}</td>
+                    <td data-label="Dipakai">{question.used} ujian</td>
+                    <td data-label="Aksi">
                       <div className="question-actions">
                         <button
                           title="Edit soal"

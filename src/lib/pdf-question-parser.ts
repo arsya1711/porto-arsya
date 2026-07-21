@@ -158,11 +158,13 @@ function parseBlock(sourceNumber: number, block: string): ParsedPdfQuestion {
     if (optionLetters.join("") !== expectedLetters.join("")) {
       errors.push("Urutan opsi harus berurutan mulai dari A.");
     }
-    if (correctOption === null || correctOption >= options.length) {
-      errors.push("Kunci pilihan ganda harus menunjuk opsi yang tersedia.");
+    // Kunci boleh kosong: naskah ujian sering tidak memuatnya, dan soal tetap
+    // berguna di bank untuk dilengkapi kemudian. Yang tetap salah adalah kunci
+    // yang menunjuk opsi tidak tersedia. Soal tanpa kunci ditolak saat dipakai
+    // menyusun ujian (lihat `save_managed_exam` pada migrasi 017).
+    if (correctOption !== null && correctOption >= options.length) {
+      errors.push("Kunci pilihan ganda menunjuk opsi yang tidak tersedia.");
     }
-  } else if (!answerKey) {
-    errors.push("Jawaban atau pedoman essay wajib diisi.");
   } else if (answerKey.length > 10000) {
     errors.push("Pedoman jawaban melebihi 10.000 karakter.");
   }

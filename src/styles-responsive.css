@@ -89,7 +89,7 @@ img {
 }
 
 /* Tablet: a fixed 236px sidebar leaves too little room on portrait screens. */
-@media (max-width: 1080px) {
+@media (max-width: 1180px) {
   .portal-sidebar {
     display: none;
   }
@@ -97,8 +97,39 @@ img {
   .portal-sidebar.mobile-open {
     display: flex;
     width: min(300px, 86vw);
+    z-index: 70;
     overflow-y: auto;
     padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    box-shadow: 18px 0 45px #0b13268a;
+  }
+
+  .mobile-nav-close {
+    display: grid;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 36px;
+    height: 36px;
+    place-items: center;
+    border: 0;
+    border-radius: 9px;
+    background: #ffffff12;
+    color: #fff;
+  }
+
+  .mobile-nav-close svg {
+    width: 18px;
+  }
+
+  .mobile-nav-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: #0b132699;
   }
 
   .portal-main {
@@ -161,6 +192,130 @@ img {
 
   .settings-functional-layout > aside button {
     min-width: max-content;
+  }
+}
+
+.mobile-bank-filter {
+  display: none;
+}
+
+@media (max-width: 1365px) {
+  .question-layout {
+    display: block;
+  }
+
+  .question-layout > .bank-list {
+    display: none;
+  }
+
+  .mobile-bank-filter {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border: 1px solid #e1e5ec;
+    border-radius: 9px;
+    background: #fff;
+  }
+
+  .mobile-bank-filter > span {
+    flex: 0 0 auto;
+    color: #657084;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .mobile-bank-filter select {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #344055;
+    font-size: 13px;
+    font-weight: 700;
+  }
+}
+
+/* Question/exam tables need a little more room than other data tables. */
+@media (min-width: 761px) and (max-width: 860px) {
+  :is(.question-table, .exam-management-table).responsive-card-table {
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  :is(.question-table, .exam-management-table).responsive-card-table table {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  :is(.question-table, .exam-management-table).responsive-card-table thead {
+    display: none;
+  }
+
+  :is(.question-table, .exam-management-table).responsive-card-table tbody {
+    display: grid;
+    gap: 10px;
+  }
+
+  :is(.question-table, .exam-management-table).responsive-card-table tbody tr {
+    display: block;
+    overflow: hidden;
+    border: 1px solid #e4e8ef;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 4px 14px rgba(23, 35, 60, 0.04);
+  }
+
+  :is(.question-table, .exam-management-table).responsive-card-table tbody td {
+    display: grid;
+    grid-template-columns: minmax(110px, 26%) minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 13px;
+    border-bottom: 1px solid #eef0f4;
+    color: #4f5b70;
+    white-space: normal;
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+
+  :is(.question-table, .exam-management-table).responsive-card-table tbody td:last-child {
+    border-bottom: 0;
+  }
+
+  :is(.question-table, .exam-management-table).responsive-card-table tbody td::before {
+    content: attr(data-label);
+    color: #8b95a7;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.55px;
+    text-transform: uppercase;
+  }
+
+  .question-table.responsive-card-table .question-select-column {
+    width: 100%;
+    padding-inline: 13px !important;
+    text-align: left !important;
+  }
+
+  .question-table.responsive-card-table .question-cell,
+  .question-table.responsive-card-table .question-cell b,
+  .exam-management-table.responsive-card-table .exam-cell,
+  .exam-management-table.responsive-card-table .exam-cell p {
+    min-width: 0;
+    white-space: normal;
+  }
+
+  .question-table.responsive-card-table .question-actions,
+  .exam-management-table.responsive-card-table .row-actions {
+    justify-content: flex-start;
   }
 }
 
@@ -377,6 +532,105 @@ img {
   .answer-options button > b {
     min-width: 0;
     overflow-wrap: anywhere;
+  }
+
+  .responsive-card-table {
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .responsive-card-table table {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .responsive-card-table thead {
+    display: none;
+  }
+
+  .responsive-card-table tbody {
+    display: grid;
+    gap: 10px;
+  }
+
+  .responsive-card-table tbody tr {
+    display: block;
+    overflow: hidden;
+    border: 1px solid #e4e8ef;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 4px 14px rgba(23, 35, 60, 0.04);
+  }
+
+  .responsive-card-table tbody td {
+    display: grid;
+    grid-template-columns: minmax(96px, 32%) minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 13px;
+    border-bottom: 1px solid #eef0f4;
+    color: #4f5b70;
+    white-space: normal;
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+
+  .responsive-card-table tbody td:last-child {
+    border-bottom: 0;
+  }
+
+  .responsive-card-table tbody td::before {
+    content: attr(data-label);
+    color: #8b95a7;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.55px;
+    text-transform: uppercase;
+  }
+
+  .responsive-card-table tbody td[colspan] {
+    display: block;
+    padding: 28px 16px;
+    text-align: center;
+  }
+
+  .responsive-card-table tbody td[colspan]::before {
+    content: none;
+  }
+
+  .responsive-card-table .question-select-column {
+    width: 100%;
+    padding-inline: 13px !important;
+    text-align: left !important;
+  }
+
+  .responsive-card-table .question-cell,
+  .responsive-card-table .question-cell b,
+  .responsive-card-table .student-cell,
+  .responsive-card-table .student-cell p,
+  .responsive-card-table .exam-cell,
+  .responsive-card-table .exam-cell p {
+    min-width: 0;
+    white-space: normal;
+  }
+
+  .responsive-card-table .question-cell b,
+  .responsive-card-table .student-cell small,
+  .responsive-card-table .exam-cell b,
+  .responsive-card-table .exam-cell small {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .responsive-card-table .question-actions,
+  .responsive-card-table .row-actions,
+  .responsive-card-table .user-actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
   }
 
   /* Admin data tables become readable records instead of miniature tables. */
@@ -904,6 +1158,11 @@ img {
   .role-admin .admin-master-table tbody td,
   .role-admin .users-table tbody td,
   .role-admin .audit-table tbody td {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+  }
+
+  .responsive-card-table tbody td {
     grid-template-columns: minmax(0, 1fr);
     gap: 3px;
   }

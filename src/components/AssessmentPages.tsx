@@ -401,18 +401,18 @@ export function RealExamManagement({
       {loading || error || !visibleExams.length ? (
         <PageState loading={loading} error={error} empty="Belum ada ujian. Buat ujian pertama dari bank soal yang tersedia." onRetry={() => void load()} />
       ) : (
-        <div className="table-card">
+        <div className="table-card exam-management-table responsive-card-table">
           <table>
             <thead><tr><th>UJIAN</th><th>KELAS</th><th>JADWAL</th><th>PESERTA</th><th>STATUS</th><th>AKSI</th></tr></thead>
             <tbody>
               {visibleExams.map((exam) => (
                 <tr key={exam.id}>
-                  <td><div className="exam-cell"><span>{relationName(exam.subjects, "UJ").slice(0, 2).toUpperCase()}</span><p><b>{exam.title}</b><small>{relationName(exam.subjects)} · {relationCount(exam.exam_questions)} soal</small></p></div></td>
-                  <td>{relationName(exam.classes)}</td>
-                  <td><b className="table-main">{formatDate(exam.starts_at)}</b><small>{exam.duration_minutes} menit</small></td>
-                  <td><div className="participant"><Users /> <span>{relationCount(exam.exam_assignments)} siswa</span></div></td>
-                  <td><span className={`status ${exam.status}`}><i />{exam.status[0].toUpperCase() + exam.status.slice(1)}</span></td>
-                  <td><div className="row-actions"><button type="button" title="Edit ujian" onClick={() => void openEdit(exam)}><Pencil /></button><button type="button" className="danger" title="Hapus ujian" onClick={() => void removeExam(exam)}><Trash2 /></button></div></td>
+                  <td data-label="Ujian"><div className="exam-cell"><span>{relationName(exam.subjects, "UJ").slice(0, 2).toUpperCase()}</span><p><b>{exam.title}</b><small>{relationName(exam.subjects)} · {relationCount(exam.exam_questions)} soal</small></p></div></td>
+                  <td data-label="Kelas">{relationName(exam.classes)}</td>
+                  <td data-label="Jadwal"><b className="table-main">{formatDate(exam.starts_at)}</b><small>{exam.duration_minutes} menit</small></td>
+                  <td data-label="Peserta"><div className="participant"><Users /> <span>{relationCount(exam.exam_assignments)} siswa</span></div></td>
+                  <td data-label="Status"><span className={`status ${exam.status}`}><i />{exam.status[0].toUpperCase() + exam.status.slice(1)}</span></td>
+                  <td data-label="Aksi"><div className="row-actions"><button type="button" title="Edit ujian" onClick={() => void openEdit(exam)}><Pencil /></button><button type="button" className="danger" title="Hapus ujian" onClick={() => void removeExam(exam)}><Trash2 /></button></div></td>
                 </tr>
               ))}
             </tbody>

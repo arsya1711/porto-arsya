@@ -38,11 +38,8 @@ function validate(question: ParsedPdfQuestion): string[] {
     if (question.options.some((option) => !option)) {
       errors.push("Semua opsi pilihan ganda wajib diisi.");
     }
-    if (question.correctOption === null) {
-      errors.push("Kunci pilihan ganda harus menunjuk opsi yang tersedia.");
-    }
-  } else if (!question.answerKey) {
-    errors.push("Jawaban atau pedoman essay wajib diisi.");
+    // Kunci jawaban tidak diambil dari naskah dan boleh menyusul; soal tanpa
+    // kunci ditolak saat dipakai menyusun ujian, bukan saat disimpan ke bank.
   }
   return errors;
 }
@@ -121,8 +118,14 @@ export async function extractQuestionsWithAi(
     toParsedQuestion(raw as AiQuestion, index),
   );
 
-  const errors: string[] = [
-    "Kunci jawaban tidak diambil dari naskah — isi manual sebelum menyimpan.",
-  ];
+  const needingKey = questions.filter(
+    (question) =>
+      question.type === "Pilihan Ganda" && question.correctOption === null,
+  ).length;
+  const errors = needingKey
+    ? [
+        `${needingKey} soal belum punya kunci jawaban. Soal tetap dapat disimpan ke bank, tetapi kunci wajib diisi sebelum soal dipakai menyusun ujian.`,
+      ]
+    : [];
   return { questions, errors };
 }
