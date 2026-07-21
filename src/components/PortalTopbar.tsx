@@ -69,6 +69,7 @@ export function PortalTopbar({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -79,10 +80,12 @@ export function PortalTopbar({
     const shortcut = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        searchRef.current?.focus();
+        setMobileSearchOpen(true);
+        window.requestAnimationFrame(() => searchRef.current?.focus());
       }
       if (event.key === "Escape") {
         setQuery("");
+        setMobileSearchOpen(false);
         setHelpOpen(false);
         setNoticeOpen(false);
         setAccountOpen(false);
@@ -159,13 +162,25 @@ export function PortalTopbar({
 
   const selectResult = (result: SearchResult) => {
     setQuery("");
+    setMobileSearchOpen(false);
     navigate(result.href);
+  };
+
+  const toggleMobileSearch = () => {
+    setMobileSearchOpen((open) => {
+      const nextOpen = !open;
+      if (nextOpen) window.requestAnimationFrame(() => searchRef.current?.focus());
+      return nextOpen;
+    });
+    setHelpOpen(false);
+    setNoticeOpen(false);
+    setAccountOpen(false);
   };
 
   return (
     <header className="topbar">
       <button className="mobile-menu" type="button" aria-label="Buka navigasi" onClick={onOpenNavigation}><Menu /></button>
-      <div className="global-search topbar-search">
+      <div className={`global-search topbar-search${mobileSearchOpen ? " mobile-open" : ""}`}>
         <Search />
         <input ref={searchRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={profile.role === "admin" ? "Cari pengguna, kelas, mata pelajaran, atau ujian…" : "Cari ujian, soal, atau siswa…"} />
         {query ? <button type="button" onClick={() => setQuery("")} aria-label="Bersihkan pencarian"><X /></button> : <kbd>Ctrl K</kbd>}
@@ -175,16 +190,17 @@ export function PortalTopbar({
         </div>}
       </div>
       <div className="top-actions">
+        <button type="button" className="mobile-search-toggle" aria-label={mobileSearchOpen ? "Tutup pencarian" : "Buka pencarian"} aria-expanded={mobileSearchOpen} onClick={toggleMobileSearch}>{mobileSearchOpen ? <X /> : <Search />}</button>
         <div className="top-action-wrap">
-          <button type="button" aria-label="Bantuan" onClick={() => { setHelpOpen((value) => !value); setNoticeOpen(false); setAccountOpen(false); }}><CircleHelp /></button>
+          <button type="button" aria-label="Bantuan" onClick={() => { setHelpOpen((value) => !value); setMobileSearchOpen(false); setNoticeOpen(false); setAccountOpen(false); }}><CircleHelp /></button>
           {helpOpen && <div className="topbar-popover help-popover"><div className="popover-title"><b>Pusat bantuan</b></div><p>Gunakan pencarian dengan <kbd>Ctrl K</kbd>. Semua perubahan data master tercatat pada Audit & Keamanan.</p><Link to={profile.role === "admin" ? "/app/audit" : "/app/pengaturan"} onClick={() => setHelpOpen(false)}><ShieldCheck />{profile.role === "admin" ? "Buka audit sistem" : "Buka profil akun"}</Link><Link to="/app/pengaturan" onClick={() => setHelpOpen(false)}><Settings />Buka pengaturan</Link></div>}
         </div>
         <div className="top-action-wrap">
-          <button type="button" className="notification" aria-label="Notifikasi" onClick={() => { setNoticeOpen((value) => !value); setHelpOpen(false); setAccountOpen(false); void loadNotices(); }}><Bell />{notices.length > 0 && <i />}</button>
+          <button type="button" className="notification" aria-label="Notifikasi" onClick={() => { setNoticeOpen((value) => !value); setMobileSearchOpen(false); setHelpOpen(false); setAccountOpen(false); void loadNotices(); }}><Bell />{notices.length > 0 && <i />}</button>
           {noticeOpen && <div className="topbar-popover notice-popover"><div className="popover-title"><b>Notifikasi</b><button type="button" onClick={() => void loadNotices()}>Segarkan</button></div>{noticeLoading ? <p className="popover-empty">Memuat notifikasi…</p> : !notices.length ? <p className="popover-empty">Tidak ada notifikasi baru.</p> : notices.map((notice) => <Link key={notice.id} to={notice.href} onClick={() => setNoticeOpen(false)}><span><Clock3 /></span><p><b>{notice.title}</b><small>{notice.detail} · {notice.time}</small></p></Link>)}</div>}
         </div>
         <div className="top-action-wrap">
-          <button type="button" className="avatar" title={profile.full_name} onClick={() => { setAccountOpen((value) => !value); setHelpOpen(false); setNoticeOpen(false); }}>{initials(profile.full_name)}</button>
+          <button type="button" className="avatar" title={profile.full_name} onClick={() => { setAccountOpen((value) => !value); setMobileSearchOpen(false); setHelpOpen(false); setNoticeOpen(false); }}>{initials(profile.full_name)}</button>
           {accountOpen && <div className="topbar-popover account-popover"><div className="account-summary"><span><GraduationCap /></span><p><b>{profile.full_name}</b><small>{profile.email}</small><em>{profile.role}</em></p></div><Link to="/app/pengaturan" onClick={() => setAccountOpen(false)}><Settings />Pengaturan akun</Link><button type="button" onClick={logout}><LogOut />Keluar</button></div>}
         </div>
       </div>

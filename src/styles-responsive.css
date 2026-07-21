@@ -88,6 +88,10 @@ img {
   width: min(520px, calc(100vw - 28px));
 }
 
+.mobile-search-toggle {
+  display: none;
+}
+
 /* Tablet: a fixed 236px sidebar leaves too little room on portrait screens. */
 @media (max-width: 1180px) {
   .portal-sidebar {
@@ -108,8 +112,8 @@ img {
     position: absolute;
     top: 10px;
     right: 10px;
-    width: 36px;
-    height: 36px;
+    width: 44px;
+    height: 44px;
     place-items: center;
     border: 0;
     border-radius: 9px;
@@ -171,6 +175,14 @@ img {
 
   .portal-mobile-nav svg {
     width: 18px;
+  }
+
+  .portal-mobile-nav a.active {
+    color: #315ce8;
+  }
+
+  .portal-mobile-nav a.active svg {
+    stroke-width: 2.4;
   }
 
   .portal-page {
@@ -366,6 +378,60 @@ img {
     min-width: 0;
   }
 
+  .mobile-menu,
+  .top-actions > button,
+  .top-actions .top-action-wrap > button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .mobile-search-toggle {
+    display: grid;
+  }
+
+  .global-search.topbar-search.mobile-open {
+    position: fixed;
+    top: 62px;
+    right: 10px;
+    left: 10px;
+    z-index: 55;
+    display: flex;
+    width: auto;
+    max-width: none;
+    height: 46px;
+    min-height: 46px;
+    padding-inline: 12px;
+    border: 1px solid #dfe3eb;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 12px 32px rgba(23, 35, 60, 0.16);
+  }
+
+  .global-search.topbar-search.mobile-open input {
+    min-width: 0;
+    font-size: 13px;
+  }
+
+  .global-search.topbar-search.mobile-open > button {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+  }
+
+  .global-search.topbar-search.mobile-open kbd {
+    display: none;
+  }
+
+  .global-search.topbar-search.mobile-open .search-results {
+    position: absolute;
+    top: 52px;
+    right: 0;
+    bottom: auto;
+    left: 0;
+    width: 100%;
+    max-height: calc(100dvh - 126px);
+  }
+
   .portal-page {
     padding: 24px 14px calc(76px + env(safe-area-inset-bottom));
   }
@@ -406,6 +472,26 @@ img {
     width: 100%;
   }
 
+  .toolbar > div:first-child,
+  .toolbar > button,
+  .toolbar-filter,
+  .question-filters select,
+  .report-filter select,
+  .report-filter button,
+  .title-actions > button,
+  .title-actions > a,
+  .settings-functional-layout > aside button {
+    min-height: 44px;
+  }
+
+  .toolbar > .question-filters {
+    height: auto;
+  }
+
+  .question-filters select {
+    height: 44px;
+  }
+
   .report-filter {
     flex-wrap: wrap;
     overflow: visible;
@@ -417,7 +503,7 @@ img {
   }
 
   .report-filter button {
-    min-height: 38px;
+    min-height: 44px;
   }
 
   .settings-real-grid {
@@ -509,6 +595,40 @@ img {
     bottom: 0;
     z-index: 2;
     background: #fff;
+  }
+
+  .pdf-import-modal .pdf-question-list {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .simple-modal > header > button,
+  .wizard > header > button,
+  .table-footer button,
+  .number-grid button,
+  .responsive-card-table .question-actions button,
+  .responsive-card-table .row-actions button,
+  .responsive-card-table .user-actions button:has(svg),
+  .role-admin .master-actions button:has(svg) {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+  }
+
+  .responsive-card-table .user-actions button,
+  .role-admin .master-actions button,
+  .option-editor label > button,
+  .pdf-preview-head button,
+  .simple-modal > footer button,
+  .wizard > footer button,
+  .submit-modal footer button {
+    min-height: 44px;
+  }
+
+  .password-control > button {
+    right: 2px;
+    width: 40px;
+    height: 40px;
   }
 
   .runner {
@@ -748,7 +868,7 @@ img {
     margin-top: 14px;
   }
 
-  .role-admin .analysis-row {
+  .analysis-row {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 4px 9px;
@@ -756,25 +876,36 @@ img {
     padding: 13px;
   }
 
-  .role-admin .analysis-row > span:first-child {
+  .analysis-row > span:first-child {
+    grid-row: 1;
+    grid-column: 1;
     margin-right: 0;
   }
 
-  .role-admin .analysis-row > p {
+  .analysis-row > p {
+    grid-row: 1;
+    grid-column: 2 / 4;
     min-width: 0;
   }
 
-  .role-admin .analysis-row > p b {
+  .analysis-row > p b {
     overflow-wrap: anywhere;
   }
 
-  .role-admin .analysis-row > div {
-    grid-column: 2 / 4;
+  .analysis-row > div {
+    grid-row: 2;
+    grid-column: 2;
     display: flex;
     width: auto;
     align-items: center;
     justify-content: space-between;
     gap: 10px;
+  }
+
+  .analysis-row > .difficulty {
+    grid-row: 2;
+    grid-column: 3;
+    justify-self: end;
   }
 }
 
@@ -952,7 +1083,8 @@ img {
   .top-actions .top-action-wrap > button,
   .top-actions > button,
   .mobile-menu {
-    width: 32px;
+    width: 44px;
+    height: 44px;
   }
 
   .top-actions .top-action-wrap > .avatar {
@@ -967,6 +1099,18 @@ img {
     left: 10px;
     width: auto;
     max-height: calc(100dvh - 76px);
+  }
+
+  .real-dashboard .schedule-list > div {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .real-dashboard .schedule-list .status {
+    display: inline-flex;
+    padding: 4px 6px;
+    font-size: 10px;
   }
 
   .stats-grid {

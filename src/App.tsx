@@ -11,6 +11,7 @@ import {
 import {
   Link,
   Navigate,
+  NavLink,
   Route,
   Routes,
   useLocation,
@@ -712,10 +713,10 @@ function MobilePortalNav({ role }: { role: Role }) {
   return (
     <nav className="portal-mobile-nav">
       {items.map(([to, icon, label]) => (
-        <Link to={to as string} key={to as string}>
+        <NavLink to={to as string} key={to as string} end={to === "/app"}>
           {icon}
           <span>{label}</span>
-        </Link>
+        </NavLink>
       ))}
     </nav>
   );
