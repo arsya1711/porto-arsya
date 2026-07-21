@@ -57,7 +57,8 @@ import {
   saveLocal,
   supabase,
 } from "./lib/supabase";
-import { AuthProvider, type Profile, useAuth } from "./auth/AuthContext";
+import { AuthProvider } from "./auth/AuthContext";
+import { type Profile, useAuth } from "./auth/auth-context";
 import { QuestionBank } from "./components/QuestionBank";
 import { StaffDashboard, StudentDashboard } from "./components/Dashboards";
 import {
@@ -509,12 +510,36 @@ function Portal({
   useEffect(() => {
     let animation: { kill: () => void } | undefined;
     let cancelled = false;
-    const target = document.querySelector(".portal-page");
+    const target = document.querySelector<HTMLElement>(".portal-page");
     if (!target || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     void import("gsap").then(({ gsap }) => {
-      if (!cancelled) animation = gsap.fromTo(target, { autoAlpha: 0, y: 14 }, { autoAlpha: 1, y: 0, duration: 0.38, ease: "power2.out" });
+      if (!cancelled) {
+        animation = gsap.fromTo(
+          target,
+          { autoAlpha: 0, y: 14 },
+          {
+            autoAlpha: 1,
+            y: 0,
+            duration: 0.38,
+            ease: "power2.out",
+            // Transform pada ancestor mengubah containing block elemen
+            // position:fixed. Jika dibiarkan, modal di halaman panjang akan
+            // dipusatkan jauh di bawah viewport dan hanya overlay yang tampak.
+            clearProps: "transform,translate,rotate,scale,opacity,visibility",
+          },
+        );
+      }
     });
-    return () => { cancelled = true; animation?.kill(); };
+    return () => {
+      cancelled = true;
+      animation?.kill();
+      target.style.removeProperty("transform");
+      target.style.removeProperty("translate");
+      target.style.removeProperty("rotate");
+      target.style.removeProperty("scale");
+      target.style.removeProperty("opacity");
+      target.style.removeProperty("visibility");
+    };
   }, [location.pathname]);
   return (
     <div className={`portal-shell role-${role}`}>

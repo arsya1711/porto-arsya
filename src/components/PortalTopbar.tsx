@@ -17,7 +17,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import type { Profile } from "../auth/AuthContext";
+import type { Profile } from "../auth/auth-context";
 import { supabase } from "../lib/supabase";
 
 type SearchResult = { id: string; title: string; detail: string; href: string; icon: "user" | "class" | "subject" | "exam" | "question" };

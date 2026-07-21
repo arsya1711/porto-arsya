@@ -18,7 +18,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useAuth } from "../auth/AuthContext";
+import { useAuth } from "../auth/auth-context";
 import { supabase } from "../lib/supabase";
 import type { ParsedPdfQuestion } from "../lib/pdf-question-parser";
 import { findSimilarQuestion, normalizeQuestion } from "../lib/question-similarity";

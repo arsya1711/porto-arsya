@@ -20,7 +20,7 @@ import {
   WifiOff,
 } from "lucide-react";
 import { BrandLogo } from "./BrandLogo";
-import type { Profile } from "../auth/AuthContext";
+import type { Profile } from "../auth/auth-context";
 import { supabase } from "../lib/supabase";
 import type { ExamStatus, StudentExamCatalogRow } from "../types";
 

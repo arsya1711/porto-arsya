@@ -1,31 +1,7 @@
-import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import type { Session, User } from '@supabase/supabase-js'
-import type { Role } from '../types'
+import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
+import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
-
-export type Profile = {
-  id: string
-  full_name: string
-  email: string
-  role: Role
-  student_number: string | null
-  active: boolean
-}
-
-type AuthContextValue = {
-  session: Session | null
-  user: User | null
-  profile: Profile | null
-  loading: boolean
-  passwordRecovery: boolean
-  login: (email: string, password: string) => Promise<Profile>
-  logout: () => Promise<void>
-  resetPassword: (email: string) => Promise<void>
-  updatePassword: (password: string) => Promise<void>
-  refreshProfile: () => Promise<void>
-}
-
-const AuthContext = createContext<AuthContextValue | null>(null)
+import { AuthContext, type AuthContextValue, type Profile } from './auth-context'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
@@ -136,11 +112,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }), [session, profile, loading, passwordRecovery, fetchProfile])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-}
-
-// eslint-disable-next-line react-refresh/only-export-components
-export function useAuth() {
-  const context = useContext(AuthContext)
-  if (!context) throw new Error('useAuth harus digunakan di dalam AuthProvider.')
-  return context
 }

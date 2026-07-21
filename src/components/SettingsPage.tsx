@@ -12,7 +12,7 @@ import {
   ShieldCheck,
   UserRound,
 } from "lucide-react";
-import type { Profile } from "../auth/AuthContext";
+import type { Profile } from "../auth/auth-context";
 import { isSupabaseConfigured, supabase } from "../lib/supabase";
 
 type Notify = (text: string, error?: boolean) => void;
