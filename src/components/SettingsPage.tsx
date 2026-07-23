@@ -157,7 +157,7 @@ export function RealSettingsPage({ profile, notify }: { profile: Profile; notify
 
   return (
     <div className="portal-page">
-      <div className="page-title"><div><p>PENGATURAN</p><h1>Pengaturan Aplikasi</h1><span>Kelola identitas, keamanan, periode akademik, dan notifikasi.</span></div></div>
+      <div className="page-title"><div><p>PENGATURAN</p><h1>Pengaturan Aplikasi</h1><span>{profile.role === "admin" ? "Kelola profil sekolah, keamanan, periode akademik, dan notifikasi." : "Lihat informasi akun dan atur notifikasi yang ingin diterima."}</span></div></div>
       <div className="settings-functional-layout">
         <aside>{availableTabs.map((item) => <button type="button" key={item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)}>{item.icon}{item.label}</button>)}</aside>
         <div>

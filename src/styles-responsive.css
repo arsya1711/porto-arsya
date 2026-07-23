@@ -753,7 +753,7 @@ img {
   .number-grid button,
   .responsive-card-table .question-actions button,
   .responsive-card-table .row-actions button,
-  .responsive-card-table .user-actions button:has(svg),
+  .responsive-card-table .user-actions > button:has(svg),
   .role-admin .master-actions button:has(svg) {
     width: 44px;
     min-width: 44px;
@@ -784,7 +784,7 @@ img {
     min-height: calc(100dvh - 62px);
   }
 
-  .runner-stats p {
+  .runner-timer {
     flex: 0 0 auto;
   }
 
@@ -1257,6 +1257,35 @@ img {
   .role-admin .grade-chart {
     min-width: 460px;
   }
+
+  .exam-modal-progress {
+    padding-inline: 16px;
+  }
+
+  .exam-modal-progress span {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .exam-modal-progress b {
+    white-space: normal;
+    line-height: 1.3;
+  }
+
+  .section-switcher {
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .section-switcher::-webkit-scrollbar {
+    display: none;
+  }
+
+  .section-switcher button {
+    flex: 0 0 auto;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1459,6 +1488,36 @@ img {
   .role-admin .dashboard-status-grid {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
+
+  .exam-review {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .exam-step {
+    min-height: 0;
+  }
+
+  .page-action-menu {
+    width: 100%;
+  }
+
+  .page-action-menu > summary {
+    justify-content: center;
+  }
+
+  .page-action-menu > div {
+    width: min(280px, calc(100vw - 28px));
+  }
+
+  .report-filter label {
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
+  }
+
+  .report-filter button {
+    width: 100%;
+  }
 }
 
 @media (max-width: 360px) {
@@ -1493,7 +1552,7 @@ img {
     justify-content: center;
   }
 
-  .runner-stats p {
+  .runner-timer {
     padding-inline: 6px;
   }
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -174,11 +174,13 @@ function PageState({
   error,
   empty,
   onRetry,
+  action,
 }: {
   loading: boolean;
   error: string;
   empty: string;
   onRetry?: () => void;
+  action?: ReactNode;
 }) {
   return (
     <div className="real-empty-state">
@@ -190,6 +192,7 @@ function PageState({
           <RefreshCw /> Coba lagi
         </button>
       )}
+      {!loading && !error && action}
     </div>
   );
 }
@@ -207,6 +210,7 @@ export function RealExamManagement({
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState<ExamDraft | null>(null);
+  const [examStep, setExamStep] = useState<0 | 1 | 2>(0);
   const [saving, setSaving] = useState(false);
   const [securityDefaults, setSecurityDefaults] = useState({ fullscreen: true, recordTabs: true });
 
@@ -272,7 +276,8 @@ export function RealExamManagement({
     );
   }, [exams, search]);
 
-  const openCreate = () =>
+  const openCreate = () => {
+    setExamStep(0);
     setDraft({
       title: "",
       description: "",
@@ -290,6 +295,7 @@ export function RealExamManagement({
       recordTabSwitches: securityDefaults.recordTabs,
       questionIds: [],
     });
+  };
 
   const openEdit = async (exam: ExamRow) => {
     if (!supabase) return;
@@ -302,6 +308,7 @@ export function RealExamManagement({
       notify(questionError.message, true);
       return;
     }
+    setExamStep(0);
     setDraft({
       id: exam.id,
       title: exam.title,
@@ -389,6 +396,35 @@ export function RealExamManagement({
     });
   };
 
+  const nextExamStep = () => {
+    if (!draft) return;
+    if (examStep === 0) {
+      if (!draft.title.trim() || !draft.subjectId || !draft.classId) {
+        notify("Lengkapi judul, mata pelajaran, dan kelas peserta.", true);
+        return;
+      }
+      if (!draft.startsAt || Number.isNaN(new Date(draft.startsAt).getTime()) || draft.duration < 1) {
+        notify("Periksa kembali jadwal mulai dan durasi ujian.", true);
+        return;
+      }
+    }
+    if (examStep === 1 && !draft.questionIds.length) {
+      notify("Pilih minimal satu soal sebelum melanjutkan.", true);
+      return;
+    }
+    setExamStep((current) => Math.min(2, current + 1) as 0 | 1 | 2);
+  };
+
+  const closeExamModal = () => {
+    if (saving) return;
+    setDraft(null);
+    setExamStep(0);
+  };
+
+  const selectedSubjectName = subjects.find((item) => item.id === draft?.subjectId)?.name ?? "Belum dipilih";
+  const selectedClassName = classes.find((item) => item.id === draft?.classId)?.name ?? "Belum dipilih";
+  const examStepTitles = ["Informasi dasar", "Pilih soal", "Keamanan & publikasi"];
+
   return (
     <div className="portal-page">
       <PageHeader
@@ -409,7 +445,13 @@ export function RealExamManagement({
         <button type="button" onClick={() => void load()}><RefreshCw /> Muat ulang</button>
       </div>
       {loading || error || !visibleExams.length ? (
-        <PageState loading={loading} error={error} empty="Belum ada ujian. Buat ujian pertama dari bank soal yang tersedia." onRetry={() => void load()} />
+        <PageState
+          loading={loading}
+          error={error}
+          empty={search ? "Tidak ada ujian yang sesuai dengan pencarian." : "Belum ada ujian. Buat ujian pertama dari bank soal yang tersedia."}
+          onRetry={() => void load()}
+          action={!search && subjects.length && classes.length ? <button type="button" className="primary" onClick={openCreate}><Plus /> Buat ujian pertama</button> : undefined}
+        />
       ) : (
         <div className="table-card exam-management-table responsive-card-table">
           <table>
@@ -431,39 +473,79 @@ export function RealExamManagement({
         </div>
       )}
       {draft && (
-        <div className="modal-overlay" onMouseDown={() => !saving && setDraft(null)}>
+        <div className="modal-overlay" onMouseDown={closeExamModal}>
           <div className="modal wide" onMouseDown={(event) => event.stopPropagation()}>
             <div className="simple-modal real-exam-modal">
-              <header><div><p>{draft.id ? "EDIT UJIAN" : "UJIAN BARU"}</p><h2>Informasi dan soal ujian</h2></div><button type="button" onClick={() => setDraft(null)}><X /></button></header>
-              <div className="modal-content">
-                <label className="form-field"><span>Judul ujian</span><input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="Contoh: Penilaian Tengah Semester" /></label>
-                <label className="form-field"><span>Deskripsi (opsional)</span><textarea rows={2} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} /></label>
-                <div className="form-grid">
-                  <label className="form-field"><span>Mata pelajaran</span><select value={draft.subjectId} onChange={(event) => setDraft({ ...draft, subjectId: event.target.value, questionIds: [] })}>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
-                  <label className="form-field"><span>Kelas peserta</span><select value={draft.classId} onChange={(event) => setDraft({ ...draft, classId: event.target.value })}>{classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-                  <label className="form-field"><span>Mulai</span><input type="datetime-local" value={draft.startsAt} onChange={(event) => setDraft({ ...draft, startsAt: event.target.value })} /></label>
-                  <label className="form-field"><span>Durasi (menit)</span><input type="number" min={1} value={draft.duration} onChange={(event) => setDraft({ ...draft, duration: Math.max(1, Number(event.target.value)) })} /></label>
-                  <label className="form-field"><span>{draft.hadAccessCode ? "Kode akses baru (kosong = pertahankan)" : "Kode akses (opsional)"}</span><input value={draft.accessCode} disabled={draft.removeAccessCode} minLength={4} maxLength={64} autoComplete="off" onChange={(event) => setDraft({ ...draft, accessCode: event.target.value.toUpperCase(), removeAccessCode: false })} /></label>
-                  <label className="form-field"><span>Status awal</span><select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as ExamDraft["status"] })}><option value="draft">Draft</option><option value="terjadwal">Terjadwal</option></select></label>
+              <header>
+                <div>
+                  <p>{draft.id ? "EDIT UJIAN" : "UJIAN BARU"} · LANGKAH {examStep + 1} DARI 3</p>
+                  <h2>{examStepTitles[examStep]}</h2>
                 </div>
-                {draft.hadAccessCode && <label className="real-remove-access-code"><input type="checkbox" checked={draft.removeAccessCode} onChange={(event) => setDraft({ ...draft, removeAccessCode: event.target.checked, accessCode: "" })} /> Hapus kode akses yang tersimpan</label>}
-                <div className="real-question-picker">
-                  <div><b>Pilih soal</b><span>{draft.questionIds.length} dipilih</span></div>
-                  {!filteredQuestions.length ? <p>Belum ada soal pada bank soal mata pelajaran ini.</p> : filteredQuestions.map((question) => (
-                    <label key={question.id}>
-                      <input type="checkbox" checked={draft.questionIds.includes(question.id)} onChange={(event) => toggleQuestion(question.id, event.target.checked)} />
-                      <span><b>{question.body}</b><small>{question.bank} · {question.type === "essay" ? "Essay" : "Pilihan Ganda"}</small></span>
-                    </label>
-                  ))}
-                </div>
-                <div className="switch-list real-switches">
-                  <label><span><b>Acak urutan soal</b><small>Urutan soal dapat berbeda untuk siswa.</small></span><input type="checkbox" checked={draft.shuffleQuestions} onChange={(event) => setDraft({ ...draft, shuffleQuestions: event.target.checked })} /></label>
-                  <label><span><b>Acak pilihan jawaban</b><small>Acak opsi pada soal pilihan ganda.</small></span><input type="checkbox" checked={draft.shuffleOptions} onChange={(event) => setDraft({ ...draft, shuffleOptions: event.target.checked })} /></label>
-                  <label><span><b>Pantau layar penuh</b><small>Catat perpindahan tab selama ujian.</small></span><input type="checkbox" checked={draft.fullscreenMode} onChange={(event) => setDraft({ ...draft, fullscreenMode: event.target.checked })} /></label>
-                  <label><span><b>Catat perpindahan tab</b><small>Simpan event integritas ketika siswa meninggalkan ujian.</small></span><input type="checkbox" checked={draft.recordTabSwitches} onChange={(event) => setDraft({ ...draft, recordTabSwitches: event.target.checked })} /></label>
-                </div>
+                <button type="button" aria-label="Tutup formulir ujian" onClick={closeExamModal}><X /></button>
+              </header>
+              <div className="exam-modal-progress" aria-label={`Langkah ${examStep + 1} dari 3`}>
+                {examStepTitles.map((title, index) => (
+                  <span key={title} aria-current={index === examStep ? "step" : undefined} className={index === examStep ? "active" : index < examStep ? "done" : ""}>
+                    <i>{index < examStep ? <CheckCircle2 /> : index + 1}</i>
+                    <b>{title}</b>
+                  </span>
+                ))}
               </div>
-              <footer><button type="button" onClick={() => setDraft(null)}>Batal</button><button type="button" className="primary" disabled={saving} onClick={() => void saveExam()}>{saving ? "Menyimpan…" : "Simpan ujian"}</button></footer>
+              <div className="modal-content">
+                {examStep === 0 && (
+                  <div className="exam-step">
+                    <p className="exam-step-intro">Tentukan identitas, peserta, dan waktu pelaksanaan ujian.</p>
+                    <label className="form-field"><span>Judul ujian</span><input autoFocus value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="Contoh: Penilaian Tengah Semester" /></label>
+                    <label className="form-field"><span>Deskripsi (opsional)</span><textarea rows={2} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} placeholder="Tambahkan petunjuk singkat untuk peserta." /></label>
+                    <div className="form-grid">
+                      <label className="form-field"><span>Mata pelajaran</span><select value={draft.subjectId} onChange={(event) => setDraft({ ...draft, subjectId: event.target.value, questionIds: [] })}>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
+                      <label className="form-field"><span>Kelas peserta</span><select value={draft.classId} onChange={(event) => setDraft({ ...draft, classId: event.target.value })}>{classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+                      <label className="form-field"><span>Mulai</span><input type="datetime-local" value={draft.startsAt} onChange={(event) => setDraft({ ...draft, startsAt: event.target.value })} /></label>
+                      <label className="form-field"><span>Durasi (menit)</span><input type="number" min={1} value={draft.duration} onChange={(event) => setDraft({ ...draft, duration: Math.max(1, Number(event.target.value)) })} /></label>
+                      <label className="form-field"><span>Status awal</span><select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as ExamDraft["status"] })}><option value="draft">Simpan sebagai draft</option><option value="terjadwal">Jadwalkan untuk peserta</option></select></label>
+                    </div>
+                  </div>
+                )}
+                {examStep === 1 && (
+                  <div className="exam-step">
+                    <p className="exam-step-intro">Menampilkan soal <b>{selectedSubjectName}</b>. Pilih minimal satu soal untuk ujian ini.</p>
+                    <div className="real-question-picker">
+                      <div><b>Daftar soal</b><span>{draft.questionIds.length} dipilih</span></div>
+                      {!filteredQuestions.length ? <p>Belum ada soal pada bank soal mata pelajaran ini. Tutup formulir, lalu tambahkan soal terlebih dahulu.</p> : filteredQuestions.map((question) => (
+                        <label key={question.id}>
+                          <input type="checkbox" checked={draft.questionIds.includes(question.id)} onChange={(event) => toggleQuestion(question.id, event.target.checked)} />
+                          <span><b>{question.body}</b><small>{question.bank} · {question.type === "essay" ? "Essay" : "Pilihan Ganda"}</small></span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {examStep === 2 && (
+                  <div className="exam-step">
+                    <div className="exam-review" aria-label="Ringkasan ujian">
+                      <div><small>Mata pelajaran</small><b>{selectedSubjectName}</b></div>
+                      <div><small>Kelas</small><b>{selectedClassName}</b></div>
+                      <div><small>Isi ujian</small><b>{draft.questionIds.length} soal · {draft.duration} menit</b></div>
+                    </div>
+                    <label className="form-field"><span>{draft.hadAccessCode ? "Kode akses baru (kosong = pertahankan)" : "Kode akses (opsional)"}</span><input value={draft.accessCode} disabled={draft.removeAccessCode} minLength={4} maxLength={64} autoComplete="off" placeholder="Minimal 4 karakter" onChange={(event) => setDraft({ ...draft, accessCode: event.target.value.toUpperCase(), removeAccessCode: false })} /></label>
+                    {draft.hadAccessCode && <label className="real-remove-access-code"><input type="checkbox" checked={draft.removeAccessCode} onChange={(event) => setDraft({ ...draft, removeAccessCode: event.target.checked, accessCode: "" })} /> Hapus kode akses yang tersimpan</label>}
+                    <div className="switch-list real-switches">
+                      <label><span><b>Acak urutan soal</b><small>Urutan soal dapat berbeda untuk setiap siswa.</small></span><input type="checkbox" checked={draft.shuffleQuestions} onChange={(event) => setDraft({ ...draft, shuffleQuestions: event.target.checked })} /></label>
+                      <label><span><b>Acak pilihan jawaban</b><small>Acak opsi pada soal pilihan ganda.</small></span><input type="checkbox" checked={draft.shuffleOptions} onChange={(event) => setDraft({ ...draft, shuffleOptions: event.target.checked })} /></label>
+                      <label><span><b>Wajibkan layar penuh</b><small>Minta siswa menjalankan ujian dalam mode layar penuh.</small></span><input type="checkbox" checked={draft.fullscreenMode} onChange={(event) => setDraft({ ...draft, fullscreenMode: event.target.checked })} /></label>
+                      <label><span><b>Catat perpindahan tab</b><small>Simpan kejadian ketika siswa meninggalkan halaman ujian.</small></span><input type="checkbox" checked={draft.recordTabSwitches} onChange={(event) => setDraft({ ...draft, recordTabSwitches: event.target.checked })} /></label>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <footer>
+                <button type="button" onClick={examStep === 0 ? closeExamModal : () => setExamStep((examStep - 1) as 0 | 1 | 2)}>{examStep === 0 ? "Batal" : "Kembali"}</button>
+                {examStep < 2 ? (
+                  <button type="button" className="primary" onClick={nextExamStep}>Lanjut</button>
+                ) : (
+                  <button type="button" className="primary" disabled={saving} onClick={() => void saveExam()}>{saving ? "Menyimpan…" : draft.status === "draft" ? "Simpan draft" : "Jadwalkan ujian"}</button>
+                )}
+              </footer>
             </div>
           </div>
         </div>
@@ -693,7 +775,13 @@ export function RealReports() {
     <div className="portal-page">
       <PageHeader eyebrow="LAPORAN & ANALITIK" title="Hasil Ujian" description="Ringkasan nilai dihitung dari jawaban dan percobaan ujian yang tersimpan." action={<button type="button" className="outline" onClick={exportCsv} disabled={!rows.length}><Download /> Ekspor CSV</button>} />
       {loading || error || !attempts.length ? <PageState loading={loading} error={error} empty="Belum ada ujian yang dikumpulkan siswa." onRetry={() => void loadAttempts()} /> : <>
-        <div className="report-filter"><select value={selectedExam} onChange={(event) => setSelectedExam(event.target.value)}>{examOptions.map(([id, title]) => <option key={id} value={id}>{title}</option>)}</select><button type="button" onClick={() => void loadAttempts()}>Perbarui data</button></div>
+        <div className="report-filter">
+          <label>
+            <span>Pilih ujian yang dianalisis</span>
+            <select value={selectedExam} onChange={(event) => setSelectedExam(event.target.value)}>{examOptions.map(([id, title]) => <option key={id} value={id}>{title}</option>)}</select>
+          </label>
+          <button type="button" onClick={() => void loadAttempts()}><RefreshCw /> Muat ulang</button>
+        </div>
         <div className="report-stats">
           <div><small>RATA-RATA</small><b>{scores.length ? average.toLocaleString("id-ID", { maximumFractionDigits: 1 }) : "—"}</b><span>{scores.length} nilai final</span></div>
           <div><small>NILAI TERTINGGI</small><b>{scores.length ? Math.max(...scores) : "—"}</b><span>{scores.length ? rows.find((item) => item.score === Math.max(...scores))?.studentName : "Belum ada"}</span></div>

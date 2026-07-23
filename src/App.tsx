@@ -28,6 +28,7 @@ import {
   CalendarDays,
   Check,
   CheckCircle2,
+  ChevronDown,
   ClipboardCheck,
   Clock3,
   Download,
@@ -38,6 +39,7 @@ import {
   LayoutDashboard,
   LockKeyhole,
   LogOut,
+  MoreHorizontal,
   Pencil,
   Plus,
   Search,
@@ -80,6 +82,11 @@ import {
   isAnsweredValue,
   normalizeStoredAnswers,
 } from "./lib/exam-answer-state";
+import {
+  formatExamRemaining,
+  parseExamDeadline,
+  remainingSecondsFromDeadline,
+} from "./lib/exam-timer";
 
 type Toast = { text: string; error?: boolean } | null;
 
@@ -476,27 +483,60 @@ function Portal({
       window.removeEventListener("school-settings-updated", loadTimeout);
     };
   }, [logout]);
-  const teacherNav: [string, ReactNode, string][] = [
-    ["/app", <LayoutDashboard />, "Ringkasan"],
-    ["/app/ujian", <CalendarDays />, "Ujian"],
-    ["/app/bank-soal", <FileQuestion />, "Bank Soal"],
-    ["/app/kelas", <Users />, "Kelas & Siswa"],
-    ["/app/koreksi", <ClipboardCheck />, "Koreksi"],
-    ["/app/laporan", <BarChart3 />, "Laporan"],
-    ["/app/rapor", <BookOpenCheck />, "Rapor"],
+  type NavItem = [string, ReactNode, string];
+  type NavGroup = { label: string; items: NavItem[] };
+  const teacherNav: NavGroup[] = [
+    {
+      label: "Utama",
+      items: [["/app", <LayoutDashboard />, "Ringkasan"]],
+    },
+    {
+      label: "Persiapan ujian",
+      items: [
+        ["/app/bank-soal", <FileQuestion />, "Bank Soal"],
+        ["/app/ujian", <CalendarDays />, "Ujian"],
+        ["/app/kelas", <Users />, "Kelas & Siswa"],
+      ],
+    },
+    {
+      label: "Penilaian",
+      items: [
+        ["/app/koreksi", <ClipboardCheck />, "Koreksi Essay"],
+        ["/app/laporan", <BarChart3 />, "Hasil Ujian"],
+        ["/app/rapor", <BookOpenCheck />, "Rapor Semester"],
+      ],
+    },
   ];
-  const adminNav: [string, ReactNode, string][] = [
-    ["/app", <LayoutDashboard />, "Ringkasan"],
-    ["/app/tahun-ajaran", <CalendarDays />, "Tahun Ajaran"],
-    ["/app/mata-pelajaran", <BookOpen />, "Mata Pelajaran"],
-    ["/app/kelas", <Users />, "Kelas & Siswa"],
-    ["/app/guru", <UserRound />, "Guru"],
-    ["/app/admin", <ShieldCheck />, "Administrator"],
-    ["/app/laporan", <BarChart3 />, "Laporan Sekolah"],
-    ["/app/rapor", <BookOpenCheck />, "Rapor"],
-    ["/app/audit", <LockKeyhole />, "Audit & Keamanan"],
+  const adminNav: NavGroup[] = [
+    {
+      label: "Utama",
+      items: [["/app", <LayoutDashboard />, "Ringkasan"]],
+    },
+    {
+      label: "Akademik",
+      items: [
+        ["/app/tahun-ajaran", <CalendarDays />, "Tahun Ajaran"],
+        ["/app/mata-pelajaran", <BookOpen />, "Mata Pelajaran"],
+        ["/app/kelas", <Users />, "Kelas & Siswa"],
+      ],
+    },
+    {
+      label: "Akses pengguna",
+      items: [
+        ["/app/guru", <UserRound />, "Guru"],
+        ["/app/admin", <ShieldCheck />, "Administrator"],
+      ],
+    },
+    {
+      label: "Pemantauan",
+      items: [
+        ["/app/laporan", <BarChart3 />, "Hasil Ujian"],
+        ["/app/rapor", <BookOpenCheck />, "Rapor Semester"],
+        ["/app/audit", <LockKeyhole />, "Audit & Keamanan"],
+      ],
+    },
   ];
-  const nav = role === "admin" ? adminNav : teacherNav;
+  const navGroups = role === "admin" ? adminNav : teacherNav;
   useEffect(() => setMobileNavigationOpen(false), [location.pathname]);
   useEffect(() => {
     if (!mobileNavigationOpen) return;
@@ -576,24 +616,35 @@ function Portal({
           </b>
         </Link>
         <nav>
-          {nav.map(([to, icon, label]) => (
-            <Link
-              key={to}
-              className={location.pathname === to ? "active" : ""}
-              to={to}
-              onClick={() => setMobileNavigationOpen(false)}
-            >
-              {icon}
-              {label}
-            </Link>
+          {navGroups.map((group) => (
+            <div className="portal-nav-group" role="group" aria-label={group.label} key={group.label}>
+              <p>{group.label}</p>
+              {group.items.map(([to, icon, label]) => (
+                <Link
+                  key={to}
+                  className={location.pathname === to ? "active" : ""}
+                  to={to}
+                  aria-current={location.pathname === to ? "page" : undefined}
+                  onClick={() => setMobileNavigationOpen(false)}
+                >
+                  {icon}
+                  {label}
+                </Link>
+              ))}
+            </div>
           ))}
         </nav>
         <div className="side-bottom">
-          <Link to="/app/pengaturan" onClick={() => setMobileNavigationOpen(false)}>
+          <Link
+            to="/app/pengaturan"
+            className={location.pathname === "/app/pengaturan" ? "active" : ""}
+            aria-current={location.pathname === "/app/pengaturan" ? "page" : undefined}
+            onClick={() => setMobileNavigationOpen(false)}
+          >
             <Settings />
             Pengaturan
           </Link>
-          <button onClick={() => { setMobileNavigationOpen(false); void logout(); }}>
+          <button type="button" onClick={() => { setMobileNavigationOpen(false); void logout(); }}>
             <LogOut />
             Keluar
           </button>
@@ -1215,23 +1266,47 @@ function UserManagement({
           canManage ? (
             <div className="title-actions">
               {roleFilter === "siswa" && (
-                <>
-                  <button onClick={() => void deleteClass()} disabled={!classFilter}>
-                    <Trash2 /> Hapus kelas
-                  </button>
-                  {selectedClassOption && (
-                    <button onClick={() => setClassEditor(selectedClassOption)}>
-                      <Pencil /> Atur kelas
+                <details className="page-action-menu">
+                  <summary>
+                    <MoreHorizontal /> Kelola kelas <ChevronDown />
+                  </summary>
+                  <div>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        setClassEditor("new");
+                        event.currentTarget.closest("details")?.removeAttribute("open");
+                      }}
+                    >
+                      <Plus /> Tambah kelas
                     </button>
-                  )}
-                  <button onClick={() => setClassEditor("new")}>
-                    <Plus /> Tambah kelas
-                  </button>
-                </>
+                    <button
+                      type="button"
+                      disabled={!selectedClassOption}
+                      onClick={(event) => {
+                        if (selectedClassOption) setClassEditor(selectedClassOption);
+                        event.currentTarget.closest("details")?.removeAttribute("open");
+                      }}
+                    >
+                      <Pencil /> Ubah kelas terpilih
+                    </button>
+                    <button
+                      type="button"
+                      className="danger"
+                      disabled={!classFilter}
+                      onClick={(event) => {
+                        event.currentTarget.closest("details")?.removeAttribute("open");
+                        void deleteClass();
+                      }}
+                    >
+                      <Trash2 /> Hapus kelas terpilih
+                    </button>
+                  </div>
+                </details>
               )}
               <button className="primary" onClick={() => setCreate(true)}>
                 <UserPlus />
-                Tambah {roleFilter}
+                Tambah {roleFilter === "siswa" ? "siswa" : roleFilter === "guru" ? "guru" : "admin"}
               </button>
             </div>
           ) : undefined
@@ -1350,35 +1425,52 @@ function UserManagement({
                         <button
                           onClick={() => setEditing(user)}
                           title="Edit pengguna"
+                          aria-label={`Edit ${user.full_name}`}
                         >
                           <Pencil />
                         </button>
-                        <button
-                          onClick={() => setResetting(user)}
-                          title="Reset kata sandi"
-                        >
-                          <LockKeyhole />
-                        </button>
-                        {roleFilter === "guru" && (
-                          <button
-                            className="assignment-button"
-                            onClick={() => setAssigning(user)}
-                            title="Atur penugasan guru"
-                            aria-label={`Atur penugasan ${user.full_name}`}
-                          >
-                            <BookOpen /> Penugasan
-                          </button>
-                        )}
-                        <button onClick={() => toggleUser(user)}>
-                          {user.active ? "Nonaktifkan" : "Aktifkan"}
-                        </button>
-                        <button
-                          className="danger"
-                          onClick={() => deleteUser(user)}
-                          title="Hapus pengguna"
-                        >
-                          <Trash2 />
-                        </button>
+                        <details className="user-row-menu">
+                          <summary>
+                            <MoreHorizontal /> Aksi lain <ChevronDown />
+                          </summary>
+                          <div>
+                            <button
+                              onClick={(event) => {
+                                setResetting(user);
+                                event.currentTarget.closest("details")?.removeAttribute("open");
+                              }}
+                            >
+                              <LockKeyhole /> Reset kata sandi
+                            </button>
+                            {roleFilter === "guru" && (
+                              <button
+                                onClick={(event) => {
+                                  setAssigning(user);
+                                  event.currentTarget.closest("details")?.removeAttribute("open");
+                                }}
+                              >
+                                <BookOpen /> Atur penugasan
+                              </button>
+                            )}
+                            <button
+                              onClick={(event) => {
+                                event.currentTarget.closest("details")?.removeAttribute("open");
+                                void toggleUser(user);
+                              }}
+                            >
+                              {user.active ? "Nonaktifkan akun" : "Aktifkan akun"}
+                            </button>
+                            <button
+                              className="danger"
+                              onClick={(event) => {
+                                event.currentTarget.closest("details")?.removeAttribute("open");
+                                void deleteUser(user);
+                              }}
+                            >
+                              <Trash2 /> Hapus pengguna
+                            </button>
+                          </div>
+                        </details>
                       </div>
                     )}
                   </td>
@@ -2058,7 +2150,7 @@ function ExamRunner({
   const [marked, setMarked] = useState<string[]>(() =>
     loadLocal(`marked:${examId}`, []),
   );
-  const [remaining, setRemaining] = useState(90 * 60);
+  const [remaining, setRemaining] = useState(0);
   const [submit, setSubmit] = useState(false);
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<RunnerQuestion[]>([]);
@@ -2079,6 +2171,7 @@ function ExamRunner({
   const pendingEssay = useRef<{ questionId: string; value: string } | null>(null);
   const answerSaveQueue = useRef<Record<string, Promise<boolean>>>({});
   const finishingRef = useRef(false);
+  const deadlineRef = useRef<number | null>(null);
   const [pendingSaves, setPendingSaves] = useState(0);
   const [submittingExam, setSubmittingExam] = useState(false);
   const [studentId, setStudentId] = useState<string | null>(null);
@@ -2089,6 +2182,8 @@ function ExamRunner({
     let active = true;
     const load = async () => {
       setLoadingExam(true);
+      deadlineRef.current = null;
+      setRemaining(0);
       const [{ data: authData }, catalogResult] = await Promise.all([
         client.auth.getUser(),
         client.rpc("get_student_exam_catalog"),
@@ -2135,7 +2230,13 @@ function ExamRunner({
       }
       setAttemptId(startedAttempt.attempt_id);
       setNeedsAccessCode(false);
-      const deadlineTime = new Date(startedAttempt.deadline).getTime();
+      const deadlineTime = parseExamDeadline(startedAttempt.deadline);
+      if (deadlineTime === null) {
+        setExamError("Batas waktu ujian dari server tidak valid. Hubungi pengawas.");
+        setLoadingExam(false);
+        return;
+      }
+      deadlineRef.current = deadlineTime;
       if (deadlineTime <= Date.now()) {
         const localAnswers = loadLocal<Record<string, number | string>>(`answers:${examId}`, {});
         const localAnswerEntries = Object.entries(localAnswers);
@@ -2206,7 +2307,7 @@ function ExamRunner({
         fullscreen: examRow.fullscreen_mode ?? true,
         recordTabSwitches: examRow.record_tab_switches ?? true,
       });
-      setRemaining(Math.max(0, Math.floor((deadlineTime - Date.now()) / 1000)));
+      setRemaining(remainingSecondsFromDeadline(deadlineTime));
       const localAnswers = normalizeStoredAnswers(
         loadLocal<unknown>(`answers:${examId}`, {}),
       );
@@ -2217,11 +2318,20 @@ function ExamRunner({
     return () => { active = false; };
   }, [examId, navigate, notify, submittedAccessCode, startRequest]);
   useEffect(() => {
-    const id = window.setInterval(
-      () => setRemaining((v) => Math.max(0, v - 1)),
-      1000,
-    );
-    return () => clearInterval(id);
+    const updateRemaining = () => {
+      if (deadlineRef.current === null) return;
+      setRemaining(
+        remainingSecondsFromDeadline(deadlineRef.current),
+      );
+    };
+    const id = window.setInterval(updateRemaining, 1000);
+    document.addEventListener("visibilitychange", updateRemaining);
+    window.addEventListener("focus", updateRemaining);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", updateRemaining);
+      window.removeEventListener("focus", updateRemaining);
+    };
   }, []);
   useEffect(() => {
     const handler = async () => {
@@ -2289,11 +2399,7 @@ function ExamRunner({
     () => Object.values(answers).filter(isAnsweredValue).length,
     [answers],
   );
-  const time = useMemo(
-    () =>
-      `${String(Math.floor(remaining / 3600)).padStart(2, "0")}:${String(Math.floor((remaining % 3600) / 60)).padStart(2, "0")}:${String(remaining % 60).padStart(2, "0")}`,
-    [remaining],
-  );
+  const time = useMemo(() => formatExamRemaining(remaining), [remaining]);
   const persistAnswer = useCallback((questionId: string, value: number | string) => {
     const save = async () => {
       if (!supabase || !attemptId) return false;
@@ -2403,8 +2509,8 @@ function ExamRunner({
     if (essaySaveTimer.current !== null) window.clearTimeout(essaySaveTimer.current);
   }, []);
   useEffect(() => {
-    if (remaining === 0 && attemptId) void finish();
-  }, [remaining, attemptId, finish]);
+    if (!loadingExam && remaining === 0 && attemptId) void finish();
+  }, [remaining, attemptId, finish, loadingExam]);
   if (loadingExam) {
     return <div className="auth-loading"><span><BrandLogo /></span><p>Menyiapkan AWExam…</p></div>;
   }
@@ -2462,13 +2568,17 @@ function ExamRunner({
             <Wifi />
             {saveStatus}
           </span>
-          <p>
+          <time
+            className={`runner-timer${remaining <= 300 ? " urgent" : remaining <= 900 ? " warning" : ""}`}
+            dateTime={`PT${remaining}S`}
+            aria-label={`Sisa waktu ${time}`}
+          >
             <small>SISA WAKTU</small>
             <b>
-              <Clock3 />
+              <Clock3 aria-hidden="true" />
               {time}
             </b>
-          </p>
+          </time>
           <button onClick={() => setSubmit(true)}>Kumpulkan</button>
         </div>
       </header>
