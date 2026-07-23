@@ -893,7 +893,13 @@ type ManagedUser = Profile & {
   class_id: string | null;
   class_name: string | null;
 };
-type ClassOption = { id: string; name: string };
+type ClassOption = {
+  id: string;
+  name: string;
+  academic_year_id: string | null;
+  academic_year_name: string;
+};
+type AcademicYearOption = { id: string; name: string; active: boolean };
 type SubjectOption = { id: string; name: string };
 
 function UserManagement({
@@ -920,6 +926,10 @@ function UserManagement({
   const [subjects, setSubjects] = useState<SubjectOption[]>([]);
   const [classFilter, setClassFilter] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
+  const [academicYears, setAcademicYears] = useState<AcademicYearOption[]>([]);
+  const [classEditor, setClassEditor] = useState<ClassOption | "new" | null>(
+    null,
+  );
   const loadUsers = useCallback(async () => {
     if (!supabase) return;
     setLoading(true);
@@ -932,17 +942,40 @@ function UserManagement({
       .order("created_at", { ascending: false });
     const classQuery =
       roleFilter === "siswa" || roleFilter === "guru"
-        ? supabase.from("classes").select("id,name").order("name")
-        : Promise.resolve({ data: [] as ClassOption[], error: null });
+        ? supabase
+            .from("classes")
+            .select("id,name,academic_year_id,academic_years(name)")
+            .order("name")
+        : Promise.resolve({
+            data: [] as {
+              id: string;
+              name: string;
+              academic_year_id: string | null;
+              academic_years: unknown;
+            }[],
+            error: null,
+          });
+    const academicYearQuery =
+      roleFilter === "siswa" && canManage
+        ? supabase
+            .from("academic_years")
+            .select("id,name,active")
+            .order("name", { ascending: false })
+        : Promise.resolve({
+            data: [] as AcademicYearOption[],
+            error: null,
+          });
     const subjectQuery =
       roleFilter === "guru"
         ? supabase.from("subjects").select("id,name").order("name")
         : Promise.resolve({ data: [] as SubjectOption[], error: null });
-    const [profileResult, classResult, subjectResult] = await Promise.all([
-      profileQuery,
-      classQuery,
-      subjectQuery,
-    ]);
+    const [profileResult, classResult, subjectResult, academicYearResult] =
+      await Promise.all([
+        profileQuery,
+        classQuery,
+        subjectQuery,
+        academicYearQuery,
+      ]);
     if (profileResult.error) notify(profileResult.error.message, true);
     else {
       const normalized = (profileResult.data ?? []).map((row) => {
@@ -961,11 +994,31 @@ function UserManagement({
       setUsers(normalized);
     }
     if (classResult.error) notify(classResult.error.message, true);
-    else setClasses((classResult.data ?? []) as ClassOption[]);
+    else {
+      setClasses(
+        (classResult.data ?? []).map((item) => {
+          const academicYearName = relationName(item.academic_years);
+          return {
+            id: item.id,
+            name: item.name,
+            academic_year_id: item.academic_year_id,
+            academic_year_name:
+              academicYearName === "—" ? "Belum diatur" : academicYearName,
+          };
+        }),
+      );
+    }
     if (subjectResult.error) notify(subjectResult.error.message, true);
     else setSubjects((subjectResult.data ?? []) as SubjectOption[]);
+    if (academicYearResult.error) {
+      notify(academicYearResult.error.message, true);
+    } else {
+      setAcademicYears(
+        (academicYearResult.data ?? []) as AcademicYearOption[],
+      );
+    }
     setLoading(false);
-  }, [notify, roleFilter]);
+  }, [canManage, notify, roleFilter]);
   useEffect(() => {
     loadUsers();
   }, [loadUsers]);
@@ -1078,25 +1131,31 @@ function UserManagement({
       );
     }
   };
-  const createClass = async () => {
+  const saveClass = async (draft: {
+    id?: string;
+    name: string;
+    academicYearId: string;
+  }) => {
     if (!supabase) return;
-    const name = window.prompt("Nama kelas baru (contoh: IX A):")?.trim();
-    if (!name) return;
-    const { data: activeYear, error: yearError } = await supabase
-      .from("academic_years")
-      .select("id")
-      .eq("active", true)
-      .maybeSingle();
-    if (yearError) return notify(yearError.message, true);
-    const { error } = await supabase.from("classes").insert({
-      name,
-      academic_year_id: activeYear?.id ?? null,
-    });
-    if (error) notify(error.message, true);
-    else {
-      notify("Kelas berhasil ditambahkan.");
-      await loadUsers();
+    const payload = {
+      name: draft.name.trim(),
+      academic_year_id: draft.academicYearId,
+    };
+    const result = draft.id
+      ? await supabase.from("classes").update(payload).eq("id", draft.id)
+      : await supabase.from("classes").insert(payload);
+    if (result.error) {
+      notify(result.error.message, true);
+      return false;
     }
+    setClassEditor(null);
+    notify(
+      draft.id
+        ? "Kelas dan tahun ajaran berhasil diperbarui."
+        : "Kelas berhasil ditambahkan.",
+    );
+    await loadUsers();
+    return true;
   };
   const deleteClass = async () => {
     if (!supabase || !classFilter) {
@@ -1128,6 +1187,9 @@ function UserManagement({
         user.role,
       ].some((value) => value.toLowerCase().includes(normalizedQuery)),
   );
+  const selectedClassOption = classes.find(
+    (item) => item.id === classFilter,
+  );
   const exportUsers = () => {
     const headers = roleFilter === "siswa"
       ? ["Nama", "Email", "Kelas", "NIS", "Status", "Dibuat"]
@@ -1157,7 +1219,12 @@ function UserManagement({
                   <button onClick={() => void deleteClass()} disabled={!classFilter}>
                     <Trash2 /> Hapus kelas
                   </button>
-                  <button onClick={() => void createClass()}>
+                  {selectedClassOption && (
+                    <button onClick={() => setClassEditor(selectedClassOption)}>
+                      <Pencil /> Atur kelas
+                    </button>
+                  )}
+                  <button onClick={() => setClassEditor("new")}>
                     <Plus /> Tambah kelas
                   </button>
                 </>
@@ -1171,26 +1238,49 @@ function UserManagement({
         }
       />
       {roleFilter === "siswa" && (
-        <div className="class-tabs">
-          <button
-            className={classFilter === "" ? "active" : ""}
-            onClick={() => setClassFilter("")}
-          >
-            Semua siswa <span>{users.length}</span>
-          </button>
-          {classes.map((item) => (
+        <>
+          <div className="class-tabs">
             <button
-              className={classFilter === item.id ? "active" : ""}
-              onClick={() => setClassFilter(item.id)}
-              key={item.id}
+              className={classFilter === "" ? "active" : ""}
+              onClick={() => setClassFilter("")}
             >
-              {item.name}{" "}
-              <span>
-                {users.filter((user) => user.class_id === item.id).length}
-              </span>
+              Semua siswa <span>{users.length}</span>
             </button>
-          ))}
-        </div>
+            {classes.map((item) => (
+              <button
+                className={classFilter === item.id ? "active" : ""}
+                onClick={() => setClassFilter(item.id)}
+                key={item.id}
+              >
+                {item.name}{" "}
+                <span>
+                  {users.filter((user) => user.class_id === item.id).length}
+                </span>
+              </button>
+            ))}
+          </div>
+          {selectedClassOption && (
+            <div
+              className={`class-year-context ${
+                selectedClassOption.academic_year_id ? "" : "missing"
+              }`}
+            >
+              <CalendarDays />
+              <span>
+                <b>{selectedClassOption.name}</b>
+                Tahun ajaran: {selectedClassOption.academic_year_name}
+              </span>
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => setClassEditor(selectedClassOption)}
+                >
+                  Ubah
+                </button>
+              )}
+            </div>
+          )}
+        </>
       )}
       <Toolbar
         placeholder={roleFilter === "siswa" ? "Cari nama, email, atau NIS…" : "Cari nama atau email…"}
@@ -1331,7 +1421,118 @@ function UserManagement({
           notify={notify}
         />
       )}
+      {classEditor && (
+        <ClassEditorModal
+          initial={classEditor === "new" ? undefined : classEditor}
+          academicYears={academicYears}
+          close={() => setClassEditor(null)}
+          save={saveClass}
+        />
+      )}
     </div>
+  );
+}
+
+function ClassEditorModal({
+  initial,
+  academicYears,
+  close,
+  save,
+}: {
+  initial?: ClassOption;
+  academicYears: AcademicYearOption[];
+  close: () => void;
+  save: (draft: {
+    id?: string;
+    name: string;
+    academicYearId: string;
+  }) => Promise<boolean | undefined>;
+}) {
+  const defaultAcademicYearId =
+    initial?.academic_year_id ??
+    academicYears.find((item) => item.active)?.id ??
+    academicYears[0]?.id ??
+    "";
+  const [name, setName] = useState(initial?.name ?? "");
+  const [academicYearId, setAcademicYearId] = useState(
+    defaultAcademicYearId,
+  );
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!name.trim() || !academicYearId || saving) return;
+    setSaving(true);
+    const saved = await save({
+      id: initial?.id,
+      name,
+      academicYearId,
+    });
+    if (!saved) setSaving(false);
+  };
+
+  return (
+    <Modal close={close}>
+      <form className="simple-modal class-editor-modal" onSubmit={submit}>
+        <header>
+          <div>
+            <p>DATA KELAS</p>
+            <h2>{initial ? "Atur kelas" : "Tambah kelas"}</h2>
+          </div>
+          <button type="button" onClick={close} aria-label="Tutup pengaturan kelas">
+            <X />
+          </button>
+        </header>
+        <div className="modal-content">
+          <p className="class-editor-intro">
+            Setiap kelas wajib terhubung ke satu tahun ajaran agar data ujian,
+            nilai, dan rapor masuk ke periode yang benar.
+          </p>
+          {!academicYears.length && (
+            <p className="question-form-error">
+              Belum ada tahun ajaran. Buat tahun ajaran terlebih dahulu melalui
+              menu Tahun Ajaran.
+            </p>
+          )}
+          <FormField label="Nama kelas">
+            <input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Contoh: IX A"
+              autoFocus
+              required
+            />
+          </FormField>
+          <FormField label="Tahun ajaran">
+            <select
+              value={academicYearId}
+              onChange={(event) => setAcademicYearId(event.target.value)}
+              required
+            >
+              <option value="">Pilih tahun ajaran</option>
+              {academicYears.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                  {item.active ? " — Aktif" : ""}
+                </option>
+              ))}
+            </select>
+          </FormField>
+        </div>
+        <footer>
+          <button type="button" onClick={close}>
+            Batal
+          </button>
+          <button
+            className="primary"
+            type="submit"
+            disabled={!name.trim() || !academicYearId || saving}
+          >
+            {saving ? "Menyimpan…" : initial ? "Simpan perubahan" : "Tambah kelas"}
+          </button>
+        </footer>
+      </form>
+    </Modal>
   );
 }
 
