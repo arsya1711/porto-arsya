@@ -24,6 +24,7 @@ import {
   ArrowRight,
   BarChart3,
   BookOpen,
+  BookOpenCheck,
   CalendarDays,
   Check,
   CheckCircle2,
@@ -74,6 +75,7 @@ import {
 import { RealSettingsPage } from "./components/SettingsPage";
 import { PortalTopbar } from "./components/PortalTopbar";
 import { BrandLogo } from "./components/BrandLogo";
+import { ReportCardsPage } from "./components/ReportCardsPage";
 import {
   isAnsweredValue,
   normalizeStoredAnswers,
@@ -481,6 +483,7 @@ function Portal({
     ["/app/kelas", <Users />, "Kelas & Siswa"],
     ["/app/koreksi", <ClipboardCheck />, "Koreksi"],
     ["/app/laporan", <BarChart3 />, "Laporan"],
+    ["/app/rapor", <BookOpenCheck />, "Rapor"],
   ];
   const adminNav: [string, ReactNode, string][] = [
     ["/app", <LayoutDashboard />, "Ringkasan"],
@@ -490,6 +493,7 @@ function Portal({
     ["/app/guru", <UserRound />, "Guru"],
     ["/app/admin", <ShieldCheck />, "Administrator"],
     ["/app/laporan", <BarChart3 />, "Laporan Sekolah"],
+    ["/app/rapor", <BookOpenCheck />, "Rapor"],
     ["/app/audit", <LockKeyhole />, "Audit & Keamanan"],
   ];
   const nav = role === "admin" ? adminNav : teacherNav;
@@ -694,6 +698,10 @@ function Portal({
             element={role === "guru" ? <RealGrading notify={notify} /> : <Navigate to="/app" />}
           />
           <Route path="laporan" element={<RealReports />} />
+          <Route
+            path="rapor"
+            element={<ReportCardsPage profile={profile} notify={notify} />}
+          />
           <Route path="pengaturan" element={<RealSettingsPage profile={profile} notify={notify} />} />
           <Route path="*" element={<Navigate to="/app" />} />
         </Routes>

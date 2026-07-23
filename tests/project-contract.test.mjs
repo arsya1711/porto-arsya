@@ -47,3 +47,22 @@ test('Edge Function membatasi origin dan memakai RPC transaksional', async () =>
   assert.match(login, /reserve_student_login_attempt/)
   assert.doesNotMatch(`${admin}\n${login}`, /Access-Control-Allow-Origin': '\*'/)
 })
+
+test('rapor memakai nilai final, akses terkontrol, dan menyediakan cetak A4', async () => {
+  const [migration, page, styles, app] = await Promise.all([
+    read('supabase/migrations/019_report_cards.sql'),
+    read('src/components/ReportCardsPage.tsx'),
+    read('src/styles-report-cards.css'),
+    read('src/App.tsx'),
+  ])
+  assert.match(migration, /attempt\.status = 'final'/)
+  assert.match(migration, /attempt\.final_score is not null/)
+  assert.match(migration, /enable row level security/)
+  assert.match(migration, /get_report_card_data/)
+  assert.match(migration, /audit_report_change/)
+  assert.match(page, /Komponen nilai/)
+  assert.match(page, /Publikasikan rapor/)
+  assert.match(page, /window\.print\(\)/)
+  assert.match(styles, /@page\{size:A4 portrait/)
+  assert.match(app, /path="rapor"/)
+})
