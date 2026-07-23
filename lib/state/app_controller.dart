@@ -98,6 +98,17 @@ class AppController extends ChangeNotifier {
     try {
       await repository.authenticate(username, password);
       isLoggedIn = true;
+      try {
+        await repository.refreshExams();
+        isOnline = true;
+        operationError = null;
+      } catch (_) {
+        // Session login tetap sah. Pengguna masuk dengan katalog kosong dan
+        // dapat mencoba lagi melalui pull-to-refresh/tombol muat ulang.
+        isOnline = false;
+        operationError =
+            'Login berhasil, tetapi jadwal ujian belum dapat dimuat. Coba muat ulang.';
+      }
       return true;
     } on AuthenticationException catch (error) {
       authenticationError = error.message;

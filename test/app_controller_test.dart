@@ -23,6 +23,19 @@ void main() {
       expect(controller.isLoggedIn, isFalse);
       expect(controller.authenticationError, 'NIS atau kata sandi salah.');
     });
+
+    test('keeps a valid login when the first catalog refresh fails', () async {
+      final controller = AppController(FakeExamRepository(failRefresh: true));
+      addTearDown(controller.dispose);
+
+      expect(await controller.login('12345', 'password'), isTrue);
+      expect(controller.isLoggedIn, isTrue);
+      expect(controller.isOnline, isFalse);
+      expect(
+        controller.operationError,
+        'Login berhasil, tetapi jadwal ujian belum dapat dimuat. Coba muat ulang.',
+      );
+    });
   });
 
   group('AppController exam flow', () {

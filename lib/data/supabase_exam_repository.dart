@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
 import 'exam_repository.dart';
+import 'student_login_response.dart';
 
 class SupabaseExamRepository implements ExamRepository {
   SupabaseExamRepository(this.client);
@@ -66,27 +67,27 @@ class SupabaseExamRepository implements ExamRepository {
         'student-login',
         body: {'student_number': studentNumber.trim(), 'password': password},
       );
-      final data = Map<String, dynamic>.from(response.data as Map);
-      final session = Map<String, dynamic>.from(data['session'] as Map);
-      final profile = Map<String, dynamic>.from(data['profile'] as Map);
-      final refreshToken = session['refresh_token'] as String?;
+      final loginResponse = parseStudentLoginResponse(
+        response.data,
+        fallbackStudentNumber: studentNumber.trim(),
+      );
 
-      if (refreshToken == null || refreshToken.isEmpty) {
-        throw const AuthenticationException('Sesi login tidak valid.');
+      await client.auth.setSession(loginResponse.refreshToken);
+      if (client.auth.currentUser == null) {
+        throw const AuthenticationException(
+          'Sesi login tidak dapat dibuat. Silakan coba lagi.',
+        );
       }
-
-      await client.auth.setSession(refreshToken);
       _profile = StudentProfile(
-        name: profile['full_name'] as String? ?? 'Siswa',
-        studentNumber: profile['student_number'] as String? ?? studentNumber,
-        className: profile['class_name'] as String? ?? '-',
+        name: loginResponse.fullName,
+        studentNumber: loginResponse.studentNumber,
+        className: loginResponse.className,
         school: await _loadSchoolName(),
       );
-      await refreshExams();
     } on FunctionException catch (error) {
-      final details = error.details;
-      if (details is Map && details['error'] is String) {
-        throw AuthenticationException(details['error'] as String);
+      final serverMessage = functionErrorMessage(error.details);
+      if (serverMessage != null) {
+        throw AuthenticationException(serverMessage);
       }
       if (error.status == 401) {
         throw const AuthenticationException('NIS atau kata sandi salah.');

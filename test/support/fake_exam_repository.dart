@@ -15,6 +15,7 @@ class FakeExamRepository implements ExamRepository {
     this.questions = defaultQuestions,
     this.minimumVersion,
     this.failVersionCheck = false,
+    this.failRefresh = false,
   });
 
   static const defaultQuestions = [
@@ -36,6 +37,7 @@ class FakeExamRepository implements ExamRepository {
   final List<ExamQuestion> questions;
   final String? minimumVersion;
   final bool failVersionCheck;
+  final bool failRefresh;
 
   final Map<String, String> savedAnswers = {};
   final List<String> integrityEventTypes = [];
@@ -73,7 +75,9 @@ class FakeExamRepository implements ExamRepository {
   Future<void> authenticate(String studentNumber, String password) async {}
 
   @override
-  Future<void> refreshExams() async {}
+  Future<void> refreshExams() async {
+    if (failRefresh) throw Exception('katalog tidak tersedia');
+  }
 
   @override
   Future<String?> minimumSupportedVersion() async {
