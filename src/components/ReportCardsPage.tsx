@@ -109,6 +109,13 @@ function scoreText(value: number | null) {
     : value.toLocaleString("id-ID", { maximumFractionDigits: 2 });
 }
 
+function localDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function ReportCardsPage({
   profile,
   notify,
@@ -198,9 +205,14 @@ export function ReportCardsPage({
     );
     setPeriods(normalizedPeriods);
     setClasses(normalizedClasses);
+    const today = localDateKey();
     setSelectedPeriod(
       (current) =>
         current ||
+        normalizedPeriods.find(
+          (period) =>
+            period.starts_on <= today && period.ends_on >= today,
+        )?.id ||
         normalizedPeriods.find((period) => period.activeYear)?.id ||
         normalizedPeriods[0]?.id ||
         "",
