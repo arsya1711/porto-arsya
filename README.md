@@ -4,6 +4,9 @@ Website ujian sekolah berbasis React, TypeScript, dan Supabase. Implementasi dib
 
 Audit dan status remediasi terbaru tersedia di [`docs/AUDIT_PORTO_ARSYA_2026-07-20.md`](docs/AUDIT_PORTO_ARSYA_2026-07-20.md).
 Panduan varian logo putih tersedia di [`docs/PANDUAN_LOGO_PUTIH.md`](docs/PANDUAN_LOGO_PUTIH.md).
+Modul operasional lengkap untuk Admin, Guru, dan Siswa tersedia dalam
+[`PDF siap cetak`](docs/MODUL_PENGGUNAAN_AWEXAM.pdf) dengan
+[`sumber HTML`](docs/MODUL_PENGGUNAAN_AWEXAM.html) yang dapat diperbarui.
 
 ## Cakupan web
 

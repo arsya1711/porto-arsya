@@ -1,0 +1,1255 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Modul Penggunaan AWExam — Web Staf dan Aplikasi Siswa</title>
+  <style>
+    :root {
+      --navy: #17233b;
+      --blue: #315bcf;
+      --blue-soft: #eef3fb;
+      --ink: #273247;
+      --muted: #667085;
+      --line: #d9dee7;
+      --paper: #ffffff;
+      --surface: #f6f7f9;
+    }
+
+    * { box-sizing: border-box; }
+    html {
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--ink);
+      background: #e8ebf0;
+    }
+    body { margin: 0; background: var(--paper); line-height: 1.55; }
+    a { color: var(--blue); }
+    p { margin: 0 0 9px; }
+    ul, ol { margin: 7px 0 12px; padding-left: 21px; }
+    li { margin: 4px 0; }
+    strong { color: var(--navy); }
+    code {
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: #eef1f6;
+      color: #344055;
+      font-size: .92em;
+    }
+
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto;
+      padding: 18mm 18mm 17mm;
+      background: var(--paper);
+      position: relative;
+    }
+
+    .page-break { break-before: page; page-break-before: always; }
+    .avoid-break { break-inside: avoid; page-break-inside: avoid; }
+
+    .cover {
+      min-height: 297mm;
+      padding: 23mm 20mm 18mm;
+      overflow: hidden;
+      color: white;
+      background: linear-gradient(145deg, #111b30 0%, #172641 66%, #20375f 100%);
+    }
+
+    .cover::before {
+      content: "";
+      position: absolute;
+      width: 122mm;
+      height: 122mm;
+      right: -44mm;
+      top: 58mm;
+      border: 1px solid #ffffff1f;
+      border-radius: 18mm;
+      transform: rotate(-9deg);
+    }
+
+    .cover-brand { display: flex; align-items: center; gap: 12px; position: relative; z-index: 1; }
+    .cover-brand img {
+      width: 17mm;
+      height: 17mm;
+      object-fit: contain;
+      border-radius: 5mm;
+      background: white;
+      padding: 2mm;
+    }
+    .cover-brand b { display: block; color: white; font-size: 19px; letter-spacing: .2px; }
+    .cover-brand span { display: block; color: #c9d4f5; font-size: 10px; margin-top: 2px; }
+    .cover-kicker {
+      display: inline-flex;
+      margin-top: 37mm;
+      padding: 6px 10px;
+      border: 1px solid #ffffff4d;
+      border-radius: 4px;
+      color: #e2e8f3;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.1px;
+      text-transform: uppercase;
+    }
+    .cover h1 {
+      max-width: 145mm;
+      margin: 8mm 0 6mm;
+      color: white;
+      font-size: 35px;
+      line-height: 1.13;
+      letter-spacing: -1.2px;
+      position: relative;
+      z-index: 1;
+    }
+    .cover > p {
+      max-width: 128mm;
+      color: #d5dce8;
+      font-size: 15px;
+      line-height: 1.7;
+      position: relative;
+      z-index: 1;
+    }
+    .cover-meta {
+      position: absolute;
+      left: 20mm;
+      right: 20mm;
+      bottom: 20mm;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 9px;
+      padding-top: 12px;
+      border-top: 1px solid #ffffff35;
+    }
+    .cover-meta small, .cover-meta b { display: block; }
+    .cover-meta small { color: #aeb8c9; font-size: 9px; letter-spacing: .7px; }
+    .cover-meta b { margin-top: 4px; color: white; font-size: 11px; }
+
+    .doc-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10mm;
+      padding-bottom: 5mm;
+      border-bottom: 1px solid var(--line);
+    }
+    .doc-header div { display: flex; align-items: center; gap: 8px; }
+    .doc-header img { width: 9mm; height: 9mm; object-fit: contain; }
+    .doc-header b { color: var(--navy); font-size: 12px; }
+    .doc-header span { color: #8b95a6; font-size: 9px; letter-spacing: .6px; }
+    .doc-footer {
+      position: absolute;
+      left: 18mm;
+      right: 18mm;
+      bottom: 8mm;
+      display: flex;
+      justify-content: space-between;
+      color: #9ba4b2;
+      font-size: 8px;
+    }
+
+    .eyebrow {
+      margin: 0 0 4px;
+      color: var(--blue);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+    }
+    h2 {
+      margin: 0 0 7mm;
+      color: var(--navy);
+      font-size: 26px;
+      line-height: 1.2;
+      letter-spacing: -.5px;
+    }
+    h3 {
+      margin: 7mm 0 3mm;
+      color: var(--navy);
+      font-size: 17px;
+      line-height: 1.3;
+    }
+    h4 {
+      margin: 5mm 0 2mm;
+      color: #33415a;
+      font-size: 13px;
+    }
+    .lead { margin: -3mm 0 7mm; color: var(--muted); font-size: 13px; line-height: 1.7; }
+    .small { color: var(--muted); font-size: 10px; }
+
+    .toc { list-style: none; margin: 0; padding: 0; counter-reset: chapter; }
+    .toc li {
+      counter-increment: chapter;
+      display: grid;
+      grid-template-columns: 10mm 1fr auto;
+      gap: 5px;
+      align-items: baseline;
+      margin: 0;
+      padding: 8px 0;
+      border-bottom: 1px dashed var(--line);
+    }
+    .toc li::before {
+      content: counter(chapter, decimal-leading-zero);
+      color: var(--blue);
+      font-weight: 800;
+      font-size: 11px;
+    }
+    .toc b { font-size: 12px; }
+    .toc span { color: #8e98a8; font-size: 10px; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+    .card {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--paper);
+      break-inside: avoid;
+    }
+    .card.blue,
+    .card.green,
+    .card.amber,
+    .card.red { background: var(--surface); border-color: var(--line); }
+    .card h3, .card h4 { margin-top: 0; }
+    .card > :last-child { margin-bottom: 0; }
+    .role-card .role-icon {
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 7px;
+      border-radius: 5px;
+      background: var(--navy);
+      color: white;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .role-card h3 { margin: 0 0 3px; font-size: 14px; }
+    .role-card p { color: var(--muted); font-size: 10px; }
+
+    .callout {
+      display: grid;
+      grid-template-columns: 9mm 1fr;
+      gap: 8px;
+      margin: 5mm 0;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--blue);
+      border-radius: 5px;
+      background: var(--surface);
+      break-inside: avoid;
+    }
+    .callout.warning,
+    .callout.danger,
+    .callout.success {
+      border-color: var(--line);
+      border-left-color: var(--blue);
+      background: var(--surface);
+    }
+    .callout-icon {
+      width: 7mm;
+      height: 7mm;
+      display: grid;
+      place-items: center;
+      border-radius: 4px;
+      background: #e7ebf1;
+      color: var(--navy);
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .callout.warning .callout-icon,
+    .callout.danger .callout-icon,
+    .callout.success .callout-icon { color: var(--navy); }
+    .callout b { display: block; margin-bottom: 2px; font-size: 11px; }
+    .callout p { margin: 0; color: #59667b; font-size: 10px; }
+
+    .steps { list-style: none; padding: 0; margin: 4mm 0; counter-reset: step; }
+    .steps > li {
+      counter-increment: step;
+      display: grid;
+      grid-template-columns: 9mm 1fr;
+      gap: 8px;
+      margin: 0 0 8px;
+      break-inside: avoid;
+    }
+    .steps > li::before {
+      content: counter(step);
+      width: 7mm;
+      height: 7mm;
+      display: grid;
+      place-items: center;
+      border-radius: 4px;
+      background: var(--navy);
+      color: white;
+      font-size: 10px;
+      font-weight: 800;
+    }
+    .steps b { display: block; margin-bottom: 2px; font-size: 11px; }
+    .steps p, .steps ul { color: #59667b; font-size: 10px; }
+    .steps ul { margin-top: 3px; }
+
+    .flow {
+      display: grid;
+      grid-template-columns: 1fr 6mm 1fr 6mm 1fr;
+      align-items: center;
+      gap: 4px;
+      margin: 5mm 0;
+    }
+    .flow .node {
+      min-height: 27mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 9px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: var(--surface);
+    }
+    .flow .node b { font-size: 10px; }
+    .flow .node span { margin-top: 2px; color: var(--muted); font-size: 8px; }
+    .flow .arrow { color: var(--blue); text-align: center; font-weight: 800; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 4mm 0;
+      font-size: 9.5px;
+      break-inside: auto;
+    }
+    thead { display: table-header-group; }
+    tr { break-inside: avoid; page-break-inside: avoid; }
+    th {
+      padding: 7px 8px;
+      border: 1px solid #d7deea;
+      background: var(--navy);
+      color: white;
+      text-align: left;
+      font-size: 8.5px;
+      letter-spacing: .3px;
+    }
+    td {
+      padding: 7px 8px;
+      border: 1px solid var(--line);
+      vertical-align: top;
+    }
+    tbody tr:nth-child(even) { background: var(--surface); }
+
+    .menu-map td:first-child { width: 31%; font-weight: 700; color: var(--navy); }
+    .status {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 8px;
+      font-weight: 800;
+    }
+    .status.draft { background: #eceff3; color: #606b7b; }
+    .status.scheduled,
+    .status.live,
+    .status.done { background: var(--blue-soft); color: #294c9a; }
+
+    .checklist { list-style: none; padding: 0; }
+    .checklist li {
+      position: relative;
+      padding-left: 20px;
+      margin: 6px 0;
+      font-size: 10px;
+    }
+    .checklist li::before {
+      content: "□";
+      position: absolute;
+      left: 0;
+      top: -1px;
+      color: var(--blue);
+      font-size: 15px;
+      line-height: 1;
+    }
+
+    .kbd {
+      display: inline-block;
+      padding: 1px 5px;
+      border: 1px solid #ccd3df;
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      background: white;
+      font-size: 8px;
+      font-weight: 700;
+    }
+    .sample {
+      margin: 4mm 0;
+      padding: 10px 12px;
+      border: 1px solid #dce2ed;
+      border-radius: 5px;
+      background: var(--surface);
+      white-space: pre-wrap;
+      color: #344055;
+      font: 9px/1.55 "Courier New", monospace;
+      break-inside: avoid;
+    }
+    @page { size: A4; margin: 0; }
+    @media print {
+      html, body { background: white; }
+      .page {
+        margin: 0;
+        padding: 14mm 18mm 15mm;
+        box-shadow: none;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+      .cover { padding: 23mm 20mm 18mm; }
+      .page:not(.cover) p { margin-bottom: 6px; }
+      .page:not(.cover) ul,
+      .page:not(.cover) ol { margin-top: 5px; margin-bottom: 8px; }
+      .page:not(.cover) li { margin: 2px 0; }
+      .doc-header { margin-bottom: 7mm; padding-bottom: 4mm; }
+      h2 { margin-bottom: 5mm; font-size: 24px; }
+      h3 { margin-top: 5mm; margin-bottom: 2mm; font-size: 16px; }
+      h4 { margin-top: 4mm; }
+      .lead { margin-bottom: 5mm; font-size: 13px; line-height: 1.55; }
+      .card { padding: 10px; }
+      .callout { margin: 4mm 0; padding: 9px 11px; }
+      .small,
+      .role-card p,
+      .callout p,
+      .steps p,
+      .steps ul { font-size: 11px; }
+      .toc b,
+      .role-card h3,
+      .callout b,
+      .steps b { font-size: 12px; }
+      .toc span { font-size: 10.5px; }
+      .steps { margin: 3mm 0; }
+      .steps > li { margin-bottom: 5px; }
+      .flow .node b { font-size: 11px; }
+      .flow .node span { font-size: 9.5px; }
+      table { margin: 3mm 0; font-size: 10px; }
+      th { font-size: 9.5px; }
+      th, td { padding: 5px 7px; }
+      .checklist li { font-size: 11px; }
+      .sample { font-size: 10px; }
+      .status { font-size: 9px; }
+      .flow { margin: 4mm 0; }
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      a { text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <section class="page cover">
+    <div class="cover-brand">
+      <img src="../public/logo.png" alt="Logo AWExam">
+      <div><b>AWExam</b><span>Platform ujian dan penilaian sekolah</span></div>
+    </div>
+    <span class="cover-kicker">Panduan Pengguna Resmi</span>
+    <h1>Modul Penggunaan dan Operasional AWExam</h1>
+    <p>Panduan langkah demi langkah untuk Admin dan Guru melalui web, serta Siswa melalui aplikasi Android atau web—mulai dari persiapan data sampai ujian, penilaian, laporan, dan rapor.</p>
+    <div class="cover-meta">
+      <div><small>VERSI DOKUMEN</small><b>1.0</b></div>
+      <div><small>TANGGAL PEMBARUAN</small><b>24 Juli 2026</b></div>
+      <div><small>MEDIA</small><b>Web dan aplikasi Android</b></div>
+    </div>
+  </section>
+
+  <section class="page page-break">
+    <header class="doc-header"><div><img src="../public/logo.png" alt=""><b>AWExam</b></div><span>MODUL PENGGUNAAN DAN OPERASIONAL</span></header>
+    <p class="eyebrow">Tentang Modul</p>
+    <h2>Tujuan dan sasaran pengguna</h2>
+    <p class="lead">Modul ini menjadi acuan operasional agar setiap pengguna memahami tugasnya, menjalankan proses dalam urutan yang benar, dan dapat menangani kendala dasar tanpa menebak-nebak.</p>
+
+    <div class="grid-3">
+      <article class="card role-card blue"><span class="role-icon">A</span><h3>Admin</h3><p>Menyiapkan data sekolah, akun, kelas, penugasan guru, pengawasan, dan rapor.</p></article>
+      <article class="card role-card green"><span class="role-icon">G</span><h3>Guru</h3><p>Mengelola bank soal, membuat ujian, mengoreksi essay, dan melihat hasil.</p></article>
+      <article class="card role-card amber"><span class="role-icon">S</span><h3>Siswa</h3><p>Memakai aplikasi Android atau web untuk melihat jadwal, mengerjakan ujian, dan melihat hasil.</p></article>
+    </div>
+
+    <h3>Cara menggunakan modul</h3>
+    <ol>
+      <li>Baca bagian <strong>Dasar Penggunaan</strong> untuk memahami login dan navigasi.</li>
+      <li>Buka bab sesuai peran akun Anda.</li>
+      <li>Ikuti urutan pada bagian <strong>Alur kerja yang disarankan</strong>.</li>
+      <li>Gunakan checklist sebelum ujian sungguhan.</li>
+      <li>Jika muncul kendala, cocokkan pesan layar dengan tabel troubleshooting.</li>
+    </ol>
+
+    <div class="callout">
+      <span class="callout-icon">i</span>
+      <div><b>Hak akses menentukan menu</b><p>Menu yang terlihat dapat berbeda antara Admin, Guru, dan Siswa. Jika sebuah menu tidak muncul, periksa peran akun dan penugasan pengguna tersebut.</p></div>
+    </div>
+
+    <h3>Daftar isi</h3>
+    <ol class="toc">
+      <li><b>Alur Besar AWExam</b><span>Urutan kerja tiga peran</span></li>
+      <li><b>Dasar Penggunaan Web &amp; Aplikasi</b><span>Login, navigasi, pencarian, dan logout</span></li>
+      <li><b>Panduan Admin</b><span>Data master, akun, kelas, audit, dan pengaturan</span></li>
+      <li><b>Panduan Guru</b><span>Bank soal, ujian, koreksi, dan laporan</span></li>
+      <li><b>Panduan Siswa</b><span>Masuk, mengerjakan, menyimpan, dan mengumpulkan</span></li>
+      <li><b>Simulasi Ujian End-to-End</b><span>Latihan sebelum pelaksanaan nyata</span></li>
+      <li><b>SOP Pelaksanaan Ujian</b><span>Sebelum, saat, dan setelah ujian</span></li>
+      <li><b>Troubleshooting</b><span>Solusi masalah umum</span></li>
+      <li><b>Keamanan dan Checklist</b><span>Kontrol akun dan pemeriksaan akhir</span></li>
+      <li><b>Lampiran Format Impor Soal</b><span>Template siap pakai</span></li>
+    </ol>
+    <footer class="doc-footer"><span>AWExam · Panduan Pengguna</span><span>Versi 1.0</span></footer>
+  </section>
+
+  <section class="page page-break">
+    <header class="doc-header"><div><img src="../public/logo.png" alt=""><b>AWExam</b></div><span>BAB 1 · ALUR BESAR</span></header>
+    <p class="eyebrow">Bab 1</p>
+    <h2>Alur besar penggunaan AWExam</h2>
+    <p class="lead">AWExam bekerja sebagai rangkaian. Data yang belum disiapkan pada tahap awal akan memengaruhi menu dan hasil pada tahap berikutnya.</p>
+
+    <div class="flow">
+      <div class="node"><b>1. Admin menyiapkan</b><span>Tahun ajaran, mapel, kelas, akun, dan penugasan</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>2. Guru menyusun</b><span>Bank soal, isi soal, jadwal, dan keamanan ujian</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>3. Siswa mengerjakan</b><span>Masuk, menjawab, memeriksa, dan mengumpulkan</span></div>
+    </div>
+    <div class="flow">
+      <div class="node"><b>4. Sistem menilai</b><span>Pilihan ganda otomatis, essay menunggu koreksi</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>5. Guru memfinalkan</b><span>Koreksi essay dan periksa hasil ujian</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>6. Sekolah melaporkan</b><span>Analitik, leger, rapor, cetak, atau ekspor CSV</span></div>
+    </div>
+
+    <h3>Urutan konfigurasi pertama kali</h3>
+    <ol class="steps">
+      <li><div><b>Buat dan aktifkan Tahun Ajaran</b><p>Periode ini menjadi dasar kelas, ujian, laporan, dan rapor.</p></div></li>
+      <li><div><b>Tambahkan Mata Pelajaran</b><p>Gunakan nama dan kode singkat yang konsisten, misalnya Matematika / MTK.</p></div></li>
+      <li><div><b>Buat Kelas</b><p>Setiap kelas wajib ditautkan ke satu tahun ajaran.</p></div></li>
+      <li><div><b>Buat akun Guru dan Siswa</b><p>Guru/Admin memerlukan email aktif. Akun Siswa memerlukan email, NIS unik, dan kata sandi sementara minimal delapan karakter.</p></div></li>
+      <li><div><b>Berikan penugasan Guru</b><p>Pasangkan guru dengan mata pelajaran dan kelas yang boleh dikelola.</p></div></li>
+      <li><div><b>Lengkapi profil sekolah dan keamanan</b><p>Isi nama sekolah, logo, NPSN, alamat, KKM, dan default keamanan ujian.</p></div></li>
+      <li><div><b>Lakukan simulasi lengkap</b><p>Buat satu ujian percobaan dan jalankan menggunakan akun siswa uji.</p></div></li>
+    </ol>
+
+    <div class="callout warning">
+      <span class="callout-icon">!</span>
+      <div><b>Jangan langsung membuat ujian produksi</b><p>Pastikan kelas, penugasan guru, siswa, waktu, bank soal, dan kunci jawaban sudah benar. Gunakan ujian percobaan terlebih dahulu.</p></div>
+    </div>
+    <footer class="doc-footer"><span>AWExam · Alur Besar</span><span>Bab 1</span></footer>
+  </section>
+
+  <section class="page page-break">
+    <header class="doc-header"><div><img src="../public/logo.png" alt=""><b>AWExam</b></div><span>BAB 2 · DASAR PENGGUNAAN</span></header>
+    <p class="eyebrow">Bab 2</p>
+    <h2>Login dan dasar navigasi</h2>
+
+    <h3>2.1 Masuk ke web</h3>
+    <ol class="steps">
+      <li><div><b>Buka alamat web AWExam sekolah</b><p>Gunakan Google Chrome, Microsoft Edge, atau Safari versi terbaru. Pastikan indikator koneksi menunjukkan autentikasi Supabase aktif.</p></div></li>
+      <li><div><b>Masukkan email akun</b><p>Pada web, Admin, Guru, dan Siswa masuk menggunakan <strong>email</strong> serta kata sandi yang diberikan Admin.</p></div></li>
+      <li><div><b>Masukkan kata sandi</b><p>Gunakan ikon mata untuk memeriksa pengetikan jika diperlukan, lalu tekan <strong>Masuk</strong>.</p></div></li>
+      <li><div><b>Tunggu pengalihan halaman</b><p>Admin/Guru diarahkan ke portal staf. Siswa yang memakai web diarahkan ke dashboard siswa.</p></div></li>
+    </ol>
+
+    <div class="callout warning">
+      <span class="callout-icon">!</span>
+      <div><b>Login siswa berbeda menurut media</b><p>Di <strong>aplikasi Android</strong>, siswa masuk memakai NIS dan kata sandi. Di <strong>web</strong>, siswa memakai email yang didaftarkan Admin dan kata sandi.</p></div>
+    </div>
+
+    <h3>2.2 Lupa kata sandi</h3>
+    <ol>
+      <li>Isi kolom email pada halaman login.</li>
+      <li>Tekan <strong>Lupa kata sandi?</strong></li>
+      <li>Buka email masuk dan tekan tautan reset.</li>
+      <li>Buat kata sandi baru minimal delapan karakter.</li>
+    </ol>
+    <p class="small">Jika email tidak diterima, periksa folder Spam atau minta Admin melakukan reset kata sandi melalui menu pengguna.</p>
+
+    <h3>2.3 Mengenali tampilan portal staf</h3>
+    <table class="menu-map">
+      <thead><tr><th>Area</th><th>Fungsi</th></tr></thead>
+      <tbody>
+        <tr><td>Sidebar kiri</td><td>Berpindah antarbagian. Menu dikelompokkan sesuai pekerjaan: Akademik, Persiapan Ujian, Penilaian, atau Pemantauan.</td></tr>
+        <tr><td>Ringkasan</td><td>Menampilkan statistik, jadwal terdekat, dan aktivitas terbaru.</td></tr>
+        <tr><td>Kolom pencarian</td><td>Mencari data pada halaman aktif. Gunakan nama, email, NIS, kelas, bank, atau judul ujian sesuai halaman.</td></tr>
+        <tr><td>Tombol utama berwarna biru</td><td>Aksi utama halaman, misalnya Tambah siswa, Tambah soal, atau Buat ujian.</td></tr>
+        <tr><td>Menu “Lainnya” / “Aksi lain”</td><td>Menyimpan aksi sekunder atau sensitif agar halaman tidak penuh tombol.</td></tr>
+        <tr><td>Notifikasi dan profil</td><td>Menampilkan informasi akun, status, bantuan, dan akses keluar.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>2.4 Penggunaan pada ponsel</h3>
+    <ul>
+      <li>Tekan ikon menu untuk membuka navigasi.</li>
+      <li>Tabel berubah menjadi kartu agar tetap terbaca.</li>
+      <li>Modal dapat digulir; tombol simpan berada pada bagian bawah.</li>
+      <li>Gunakan orientasi lanskap jika perlu melihat banyak kolom laporan.</li>
+    </ul>
+    <footer class="doc-footer"><span>AWExam · Dasar Penggunaan</span><span>Bab 2</span></footer>
+  </section>
+
+  <section class="page page-break">
+    <header class="doc-header"><div><img src="../public/logo.png" alt=""><b>AWExam</b></div><span>BAB 3 · PANDUAN ADMIN</span></header>
+    <p class="eyebrow">Bab 3</p>
+    <h2>Panduan operasional Admin</h2>
+    <p class="lead">Admin bertanggung jawab pada fondasi data, akun, hak akses, keamanan, dan pemantauan tingkat sekolah.</p>
+
+    <h3>3.1 Peta menu Admin</h3>
+    <table class="menu-map">
+      <thead><tr><th>Menu</th><th>Kapan digunakan</th></tr></thead>
+      <tbody>
+        <tr><td>Ringkasan</td><td>Memantau angka operasional, jadwal, dan aktivitas terbaru.</td></tr>
+        <tr><td>Tahun Ajaran</td><td>Membuat periode dan menetapkan satu periode aktif.</td></tr>
+        <tr><td>Mata Pelajaran</td><td>Membuat nama/kode mapel yang dipakai bank soal, ujian, dan rapor.</td></tr>
+        <tr><td>Kelas &amp; Siswa</td><td>Membuat kelas, menempatkan siswa, dan mengelola akun siswa.</td></tr>
+        <tr><td>Guru</td><td>Mengelola akun guru dan penugasannya.</td></tr>
+        <tr><td>Administrator</td><td>Mengelola akun dengan akses administrasi penuh.</td></tr>
+        <tr><td>Hasil Ujian</td><td>Melihat nilai, distribusi, analisis butir, dan ekspor CSV.</td></tr>
+        <tr><td>Rapor Semester</td><td>Mengelola komponen, catatan, leger, publikasi, dan cetak rapor.</td></tr>
+        <tr><td>Audit &amp; Keamanan</td><td>Meninjau perubahan data sensitif dan event integritas ujian.</td></tr>
+        <tr><td>Pengaturan</td><td>Mengatur profil sekolah, keamanan, KKM, dan notifikasi.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>3.2 Tahun Ajaran</h3>
+    <ol class="steps">
+      <li><div><b>Buka Akademik → Tahun Ajaran</b><p>Tekan <strong>Tambah tahun ajaran</strong>.</p></div></li>
+      <li><div><b>Masukkan nama periode</b><p>Gunakan format konsisten, misalnya <code>2026/2027</code>.</p></div></li>
+      <li><div><b>Simpan dan aktifkan</b><p>Tekan <strong>Aktifkan</strong> pada periode yang sedang digunakan. Hanya satu periode yang boleh aktif.</p></div></li>
+      <li><div><b>Ubah jika diperlukan</b><p>Tekan ikon pensil; formulir akan berpindah ke mode edit. Periode aktif tidak dapat dihapus.</p></div></li>
+    </ol>
+
+    <h3>3.3 Mata Pelajaran</h3>
+    <ol>
+      <li>Buka <strong>Akademik → Mata Pelajaran</strong>.</li>
+      <li>Tekan <strong>Tambah mata pelajaran</strong>.</li>
+      <li>Isi nama dan kode, lalu tekan <strong>Tambahkan</strong>.</li>
+      <li>Gunakan ikon pensil untuk mengubah nama/kode.</li>
+    </ol>
+    <div class="callout warning">
+      <span class="callout-icon">!</span>
+      <div><b>Penghapusan mapel dilindungi</b><p>Mata pelajaran tidak dapat dihapus jika masih digunakan bank soal, ujian, atau penugasan guru. Pindahkan atau hapus hubungan tersebut terlebih dahulu.</p></div>
+    </div>
+    <footer class="doc-footer"><span>AWExam · Panduan Admin</span><span>Bab 3</span></footer>
+  </section>
+
+  <section class="page page-break">
+    <header class="doc-header"><div><img src="../public/logo.png" alt=""><b>AWExam</b></div><span>BAB 3 · PANDUAN ADMIN</span></header>
+    <p class="eyebrow">Admin · Data Kelas dan Akun</p>
+    <h2>Kelas, siswa, guru, dan administrator</h2>
+
+    <h3>3.4 Membuat kelas</h3>
+    <ol class="steps">
+      <li><div><b>Buka Kelas &amp; Siswa</b><p>Tekan <strong>Kelola kelas → Tambah kelas</strong>.</p></div></li>
+      <li><div><b>Isi nama kelas</b><p>Contoh: IX A, IX B, atau XII IPA 1.</p></div></li>
+      <li><div><b>Pilih tahun ajaran</b><p>Pilih periode yang sesuai; periode aktif ditandai pada daftar.</p></div></li>
+      <li><div><b>Simpan</b><p>Setelah kelas muncul sebagai tab, pilih tab tersebut untuk meninjau siswa dan konteks tahun ajaran.</p></div></li>
+    </ol>
+
+    <h3>3.5 Membuat akun siswa</h3>
+    <ol class="steps">
+      <li><div><b>Tekan Tambah siswa</b><p>Formulir akun baru akan terbuka.</p></div></li>
+      <li><div><b>Isi identitas</b><p>Nama lengkap, email, NIS, kelas, dan kata sandi sementara minimal delapan karakter.</p></div></li>
+      <li><div><b>Pilih kelas</b><p>Siswa boleh dibuat dengan status “Belum ditempatkan”, tetapi ujian kelas tidak akan muncul sampai siswa ditempatkan.</p></div></li>
+      <li><div><b>Tekan Buat Akun</b><p>Berikan NIS dan kata sandi untuk aplikasi Android; sertakan email bila siswa juga diizinkan menggunakan web.</p></div></li>
+    </ol>
+
+    <h3>3.6 Mengelola akun yang sudah ada</h3>
+    <table>
+      <thead><tr><th>Aksi</th><th>Fungsi</th><th>Catatan</th></tr></thead>
+      <tbody>
+        <tr><td>Edit</td><td>Mengubah nama, email, NIS, atau kelas.</td><td>Periksa kembali email karena digunakan untuk login.</td></tr>
+        <tr><td>Reset kata sandi</td><td>Membuat kata sandi sementara baru.</td><td>Minimal 8 karakter dan konfirmasi harus sama.</td></tr>
+        <tr><td>Nonaktifkan akun</td><td>Mencegah pengguna masuk tanpa menghapus data.</td><td>Pilihan yang disarankan untuk akun sementara tidak digunakan.</td></tr>
+        <tr><td>Hapus pengguna</td><td>Menghapus akun sesuai aturan backend.</td><td>Gunakan hanya jika benar-benar diperlukan.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>3.7 Membuat akun Guru dan Admin</h3>
+    <ul>
+      <li>Buka menu <strong>Guru</strong> atau <strong>Administrator</strong>.</li>
+      <li>Tekan tombol tambah akun pada kanan atas.</li>
+      <li>Isi nama, email, dan kata sandi sementara.</li>
+      <li>Untuk Guru, lanjutkan dengan penugasan mata pelajaran dan kelas.</li>
+      <li>Batasi jumlah Administrator karena peran ini memiliki akses luas.</li>
+    </ul>
+
+    <div class="callout danger">
+      <span class="callout-icon">!</span>
+      <div><b>Jangan memakai satu akun untuk banyak orang</b><p>Akun pribadi diperlukan agar audit dapat menunjukkan siapa yang melakukan perubahan, reset, publikasi, atau tindakan sensitif lainnya.</p></div>
+    </div>
+    <footer class="doc-footer"><span>AWExam · Panduan Admin</span><span>Bab 3</span></footer>
+  </section>
+
+  <section class="page page-break">
+    <header class="doc-header"><div><img src="../public/logo.png" alt=""><b>AWExam</b></div><span>BAB 3 · PANDUAN ADMIN</span></header>
+    <p class="eyebrow">Admin · Penugasan dan Pengaturan</p>
+    <h2>Penugasan guru, profil, dan keamanan</h2>
+
+    <h3>3.8 Memberikan penugasan Guru</h3>
+    <ol class="steps">
+      <li><div><b>Buka menu Guru</b><p>Cari guru yang akan ditugaskan.</p></div></li>
+      <li><div><b>Buka Aksi lain → Atur penugasan</b><p>Modal penugasan menampilkan pasangan yang sudah aktif.</p></div></li>
+      <li><div><b>Pilih mata pelajaran dan kelas</b><p>Satu guru dapat mempunyai beberapa pasangan mapel–kelas.</p></div></li>
+      <li><div><b>Tekan Tambahkan penugasan</b><p>Penugasan diperlukan sebelum guru dapat mengelola ujian untuk kelas tersebut.</p></div></li>
+      <li><div><b>Hapus pasangan yang tidak berlaku</b><p>Tekan ikon hapus pada daftar penugasan aktif dan konfirmasi tindakan.</p></div></li>
+    </ol>
+
+    <h3>3.9 Pengaturan aplikasi</h3>
+    <table class="menu-map">
+      <thead><tr><th>Tab</th><th>Pengaturan</th></tr></thead>
+      <tbody>
+        <tr><td>Profil sekolah</td><td>Logo, nama sekolah, NPSN, dan alamat yang tampil pada sidebar dan rapor.</td></tr>
+        <tr><td>Keamanan</td><td>Default layar penuh, pencatatan perpindahan tab, dan batas sesi tidak aktif.</td></tr>
+        <tr><td>Tahun ajaran</td><td>Melihat periode aktif dan mengatur KKM/nilai ketuntasan.</td></tr>
+        <tr><td>Notifikasi</td><td>Pembaruan ujian, pengingat koreksi, dan peringatan keamanan.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>3.10 Audit &amp; Keamanan</h3>
+    <p>Halaman ini dipisah menjadi dua jenis catatan:</p>
+    <div class="grid-2">
+      <article class="card blue"><h4>Aktivitas sistem</h4><p class="small">Menampilkan pembuatan, perubahan, penghapusan, aktivasi, dan reset akun/data master beserta aktornya.</p></article>
+      <article class="card amber"><h4>Integritas ujian</h4><p class="small">Menampilkan kejadian saat siswa meninggalkan tab atau keluar dari mode layar penuh.</p></article>
+    </div>
+    <ol>
+      <li>Pilih tab jenis catatan.</li>
+      <li>Gunakan kolom pencarian berdasarkan aktor, tindakan, siswa, atau ujian.</li>
+      <li>Tekan <strong>Segarkan</strong> untuk mengambil data terbaru.</li>
+      <li>Jangan langsung menyimpulkan pelanggaran; cocokkan waktu dan konteks kejadian.</li>
+    </ol>
+
+    <h3>3.11 Hasil dan Rapor Semester</h3>
+    <ul>
+      <li><strong>Hasil Ujian:</strong> pilih ujian, lihat rata-rata, nilai tertinggi, ketuntasan, menunggu koreksi, distribusi, dan analisis soal.</li>
+      <li><strong>Rapor Siswa:</strong> pilih periode, kelas, siswa, lalu tinjau nilai per mata pelajaran.</li>
+      <li><strong>Leger Kelas:</strong> melihat seluruh siswa dan mapel dalam satu tabel serta mengekspor CSV.</li>
+      <li><strong>Komponen Nilai:</strong> menentukan ujian yang masuk rapor dan bobot relatifnya.</li>
+      <li><strong>Publikasi:</strong> lakukan setelah seluruh nilai, catatan, dan absensi final.</li>
+    </ul>
+    <footer class="doc-footer"><span>AWExam · Panduan Admin</span><span>Bab 3</span></footer>
+  </section>
+
+  <section class="page page-break">
+    <header class="doc-header"><div><img src="../public/logo.png" alt=""><b>AWExam</b></div><span>BAB 4 · PANDUAN GURU</span></header>
+    <p class="eyebrow">Bab 4</p>
+    <h2>Panduan operasional Guru</h2>
+    <p class="lead">Guru menyiapkan konten ujian, menjadwalkan pelaksanaan, menilai jawaban essay, dan meninjau hasil sesuai penugasannya.</p>
+
+    <h3>4.1 Peta menu Guru</h3>
+    <table class="menu-map">
+      <thead><tr><th>Menu</th><th>Fungsi utama</th></tr></thead>
+      <tbody>
+        <tr><td>Ringkasan</td><td>Melihat ujian, bank soal, penugasan, dan koreksi yang perlu ditindaklanjuti.</td></tr>
+        <tr><td>Bank Soal</td><td>Membuat bank, menambah/mengimpor soal, melengkapi kunci, dan mengelola soal massal.</td></tr>
+        <tr><td>Ujian</td><td>Membuat jadwal ujian, memilih kelas/soal, serta mengatur keamanan.</td></tr>
+        <tr><td>Kelas &amp; Siswa</td><td>Melihat peserta dan konteks kelas. Perubahan akun dilakukan Admin.</td></tr>
+        <tr><td>Koreksi Essay</td><td>Memberi skor dan komentar pada jawaban essay.</td></tr>
+        <tr><td>Hasil Ujian</td><td>Melihat ringkasan nilai, analisis soal, dan ekspor CSV.</td></tr>
+        <tr><td>Rapor Semester</td><td>Melihat rapor/leger; wali kelas dapat mengelola catatan dan publikasi.</td></tr>
+        <tr><td>Pengaturan</td><td>Melihat profil akun dan mengatur preferensi notifikasi.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>4.2 Membuat bank soal</h3>
+    <ol class="steps">
+      <li><div><b>Buka Bank Soal</b><p>Tekan <strong>Lainnya → Buat bank soal</strong>.</p></div></li>
+      <li><div><b>Isi identitas bank</b><p>Pilih mata pelajaran dan beri nama yang mudah dicari, misalnya “Harian — Aljabar”.</p></div></li>
+      <li><div><b>Simpan bank</b><p>Bank akan muncul pada daftar kiri atau filter bank pada ponsel.</p></div></li>
+    </ol>
+
+    <h3>4.3 Menambah soal manual</h3>
+    <ol>
+      <li>Pilih bank tujuan lalu tekan <strong>Tambah soal</strong>.</li>
+      <li>Pilih tipe <strong>Pilihan Ganda</strong> atau <strong>Essay</strong>.</li>
+      <li>Isi pertanyaan, tingkat kesulitan, dan bobot.</li>
+      <li>Untuk pilihan ganda, isi opsi dan tandai satu jawaban benar.</li>
+      <li>Untuk essay, isi pedoman/kunci jawaban sebagai acuan koreksi.</li>
+      <li>Periksa ringkasan lalu simpan.</li>
+    </ol>
+    <div class="callout warning">
+      <span class="callout-icon">!</span>
+      <div><b>Soal tanpa kunci belum siap digunakan</b><p>AWExam menandai soal dengan kunci tidak lengkap. Lengkapi kunci sebelum menyusun ujian agar penilaian otomatis tidak salah.</p></div>
+    </div>
+    <footer class="doc-footer"><span>AWExam · Panduan Guru</span><span>Bab 4</span></footer>
+  </section>
+
+  <section class="page page-break">
+    <header class="doc-header"><div><img src="../public/logo.png" alt=""><b>AWExam</b></div><span>BAB 4 · PANDUAN GURU</span></header>
+    <p class="eyebrow">Guru · Impor dan Pengelolaan Soal</p>
+    <h2>Impor banyak soal dan aksi massal</h2>
+
+    <h3>4.4 Impor banyak soal</h3>
+    <ol class="steps">
+      <li><div><b>Pilih bank tujuan</b><p>Buka <strong>Lainnya → Impor banyak soal</strong>.</p></div></li>
+      <li><div><b>Pilih sumber</b><p>PDF, Foto/OCR, Tempel teks, Word/DOCX, GIFT, atau QTI.</p></div></li>
+      <li><div><b>Unggah atau tempel konten</b><p>Berkas maksimal 10 MB. Foto menerima maksimal lima gambar per proses.</p></div></li>
+      <li><div><b>Tinjau hasil pembacaan</b><p>Periksa pertanyaan, opsi, kunci, bobot, kesulitan, error format, dan duplikat.</p></div></li>
+      <li><div><b>Pilih soal valid</b><p>Soal tidak valid tidak dapat dipilih. Soal tanpa kunci dapat masuk bank tetapi harus dilengkapi sebelum ujian.</p></div></li>
+      <li><div><b>Tekan Impor</b><p>Tunggu notifikasi berhasil sebelum menutup halaman.</p></div></li>
+    </ol>
+
+    <table>
+      <thead><tr><th>Sumber</th><th>Gunakan ketika</th><th>Catatan</th></tr></thead>
+      <tbody>
+        <tr><td>PDF</td><td>Naskah dapat diseleksi/searchable atau mengikuti format SOAL 1.</td><td>PDF hasil scan sebaiknya memakai Foto/OCR.</td></tr>
+        <tr><td>Foto/OCR</td><td>Soal berasal dari foto atau hasil scan.</td><td>Proses dilakukan di perangkat; gunakan gambar tajam dan lurus.</td></tr>
+        <tr><td>Tempel teks</td><td>Soal disalin dari Word, WhatsApp, atau dokumen.</td><td>Rapikan penomoran dan pemisah antarsoal.</td></tr>
+        <tr><td>Word/DOCX</td><td>Naskah disimpan sebagai dokumen Word.</td><td>Gunakan struktur sederhana tanpa layout kompleks.</td></tr>
+        <tr><td>GIFT</td><td>Soal berasal dari Moodle atau format GIFT.</td><td>Pastikan sintaks kurung kurawal valid.</td></tr>
+        <tr><td>QTI</td><td>Soal diekspor dari LMS yang mendukung QTI.</td><td>Menerima XML atau ZIP.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>4.5 Mengelola banyak soal</h3>
+    <ol>
+      <li>Centang soal pada tabel.</li>
+      <li>Tekan <strong>Kelola pilihan</strong>.</li>
+      <li>Pilih mode <strong>Salin</strong> atau <strong>Ubah massal</strong>.</li>
+      <li>Untuk ubah massal, tentukan bank, tingkat kesulitan, atau bobot yang ingin diubah.</li>
+      <li>Tinjau jumlah soal, lalu simpan.</li>
+    </ol>
+
+    <div class="callout">
+      <span class="callout-icon">i</span>
+      <div><b>Soal yang sudah dipakai dapat terkunci</b><p>Soal pada ujian terjadwal atau yang sudah dikerjakan dilindungi agar histori ujian dan hasil siswa tidak berubah.</p></div>
+    </div>
+    <footer class="doc-footer"><span>AWExam · Panduan Guru</span><span>Bab 4</span></footer>
+  </section>
+
+  <section class="page page-break">
+    <header class="doc-header"><div><img src="../public/logo.png" alt=""><b>AWExam</b></div><span>BAB 4 · PANDUAN GURU</span></header>
+    <p class="eyebrow">Guru · Pembuatan Ujian</p>
+    <h2>Membuat dan menjadwalkan ujian</h2>
+
+    <h3>4.6 Wizard ujian tiga langkah</h3>
+    <ol class="steps">
+      <li><div><b>Informasi dasar</b>
+        <p>Isi judul, deskripsi opsional, mata pelajaran, kelas peserta, tanggal/jam mulai, durasi, dan status awal.</p>
+        <ul><li><strong>Draft:</strong> belum ditampilkan kepada siswa.</li><li><strong>Terjadwal:</strong> akan muncul sesuai jadwal.</li></ul>
+      </div></li>
+      <li><div><b>Pilih soal</b><p>AWExam hanya menampilkan soal dari mata pelajaran yang dipilih. Pilih minimal satu soal dan pastikan seluruh kunci lengkap.</p></div></li>
+      <li><div><b>Keamanan &amp; publikasi</b><p>Tinjau ringkasan, lalu atur kode akses opsional, acak urutan soal, acak opsi, layar penuh, dan pencatatan perpindahan tab.</p></div></li>
+    </ol>
+
+    <h3>4.7 Memahami status ujian</h3>
+    <table>
+      <thead><tr><th>Status</th><th>Arti</th><th>Tindakan</th></tr></thead>
+      <tbody>
+        <tr><td><span class="status draft">DRAFT</span></td><td>Ujian masih disiapkan.</td><td>Periksa soal, jadwal, kelas, dan keamanan.</td></tr>
+        <tr><td><span class="status scheduled">TERJADWAL</span></td><td>Ujian siap dan menunggu waktu mulai.</td><td>Informasikan jadwal kepada siswa/pengawas.</td></tr>
+        <tr><td><span class="status live">BERLANGSUNG</span></td><td>Waktu ujian sedang aktif.</td><td>Pantau peserta dan koneksi.</td></tr>
+        <tr><td><span class="status done">SELESAI</span></td><td>Waktu atau pengerjaan telah berakhir.</td><td>Koreksi essay dan finalkan hasil.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>4.8 Pemeriksaan sebelum menjadwalkan</h3>
+    <ul class="checklist">
+      <li>Judul dan mata pelajaran benar.</li>
+      <li>Kelas peserta benar dan berisi siswa aktif.</li>
+      <li>Zona waktu, tanggal, jam mulai, dan durasi benar.</li>
+      <li>Jumlah soal sesuai rencana.</li>
+      <li>Semua soal pilihan ganda memiliki jawaban benar.</li>
+      <li>Soal essay memiliki pedoman jawaban dan bobot.</li>
+      <li>Kode akses sudah dicatat oleh pengawas jika digunakan.</li>
+      <li>Pengacakan dan keamanan sesuai kebijakan sekolah.</li>
+    </ul>
+
+    <div class="callout danger">
+      <span class="callout-icon">!</span>
+      <div><b>Jangan membagikan kode akses terlalu awal</b><p>Berikan kode saat peserta sudah siap dan ujian akan dimulai. Hindari mengirim kode melalui grup terbuka jauh sebelum jadwal.</p></div>
+    </div>
+    <footer class="doc-footer"><span>AWExam · Panduan Guru</span><span>Bab 4</span></footer>
+  </section>
+
+  <section class="page page-break">
+    <header class="doc-header"><div><img src="../public/logo.png" alt=""><b>AWExam</b></div><span>BAB 4 · PANDUAN GURU</span></header>
+    <p class="eyebrow">Guru · Penilaian dan Laporan</p>
+    <h2>Koreksi essay, hasil ujian, dan rapor</h2>
+
+    <h3>4.9 Koreksi Essay</h3>
+    <ol class="steps">
+      <li><div><b>Buka Penilaian → Koreksi Essay</b><p>Jawaban yang sudah dikumpulkan tampil otomatis.</p></div></li>
+      <li><div><b>Pilih siswa</b><p>Daftar kiri menunjukkan status sudah/belum dinilai dan skor.</p></div></li>
+      <li><div><b>Baca pertanyaan, kunci, dan jawaban</b><p>Buka <strong>Lihat kunci jawaban</strong> sebagai pedoman.</p></div></li>
+      <li><div><b>Masukkan skor</b><p>Skor harus berada antara 0 dan bobot maksimum soal. Tambahkan komentar yang membantu siswa.</p></div></li>
+      <li><div><b>Simpan nilai</b><p>Lanjutkan sampai progress koreksi mencapai 100%.</p></div></li>
+    </ol>
+
+    <h3>4.10 Hasil Ujian</h3>
+    <ol>
+      <li>Pilih ujian pada filter <strong>Pilih ujian yang dianalisis</strong>.</li>
+      <li>Tinjau rata-rata, nilai tertinggi, ketuntasan KKM, dan jumlah menunggu koreksi.</li>
+      <li>Baca distribusi nilai dan analisis butir soal.</li>
+      <li>Gunakan <strong>Ekspor CSV</strong> bila diperlukan untuk pengolahan lanjutan.</li>
+      <li>Tekan <strong>Muat ulang</strong> setelah koreksi untuk mengambil hasil terbaru.</li>
+    </ol>
+
+    <h3>4.11 Rapor Semester</h3>
+    <ul>
+      <li>Pilih periode, kelas, dan siswa.</li>
+      <li>Periksa ujian yang masuk melalui <strong>Komponen nilai</strong> serta bobot relatifnya.</li>
+      <li>Guru wali kelas atau Admin dapat menulis catatan, prestasi, dan ketidakhadiran.</li>
+      <li>Gunakan tampilan <strong>Leger kelas</strong> untuk perbandingan seluruh siswa.</li>
+      <li>Lakukan publikasi hanya setelah data final.</li>
+      <li>Tekan <strong>Cetak / PDF</strong> untuk menghasilkan dokumen rapor.</li>
+    </ul>
+
+    <div class="callout success">
+      <span class="callout-icon">✓</span>
+      <div><b>Praktik penilaian yang baik</b><p>Gunakan pedoman konsisten, berikan komentar singkat dan objektif, lalu periksa sampel nilai sebelum memfinalkan satu kelas.</p></div>
+    </div>
+    <footer class="doc-footer"><span>AWExam · Panduan Guru</span><span>Bab 4</span></footer>
+  </section>
+
+  <section class="page page-break">
+    <header class="doc-header"><div><img src="../public/logo.png" alt=""><b>AWExam</b></div><span>BAB 5 · PANDUAN SISWA</span></header>
+    <p class="eyebrow">Bab 5</p>
+    <h2>Mengakses AWExam sebagai Siswa</h2>
+    <p class="lead">Siswa dapat memakai aplikasi Android AWExam yang didistribusikan melalui Google Play. Web tetap dapat digunakan sebagai alternatif bila sekolah mengizinkannya.</p>
+
+    <h3>5.1 Pilih media yang digunakan</h3>
+    <table class="menu-map">
+      <thead><tr><th>Media</th><th>Login</th><th>Penggunaan</th></tr></thead>
+      <tbody>
+        <tr><td>Aplikasi Android</td><td><strong>NIS</strong> dan kata sandi.</td><td>Media utama siswa di ponsel/tablet. Menyediakan Ujian, Riwayat, Profil, sinkronisasi jawaban, timer, dan mode aman.</td></tr>
+        <tr><td>Web siswa</td><td><strong>Email</strong> dan kata sandi.</td><td>Alternatif melalui browser apabila diperbolehkan sekolah. Gunakan alamat web resmi AWExam sekolah.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>5.2 Memasang atau memperbarui aplikasi</h3>
+    <ul class="checklist">
+      <li>Buka halaman AWExam di Google Play melalui tautan yang diberikan sekolah, kemudian tekan <strong>Instal</strong>.</li>
+      <li>Jika rilis masih dalam pengujian tertutup, gunakan akun Google yang sudah didaftarkan sebagai penguji.</li>
+      <li>Pastikan nama aplikasi <strong>AWExam</strong> dan ikonnya sesuai informasi dari sekolah.</li>
+      <li>Tekan <strong>Update</strong> bila Google Play menyediakan versi yang lebih baru.</li>
+      <li>Jika layar <strong>Pembaruan diperlukan</strong> muncul, aplikasi harus diperbarui sebelum login.</li>
+    </ul>
+
+    <div class="callout">
+      <span class="callout-icon">i</span>
+      <div><b>Gunakan distribusi resmi</b><p>Utamakan instalasi dari Google Play atau tautan resmi sekolah. Jangan memasang APK dari pengirim yang tidak dikenal.</p></div>
+    </div>
+
+    <h3>5.3 Masuk melalui aplikasi Android</h3>
+    <ol class="steps">
+      <li><div><b>Buka AWExam</b><p>Pastikan perangkat terhubung ke internet dan tanggal/jam perangkat benar.</p></div></li>
+      <li><div><b>Masukkan Nomor Induk Siswa</b><p>Gunakan NIS yang terdaftar pada akun sekolah, bukan alamat email.</p></div></li>
+      <li><div><b>Masukkan kata sandi</b><p>Kata sandi minimal delapan karakter dan diberikan oleh Admin/sekolah.</p></div></li>
+      <li><div><b>Tekan Masuk ke aplikasi</b><p>Setelah berhasil, aplikasi menampilkan beranda <strong>Ujian kamu</strong>.</p></div></li>
+    </ol>
+
+    <div class="callout warning">
+      <span class="callout-icon">!</span>
+      <div><b>Lupa kata sandi</b><p>Aplikasi tidak mereset kata sandi sendiri. Hubungi guru atau petugas ujian dengan menyiapkan nama lengkap dan NIS.</p></div>
+    </div>
+    <footer class="doc-footer"><span>AWExam · Panduan Siswa</span><span>Bab 5</span></footer>
+  </section>
+
+  <section class="page page-break">
+    <header class="doc-header"><div><img src="../public/logo.png" alt=""><b>AWExam</b></div><span>BAB 5 · PANDUAN SISWA</span></header>
+    <p class="eyebrow">Siswa · Beranda Aplikasi</p>
+    <h2>Menemukan dan memulai ujian</h2>
+
+    <h3>5.4 Mengenali navigasi aplikasi</h3>
+    <table class="menu-map">
+      <thead><tr><th>Bagian</th><th>Fungsi</th></tr></thead>
+      <tbody>
+        <tr><td>Ujian aktif</td><td>Ujian yang sudah dapat dimulai atau attempt yang masih berlangsung.</td></tr>
+        <tr><td>Agenda berikutnya</td><td>Ujian yang belum masuk waktu mulai.</td></tr>
+        <tr><td>Riwayat</td><td>Ujian selesai, nilai yang sudah difinalisasi, rata-rata, dan predikat.</td></tr>
+        <tr><td>Profil</td><td>Nama, NIS, kelas, statistik, sinkronisasi, bantuan, dan tombol keluar.</td></tr>
+        <tr><td>Tersinkron / Offline</td><td>Status hubungan aplikasi dengan server. Tarik halaman ke bawah atau pilih pembaruan jadwal bila data belum muncul.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>5.5 Persiapan sebelum ujian</h3>
+    <ul class="checklist">
+      <li>Isi baterai perangkat dan siapkan koneksi internet yang stabil.</li>
+      <li>Tutup aplikasi lain yang tidak diperlukan dan aktifkan mode senyap bila diizinkan.</li>
+      <li>Siapkan kode akses bila pengawas menggunakannya.</li>
+      <li>Pastikan ujian tampil pada bagian <strong>Ujian aktif</strong>; lakukan pembaruan jadwal bila belum terlihat.</li>
+      <li>Jangan berganti perangkat setelah attempt dimulai tanpa arahan pengawas.</li>
+    </ul>
+
+    <h3>5.6 Memulai ujian dari aplikasi</h3>
+    <ol class="steps">
+      <li><div><b>Pilih kartu ujian</b><p>Baca judul, mata pelajaran, guru, tanggal, jam mulai, durasi, jumlah soal, dan petunjuk.</p></div></li>
+      <li><div><b>Periksa mode aman</b><p>Jika aktif, meninggalkan aplikasi saat ujian akan dicatat untuk pengawas.</p></div></li>
+      <li><div><b>Masukkan kode akses bila diminta</b><p>Kode diperoleh dari pengawas saat ujian akan dimulai.</p></div></li>
+      <li><div><b>Centang kesiapan</b><p>Centang “Saya sudah membaca petunjuk dan siap memulai”.</p></div></li>
+      <li><div><b>Tekan Mulai ujian</b><p>Tunggu proses <strong>Menyiapkan ujian…</strong> sampai ruang ujian terbuka.</p></div></li>
+    </ol>
+
+    <div class="callout warning">
+      <span class="callout-icon">!</span>
+      <div><b>Aktivitas keluar aplikasi dapat dicatat</b><p>Saat mode aman aktif, berpindah aplikasi atau membawa AWExam ke latar belakang menambah catatan integritas dan menampilkan peringatan ketika kembali.</p></div>
+    </div>
+    <footer class="doc-footer"><span>AWExam · Panduan Siswa</span><span>Bab 5</span></footer>
+  </section>
+
+  <section class="page page-break">
+    <header class="doc-header"><div><img src="../public/logo.png" alt=""><b>AWExam</b></div><span>BAB 5 · PANDUAN SISWA</span></header>
+    <p class="eyebrow">Siswa · Saat Ujian</p>
+    <h2>Menjawab dan mengumpulkan ujian</h2>
+
+    <h3>5.7 Mengenali ruang ujian aplikasi</h3>
+    <table class="menu-map">
+      <thead><tr><th>Elemen</th><th>Fungsi</th></tr></thead>
+      <tbody>
+        <tr><td>SISA WAKTU</td><td>Timer <strong>jam:menit:detik</strong> dihitung dari batas waktu server dan tetap disesuaikan ketika aplikasi kembali aktif.</td></tr>
+        <tr><td>Tersinkron / tertunda / Offline</td><td>Menunjukkan apakah jawaban sudah diterima server atau masih menunggu koneksi.</td></tr>
+        <tr><td>Navigator soal</td><td>Membuka seluruh nomor dan membedakan soal terjawab, belum dijawab, serta ditandai.</td></tr>
+        <tr><td>Tandai ragu</td><td>Menyimpan penanda untuk soal yang ingin diperiksa lagi tanpa menghapus jawaban.</td></tr>
+        <tr><td>Sebelumnya / Soal berikutnya</td><td>Berpindah berurutan. Pada soal terakhir, tombol berubah menjadi <strong>Periksa jawaban</strong>.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>5.8 Menjawab soal</h3>
+    <ul>
+      <li><strong>Pilihan ganda:</strong> tekan satu pilihan. Pilihan aktif akan diberi tanda.</li>
+      <li><strong>Essay:</strong> ketik jawaban dengan jelas; penyimpanan dijalankan setelah jeda singkat.</li>
+      <li>Perhatikan indikator <strong>Tersinkron</strong>. Jika muncul jumlah jawaban tertunda, tunggu koneksi pulih.</li>
+      <li>Gunakan <strong>Tandai ragu</strong> dan navigator soal untuk kembali ke jawaban yang belum pasti.</li>
+      <li>Jangan menghapus data aplikasi, logout, atau menutup paksa aplikasi saat attempt berlangsung.</li>
+    </ul>
+
+    <h3>5.9 Memeriksa dan mengumpulkan</h3>
+    <ol class="steps">
+      <li><div><b>Tekan Periksa jawaban</b><p>Ringkasan menampilkan jumlah terjawab, belum dijawab, dan ditandai.</p></div></li>
+      <li><div><b>Pilih Kembali memeriksa bila perlu</b><p>Gunakan navigator untuk membuka nomor kosong atau bertanda.</p></div></li>
+      <li><div><b>Tekan Kumpulkan ujian</b><p>Baca konfirmasi bahwa jawaban tidak dapat diubah setelah dikirim.</p></div></li>
+      <li><div><b>Tekan Ya, kumpulkan</b><p>Tunggu sampai layar <strong>Ujian berhasil dikirim!</strong> muncul.</p></div></li>
+      <li><div><b>Tekan Kembali ke beranda</b><p>Aplikasi membuka tab Riwayat. Nilai tampil setelah guru menyelesaikan koreksi dan finalisasi.</p></div></li>
+    </ol>
+
+    <div class="callout danger">
+      <span class="callout-icon">!</span>
+      <div><b>Waktu habis memicu pengumpulan otomatis</b><p>Aplikasi mencoba mengirim jawaban secara otomatis. Jika koneksi menghambat pengiriman, pulihkan koneksi lalu gunakan tombol kumpulkan sesuai pesan di layar.</p></div>
+    </div>
+    <footer class="doc-footer"><span>AWExam · Panduan Siswa</span><span>Bab 5</span></footer>
+  </section>
+
+  <section class="page page-break">
+    <header class="doc-header"><div><img src="../public/logo.png" alt=""><b>AWExam</b></div><span>BAB 6 · SIMULASI END-TO-END</span></header>
+    <p class="eyebrow">Bab 6</p>
+    <h2>Simulasi ujian sebelum digunakan</h2>
+    <p class="lead">Gunakan data uji khusus. Jangan menjadikan siswa sungguhan sebagai percobaan pertama.</p>
+
+    <h3>Skenario simulasi minimum</h3>
+    <table>
+      <thead><tr><th>Tahap</th><th>Pelaksana</th><th>Tindakan</th><th>Hasil yang diharapkan</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Admin</td><td>Buat tahun ajaran aktif, mapel “Simulasi”, dan kelas “Kelas Uji”.</td><td>Semua data muncul dan saling terhubung.</td></tr>
+        <tr><td>2</td><td>Admin</td><td>Buat satu akun guru dan dua akun siswa uji.</td><td>Akun aktif dan siswa berada di Kelas Uji.</td></tr>
+        <tr><td>3</td><td>Admin</td><td>Tugaskan guru ke mapel Simulasi dan Kelas Uji.</td><td>Penugasan muncul pada daftar aktif.</td></tr>
+        <tr><td>4</td><td>Guru</td><td>Buat bank berisi 3 PG dan 1 essay lengkap dengan kunci.</td><td>Tidak ada peringatan kunci tidak lengkap.</td></tr>
+        <tr><td>5</td><td>Guru</td><td>Buat ujian 10–15 menit, pilih semua soal, gunakan kode akses.</td><td>Ujian berstatus Terjadwal.</td></tr>
+        <tr><td>6</td><td>Siswa Uji 1</td><td>Masuk melalui aplikasi Android, jawab semua soal, tandai satu ragu, lalu kumpulkan.</td><td>Layar berhasil muncul dan hasil masuk ke Riwayat.</td></tr>
+        <tr><td>7</td><td>Siswa Uji 2</td><td>Uji koneksi terputus singkat di aplikasi, pulihkan, lalu kumpulkan.</td><td>Jawaban tertunda kembali tersinkron dan attempt terkirim.</td></tr>
+        <tr><td>8</td><td>Guru</td><td>Koreksi essay dan buka Hasil Ujian.</td><td>Nilai final, statistik, dan analisis tampil.</td></tr>
+        <tr><td>9</td><td>Admin</td><td>Periksa Audit &amp; Keamanan dan Rapor.</td><td>Event integritas serta komponen nilai tercatat.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Kriteria lulus simulasi</h3>
+    <ul class="checklist">
+      <li>Ketiga peran dapat login dan hanya melihat menu sesuai hak akses.</li>
+      <li>Ujian muncul hanya pada siswa di kelas yang dipilih.</li>
+      <li>Kode akses benar diterima dan kode salah ditolak.</li>
+      <li>Timer terlihat dan menghitung mundur secara konsisten.</li>
+      <li>Jawaban pilihan ganda dan essay tersimpan.</li>
+      <li>Pengumpulan berhasil dan jawaban tidak dapat diedit lagi.</li>
+      <li>Koreksi essay memperbarui nilai akhir.</li>
+      <li>CSV laporan dapat diunduh.</li>
+      <li>Rapor dan leger dapat dibuka/cetak.</li>
+      <li>Event meninggalkan tab tercatat bila fitur diaktifkan.</li>
+    </ul>
+    <footer class="doc-footer"><span>AWExam · Simulasi Ujian</span><span>Bab 6</span></footer>
+  </section>
+
+  <section class="page page-break">
+    <header class="doc-header"><div><img src="../public/logo.png" alt=""><b>AWExam</b></div><span>BAB 7 · SOP PELAKSANAAN</span></header>
+    <p class="eyebrow">Bab 7</p>
+    <h2>SOP sebelum, saat, dan setelah ujian</h2>
+
+    <div class="grid-3">
+      <article class="card blue">
+        <h3>H-1 sampai H-7</h3>
+        <ul class="small">
+          <li>Finalkan bank soal dan kunci.</li>
+          <li>Periksa kelas serta siswa aktif.</li>
+          <li>Jadwalkan ujian dan durasi.</li>
+          <li>Uji dengan akun siswa percobaan.</li>
+          <li>Siapkan pengawas dan bantuan teknis.</li>
+        </ul>
+      </article>
+      <article class="card green">
+        <h3>Hari H</h3>
+        <ul class="small">
+          <li>Periksa status layanan dan koneksi.</li>
+          <li>Pastikan jam perangkat sesuai.</li>
+          <li>Bagikan kode akses saat siap.</li>
+          <li>Pantau peserta dan event.</li>
+          <li>Catat insiden secara objektif.</li>
+        </ul>
+      </article>
+      <article class="card amber">
+        <h3>Setelah ujian</h3>
+        <ul class="small">
+          <li>Pastikan seluruh attempt terkumpul.</li>
+          <li>Koreksi essay sampai selesai.</li>
+          <li>Periksa anomali dan audit log.</li>
+          <li>Ekspor hasil bila diperlukan.</li>
+          <li>Finalkan rapor setelah verifikasi.</li>
+        </ul>
+      </article>
+    </div>
+
+    <h3>Pembagian tanggung jawab</h3>
+    <table>
+      <thead><tr><th>Peran</th><th>Sebelum</th><th>Saat</th><th>Setelah</th></tr></thead>
+      <tbody>
+        <tr><td>Admin</td><td>Akun, kelas, penugasan, profil, keamanan.</td><td>Dukungan login dan pemantauan sistem.</td><td>Audit, laporan sekolah, dan rapor.</td></tr>
+        <tr><td>Guru</td><td>Soal, kunci, jadwal, kode, pengaturan ujian.</td><td>Mengawasi kesiapan dan menjawab kendala konten.</td><td>Koreksi essay dan analisis hasil.</td></tr>
+        <tr><td>Pengawas</td><td>Perangkat, ruangan, daftar peserta.</td><td>Membagikan kode dan mencatat insiden.</td><td>Melaporkan kejadian kepada Guru/Admin.</td></tr>
+        <tr><td>Siswa</td><td>Menyiapkan akun dan perangkat.</td><td>Mengerjakan jujur serta menjaga halaman aktif.</td><td>Memastikan pengumpulan berhasil.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout">
+      <span class="callout-icon">i</span>
+      <div><b>Event integritas bukan vonis otomatis</b><p>Perpindahan tab dapat terjadi karena notifikasi, sistem operasi, atau kendala perangkat. Gunakan log sebagai indikator yang harus diverifikasi bersama pengawas.</p></div>
+    </div>
+    <footer class="doc-footer"><span>AWExam · SOP Pelaksanaan</span><span>Bab 7</span></footer>
+  </section>
+
+  <section class="page page-break">
+    <header class="doc-header"><div><img src="../public/logo.png" alt=""><b>AWExam</b></div><span>BAB 8 · TROUBLESHOOTING</span></header>
+    <p class="eyebrow">Bab 8</p>
+    <h2>Pemecahan masalah umum</h2>
+
+    <table>
+      <thead><tr><th>Gejala / pesan</th><th>Penyebab yang mungkin</th><th>Tindakan pengguna</th></tr></thead>
+      <tbody>
+        <tr><td>Tidak bisa login</td><td>Email/NIS atau kata sandi salah, akun nonaktif, atau sesi lama bermasalah.</td><td>Gunakan NIS pada aplikasi siswa atau email pada web. Coba masuk ulang, lalu hubungi Admin untuk memeriksa akun.</td></tr>
+        <tr><td>“Konfigurasi server belum tersedia”</td><td>Environment Supabase pada deployment belum tersedia.</td><td>Laporkan kepada pengelola teknis. Jangan memasukkan key sensitif ke browser.</td></tr>
+        <tr><td>Gagal membuat pengguna / Edge Function</td><td>Fungsi admin-users belum aktif, origin tidak diizinkan, atau sesi Admin kedaluwarsa.</td><td>Login ulang. Jika tetap gagal, minta pengelola teknis memeriksa deployment fungsi dan APP_ORIGIN.</td></tr>
+        <tr><td>Ujian tidak muncul pada siswa</td><td>Status masih Draft, jadwal belum mulai, siswa salah kelas, akun nonaktif, atau penugasan belum tersedia.</td><td>Periksa status, waktu, kelas peserta, dan data siswa.</td></tr>
+        <tr><td>Kode akses ditolak</td><td>Kode salah atau batas percobaan tercapai.</td><td>Ketik ulang sesuai kode pengawas. Guru memeriksa kode ujian bila tetap gagal.</td></tr>
+        <tr><td>Timer tidak terlihat</td><td>Ujian belum selesai dimuat atau data jadwal/durasi tidak valid.</td><td>Muat ulang sekali, tunggu soal tampil, lalu laporkan bila timer tetap hilang.</td></tr>
+        <tr><td>Jawaban “belum tersinkron”</td><td>Koneksi internet terputus atau server tidak dapat dijangkau.</td><td>Jangan tutup tab. Pulihkan koneksi dan tunggu “Semua jawaban tersimpan”.</td></tr>
+        <tr><td>Halaman putih setelah klik</td><td>Asset deployment lama tersimpan di browser atau terjadi error render.</td><td>Muat ulang, gunakan hard refresh <span class="kbd">Ctrl/Cmd + Shift + R</span>, lalu buka ulang. Laporkan halaman dan waktu kejadian.</td></tr>
+        <tr><td>Pesan MIME <code>text/html</code></td><td>Browser meminta file JavaScript lama tetapi hosting mengirim halaman HTML.</td><td>Hard refresh dan bersihkan cache situs. Pengelola melakukan deployment ulang bila banyak pengguna mengalami.</td></tr>
+        <tr><td>PDF tidak terbaca</td><td>PDF berupa scan, format tidak konsisten, atau berkas terlalu besar.</td><td>Pakai Foto/OCR, format SOAL 1, atau unggah DOCX. Pastikan maksimal 10 MB.</td></tr>
+        <tr><td>Soal tidak dapat diedit</td><td>Soal sudah dipakai pada ujian terjadwal/dikerjakan.</td><td>Salin soal ke bank lain lalu edit salinannya untuk ujian berikutnya.</td></tr>
+        <tr><td>Hasil belum final</td><td>Masih ada jawaban essay yang belum dikoreksi.</td><td>Buka Koreksi Essay dan selesaikan seluruh penilaian.</td></tr>
+        <tr><td>Rapor kosong</td><td>Belum ada nilai final, komponen belum disertakan, periode/kelas salah.</td><td>Periksa filter, finalisasi ujian, dan atur Komponen nilai.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Informasi yang perlu disertakan saat melapor</h3>
+    <ul>
+      <li>Peran serta email/NIS akun sesuai media login (jangan kirim kata sandi).</li>
+      <li>Nama halaman/menu dan tindakan terakhir.</li>
+      <li>Pesan error lengkap atau screenshot.</li>
+      <li>Tanggal dan jam kejadian.</li>
+      <li>Perangkat, browser, dan jenis koneksi.</li>
+      <li>Apakah masalah terjadi pada satu atau banyak pengguna.</li>
+    </ul>
+    <footer class="doc-footer"><span>AWExam · Troubleshooting</span><span>Bab 8</span></footer>
+  </section>
+
+  <section class="page page-break">
+    <header class="doc-header"><div><img src="../public/logo.png" alt=""><b>AWExam</b></div><span>BAB 9 · KEAMANAN</span></header>
+    <p class="eyebrow">Bab 9</p>
+    <h2>Keamanan akun dan data</h2>
+
+    <h3>Prinsip wajib</h3>
+    <div class="grid-2">
+      <article class="card blue"><h4>Akun personal</h4><p class="small">Setiap Admin dan Guru memakai akun sendiri agar aktivitas dapat diaudit.</p></article>
+      <article class="card blue"><h4>Kata sandi kuat</h4><p class="small">Minimal delapan karakter; gunakan kombinasi yang tidak mudah ditebak.</p></article>
+      <article class="card blue"><h4>Hak akses minimum</h4><p class="small">Berikan peran Admin hanya kepada petugas yang benar-benar memerlukan.</p></article>
+      <article class="card blue"><h4>Kode akses terbatas</h4><p class="small">Bagikan kode ujian tepat waktu dan hanya kepada peserta/pengawas.</p></article>
+      <article class="card blue"><h4>Keluar setelah selesai</h4><p class="small">Wajib pada komputer bersama, laboratorium, atau perangkat pinjaman.</p></article>
+      <article class="card blue"><h4>Verifikasi sebelum publikasi</h4><p class="small">Nilai, catatan, absensi, dan komponen harus diperiksa sebelum rapor dipublikasikan.</p></article>
+    </div>
+
+    <div class="callout danger">
+      <span class="callout-icon">!</span>
+      <div><b>Service-role key tidak boleh berada di web</b><p>Browser hanya boleh menerima URL Supabase dan anon key. Service-role key memiliki hak tinggi dan hanya boleh berada pada backend/Edge Function Supabase.</p></div>
+    </div>
+
+    <h3>Checklist Admin sebelum semester berjalan</h3>
+    <ul class="checklist">
+      <li>Tahun ajaran yang benar berstatus aktif.</li>
+      <li>Setiap kelas terhubung ke tahun ajaran.</li>
+      <li>Data siswa, NIS, email, dan kelas sudah diverifikasi.</li>
+      <li>Akun yang tidak digunakan sudah dinonaktifkan.</li>
+      <li>Penugasan Guru sesuai mapel dan kelas.</li>
+      <li>Profil sekolah, KKM, logo, NPSN, dan alamat sudah benar.</li>
+      <li>Default keamanan dan batas sesi sudah ditetapkan.</li>
+      <li>Simulasi ujian sudah lulus.</li>
+    </ul>
+
+    <h3>Checklist Guru sebelum menerbitkan ujian</h3>
+    <ul class="checklist">
+      <li>Bank dan mata pelajaran benar.</li>
+      <li>Semua soal memiliki isi, bobot, dan kunci/pedoman.</li>
+      <li>Tidak ada soal duplikat yang tidak disengaja.</li>
+      <li>Kelas, jadwal, durasi, dan status benar.</li>
+      <li>Kode akses dan pengaturan acak sudah sesuai.</li>
+      <li>Ujian telah diuji memakai akun percobaan.</li>
+    </ul>
+    <footer class="doc-footer"><span>AWExam · Keamanan</span><span>Bab 9</span></footer>
+  </section>
+
+  <section class="page page-break">
+    <header class="doc-header"><div><img src="../public/logo.png" alt=""><b>AWExam</b></div><span>BAB 10 · LAMPIRAN</span></header>
+    <p class="eyebrow">Bab 10</p>
+    <h2>Template impor soal</h2>
+    <p class="lead">Template berikut dapat ditulis di Word/Google Docs, disimpan sebagai PDF/DOCX, difoto, atau ditempel langsung.</p>
+
+    <div class="sample">SOAL 1
+TIPE: PG
+PERTANYAAN: Hasil dari 2 + 3 adalah ...
+A. 4
+B. 5
+C. 6
+D. 7
+KUNCI: B
+KESULITAN: Mudah
+BOBOT: 1
+
+SOAL 2
+TIPE: ESSAY
+PERTANYAAN: Jelaskan proses fotosintesis.
+JAWABAN: Tumbuhan mengubah air dan karbon dioksida menjadi glukosa dengan bantuan cahaya.
+KESULITAN: Sedang
+BOBOT: 2</div>
+
+    <h3>Aturan penulisan</h3>
+    <ul>
+      <li>Mulai setiap soal dengan <code>SOAL</code> dan nomor.</li>
+      <li>Gunakan <code>TIPE: PG</code> atau <code>TIPE: ESSAY</code>.</li>
+      <li>Pilihan ganda memakai label A, B, C, dan seterusnya.</li>
+      <li><code>KUNCI</code> berisi huruf pilihan benar.</li>
+      <li>Essay memakai <code>JAWABAN</code> sebagai pedoman koreksi.</li>
+      <li>Kesulitan: Mudah, Sedang, atau Sulit.</li>
+      <li>Bobot harus berupa angka lebih dari nol.</li>
+      <li>Berikan satu baris kosong antarsoal.</li>
+    </ul>
+
+    <h3>Glosarium singkat</h3>
+    <table>
+      <thead><tr><th>Istilah</th><th>Arti</th></tr></thead>
+      <tbody>
+        <tr><td>Attempt</td><td>Satu sesi pengerjaan ujian oleh seorang siswa.</td></tr>
+        <tr><td>Bank soal</td><td>Kumpulan soal yang dikelompokkan berdasarkan kebutuhan.</td></tr>
+        <tr><td>Bobot</td><td>Nilai maksimum soal atau pengaruh relatif komponen rapor.</td></tr>
+        <tr><td>Draft</td><td>Data masih disiapkan dan belum diterbitkan.</td></tr>
+        <tr><td>Event integritas</td><td>Catatan kejadian seperti meninggalkan tab atau layar penuh.</td></tr>
+        <tr><td>KKM</td><td>Nilai minimum ketuntasan yang digunakan pada laporan.</td></tr>
+        <tr><td>Leger</td><td>Rekap nilai seluruh siswa dalam satu kelas.</td></tr>
+        <tr><td>Publikasi rapor</td><td>Tindakan menandai rapor sebagai hasil resmi yang siap dibagikan.</td></tr>
+        <tr><td>Sinkronisasi</td><td>Proses menyimpan data dari browser ke server.</td></tr>
+      </tbody>
+    </table>
+
+    <footer class="doc-footer"><span>AWExam · Lampiran</span><span>Bab 10</span></footer>
+  </section>
+
+</body>
+</html>
