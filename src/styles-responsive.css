@@ -429,6 +429,7 @@ img {
 
   .login-panel {
     display: flex;
+    width: 100%;
     min-height: 100dvh;
     align-items: center;
     justify-content: center;
@@ -437,7 +438,15 @@ img {
   }
 
   .login-panel form {
-    width: min(400px, 100%);
+    width: 100%;
+    max-width: 100%;
+    flex: 0 1 400px;
+  }
+
+  .login-panel form > label,
+  .login-panel .input-box,
+  .login-panel .login-button {
+    width: 100%;
     max-width: 100%;
   }
 
@@ -453,6 +462,7 @@ img {
   .login-help {
     min-width: 0;
     gap: 12px;
+    flex-wrap: wrap;
   }
 
   .login-help label,

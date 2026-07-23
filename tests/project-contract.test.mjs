@@ -66,3 +66,17 @@ test('rapor memakai nilai final, akses terkontrol, dan menyediakan cetak A4', as
   assert.match(styles, /@page\{size:A4 portrait/)
   assert.match(app, /path="rapor"/)
 })
+
+test('form login mengikuti lebar viewport ponsel tanpa overflow', async () => {
+  const styles = await read('src/styles-responsive.css')
+  assert.match(styles, /@media \(max-width: 760px\)/)
+  assert.match(
+    styles,
+    /\.login-panel form \{\s*width: 100%;\s*max-width: 100%;\s*flex: 0 1 400px;/,
+  )
+  assert.match(
+    styles,
+    /\.login-panel \.input-box,\s*\.login-panel \.login-button \{\s*width: 100%;\s*max-width: 100%;/,
+  )
+  assert.match(styles, /\.login-help \{[\s\S]*?flex-wrap: wrap;/)
+})
