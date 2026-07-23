@@ -7,10 +7,12 @@ import {
   useState,
 } from "react";
 import {
+  AlertTriangle,
   BookOpen,
   ChevronDown,
   FileUp,
   FileQuestion,
+  KeyRound,
   ListChecks,
   LockKeyhole,
   MoreHorizontal,
@@ -90,6 +92,12 @@ function errorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
+function needsAnswerKey(question: Question) {
+  return question.type === "Pilihan Ganda"
+    ? !Number.isInteger(question.correctOption)
+    : !question.answerKey?.trim();
+}
+
 export function QuestionBank({ notify }: { notify: Notify }) {
   const { profile } = useAuth();
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -109,6 +117,9 @@ export function QuestionBank({ notify }: { notify: Notify }) {
   const [difficultyFilter, setDifficultyFilter] = useState<
     "all" | Question["difficulty"]
   >("all");
+  const [keyFilter, setKeyFilter] = useState<"all" | "missing" | "ready">(
+    "all",
+  );
 
   const loadData = useCallback(async () => {
     if (!supabase) {
@@ -495,12 +506,32 @@ export function QuestionBank({ notify }: { notify: Notify }) {
         (typeFilter === "all" || question.type === typeFilter) &&
         (difficultyFilter === "all" ||
           question.difficulty === difficultyFilter) &&
+        (keyFilter === "all" ||
+          (keyFilter === "missing"
+            ? needsAnswerKey(question)
+            : !needsAnswerKey(question))) &&
         (!keyword ||
           question.text.toLowerCase().includes(keyword) ||
           question.bank.toLowerCase().includes(keyword) ||
           question.subject.toLowerCase().includes(keyword)),
     );
-  }, [difficultyFilter, questions, search, selectedBank, typeFilter]);
+  }, [
+    difficultyFilter,
+    keyFilter,
+    questions,
+    search,
+    selectedBank,
+    typeFilter,
+  ]);
+
+  const missingChoiceKeys = questions.filter(
+    (question) =>
+      question.type === "Pilihan Ganda" && needsAnswerKey(question),
+  ).length;
+  const missingEssayGuides = questions.filter(
+    (question) => question.type === "Essay" && needsAnswerKey(question),
+  ).length;
+  const missingKeys = missingChoiceKeys + missingEssayGuides;
 
   return (
     <div className="portal-page">
@@ -550,6 +581,30 @@ export function QuestionBank({ notify }: { notify: Notify }) {
         </div>
       </div>
 
+      {!loading && missingKeys > 0 && (
+        <div className="missing-key-alert" role="alert">
+          <AlertTriangle />
+          <div>
+            <b>{missingKeys} soal belum memiliki kunci yang lengkap</b>
+            <span>
+              {missingChoiceKeys} pilihan ganda belum dapat dipakai dalam ujian
+              {missingEssayGuides > 0
+                ? ` · ${missingEssayGuides} essay belum memiliki pedoman`
+                : ""}
+              .
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              setKeyFilter("missing");
+              setSelectedBank("all");
+            }}
+          >
+            Tampilkan soal
+          </button>
+        </div>
+      )}
+
       <div className="toolbar question-toolbar">
         <div>
           <Search />
@@ -582,6 +637,17 @@ export function QuestionBank({ notify }: { notify: Notify }) {
             <option value="Mudah">Mudah</option>
             <option value="Sedang">Sedang</option>
             <option value="Sulit">Sulit</option>
+          </select>
+          <select
+            aria-label="Filter kelengkapan kunci jawaban"
+            value={keyFilter}
+            onChange={(event) =>
+              setKeyFilter(event.target.value as typeof keyFilter)
+            }
+          >
+            <option value="all">Semua kunci</option>
+            <option value="missing">Kunci belum lengkap</option>
+            <option value="ready">Kunci sudah lengkap</option>
           </select>
         </div>
       </div>
@@ -682,8 +748,13 @@ export function QuestionBank({ notify }: { notify: Notify }) {
               {loading ? (
                 <EmptyRow text="Memuat bank soal…" />
               ) : visibleQuestions.length ? (
-                visibleQuestions.map((question) => (
-                  <tr key={question.id}>
+                visibleQuestions.map((question) => {
+                  const missingKey = needsAnswerKey(question);
+                  return (
+                  <tr
+                    key={question.id}
+                    className={missingKey ? "question-missing-key-row" : undefined}
+                  >
                     <td className="question-select-column" data-label="Pilih">
                       <input
                         type="checkbox"
@@ -703,6 +774,14 @@ export function QuestionBank({ notify }: { notify: Notify }) {
                           {question.bank} · {question.subject}
                         </small>
                         <b title={question.text}>{question.text}</b>
+                        {missingKey && (
+                          <em className="question-key-hint">
+                            <AlertTriangle />
+                            {question.type === "Pilihan Ganda"
+                              ? "Pilih jawaban yang benar"
+                              : "Tambahkan pedoman jawaban"}
+                          </em>
+                        )}
                       </div>
                     </td>
                     <td data-label="Tipe">
@@ -717,25 +796,41 @@ export function QuestionBank({ notify }: { notify: Notify }) {
                     </td>
                     <td data-label="Bobot">{question.weight ?? 1}</td>
                     <td data-label="Status">
-                      {question.used > 0 ? (
-                        <span
-                          className="question-usage used"
-                          title="Soal dapat terkunci jika ujian sudah dijadwalkan atau dikerjakan."
-                        >
-                          <LockKeyhole /> Dipakai {question.used} ujian
-                        </span>
-                      ) : (
-                        <span className="question-usage">Belum dipakai</span>
-                      )}
+                      <div className="question-status-list">
+                        {missingKey && (
+                          <span className="question-key-status">
+                            <KeyRound />
+                            {question.type === "Pilihan Ganda"
+                              ? "Kunci belum ada"
+                              : "Pedoman belum ada"}
+                          </span>
+                        )}
+                        {question.used > 0 ? (
+                          <span
+                            className="question-usage used"
+                            title="Soal dapat terkunci jika ujian sudah dijadwalkan atau dikerjakan."
+                          >
+                            <LockKeyhole /> Dipakai {question.used} ujian
+                          </span>
+                        ) : (
+                          <span className="question-usage">Belum dipakai</span>
+                        )}
+                      </div>
                     </td>
                     <td data-label="Aksi">
                       <div className="question-actions">
                         <button
-                          title="Edit soal"
-                          aria-label="Edit soal"
+                          className={missingKey ? "complete-key" : undefined}
+                          title={
+                            missingKey ? "Lengkapi kunci jawaban" : "Edit soal"
+                          }
+                          aria-label={
+                            missingKey ? "Lengkapi kunci jawaban" : "Edit soal"
+                          }
                           onClick={() => setEditingQuestion(question)}
                         >
-                          <Pencil />
+                          {missingKey ? <KeyRound /> : <Pencil />}
+                          {missingKey && <span>Lengkapi kunci</span>}
                         </button>
                         <button
                           className="danger"
@@ -748,7 +843,8 @@ export function QuestionBank({ notify }: { notify: Notify }) {
                       </div>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               ) : (
                 <EmptyRow
                   text={
@@ -889,8 +985,8 @@ function QuestionModal({
   const [options, setOptions] = useState<string[]>(
     initial?.options?.length ? initial.options : ["", "", "", ""],
   );
-  const [correctOption, setCorrectOption] = useState(
-    initial?.correctOption ?? 0,
+  const [correctOption, setCorrectOption] = useState<number | null>(
+    initial ? (initial.correctOption ?? null) : 0,
   );
   const [answerKey, setAnswerKey] = useState(initial?.answerKey ?? "");
   const [weight, setWeight] = useState(initial?.weight ?? 1);
@@ -909,6 +1005,10 @@ function QuestionModal({
       (cleanOptions.length < 2 || cleanOptions.some((option) => !option))
     ) {
       setError("Isi minimal dua pilihan jawaban tanpa bagian yang kosong.");
+      return;
+    }
+    if (type === "Pilihan Ganda" && !Number.isInteger(correctOption)) {
+      setError("Pilih satu jawaban yang benar sebelum menyimpan soal.");
       return;
     }
     if (type === "Essay" && !answerKey.trim()) {
@@ -939,9 +1039,10 @@ function QuestionModal({
     setOptions((current) =>
       current.filter((_, itemIndex) => itemIndex !== index),
     );
-    setCorrectOption((current) =>
-      current === index ? 0 : current > index ? current - 1 : current,
-    );
+    setCorrectOption((current) => {
+      if (current === null) return null;
+      return current === index ? 0 : current > index ? current - 1 : current;
+    });
   };
 
   return (
@@ -1013,6 +1114,12 @@ function QuestionModal({
                 <span>Pilihan jawaban</span>
                 <small>Pilih radio sebagai jawaban yang benar.</small>
               </div>
+              {correctOption === null && (
+                <p className="answer-key-required">
+                  <KeyRound />
+                  Kunci belum dipilih. Tandai satu jawaban yang benar.
+                </p>
+              )}
               <div className="option-editor">
                 {options.map((option, index) => (
                   <label key={index}>
