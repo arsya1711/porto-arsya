@@ -8,13 +8,15 @@ import {
 } from "react";
 import {
   BookOpen,
+  ChevronDown,
   FileUp,
   FileQuestion,
   ListChecks,
+  LockKeyhole,
+  MoreHorizontal,
   Pencil,
   Plus,
   Search,
-  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -72,6 +74,20 @@ function nestedSubjectName(value: unknown): string {
 
 function titleCase(value: string) {
   return value ? value[0].toUpperCase() + value.slice(1) : value;
+}
+
+function errorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof error.message === "string" &&
+    error.message
+  ) {
+    return error.message;
+  }
+  return fallback;
 }
 
 export function QuestionBank({ notify }: { notify: Notify }) {
@@ -230,10 +246,7 @@ export function QuestionBank({ notify }: { notify: Notify }) {
       );
       return true;
     } catch (error) {
-      notify(
-        error instanceof Error ? error.message : "Soal gagal disimpan",
-        true,
-      );
+      notify(errorMessage(error, "Soal gagal disimpan"), true);
       return false;
     }
   };
@@ -279,10 +292,7 @@ export function QuestionBank({ notify }: { notify: Notify }) {
       notify(`${payload.length} soal dari PDF berhasil diimpor`);
       return true;
     } catch (error) {
-      notify(
-        error instanceof Error ? error.message : "Soal dari PDF gagal diimpor",
-        true,
-      );
+      notify(errorMessage(error, "Soal dari PDF gagal diimpor"), true);
       return false;
     }
   };
@@ -330,7 +340,7 @@ export function QuestionBank({ notify }: { notify: Notify }) {
       notify(`${copied.length} soal disalin${skipped ? `, ${skipped} duplikat dilewati` : ""}`);
       return true;
     } catch (error) {
-      notify(error instanceof Error ? error.message : "Soal gagal disalin", true);
+      notify(errorMessage(error, "Soal gagal disalin"), true);
       return false;
     }
   };
@@ -357,7 +367,7 @@ export function QuestionBank({ notify }: { notify: Notify }) {
       notify(`${selectedQuestions.length} soal berhasil diperbarui`);
       return true;
     } catch (error) {
-      notify(error instanceof Error ? error.message : "Perubahan massal gagal", true);
+      notify(errorMessage(error, "Perubahan massal gagal"), true);
       return false;
     }
   };
@@ -379,10 +389,7 @@ export function QuestionBank({ notify }: { notify: Notify }) {
       }
       notify("Soal berhasil dihapus dari daftar aktif");
     } catch (error) {
-      notify(
-        error instanceof Error ? error.message : "Soal gagal dihapus",
-        true,
-      );
+      notify(errorMessage(error, "Soal gagal dihapus"), true);
     }
   };
 
@@ -440,10 +447,7 @@ export function QuestionBank({ notify }: { notify: Notify }) {
       );
       return true;
     } catch (error) {
-      notify(
-        error instanceof Error ? error.message : "Bank soal gagal disimpan",
-        true,
-      );
+      notify(errorMessage(error, "Bank soal gagal disimpan"), true);
       return false;
     }
   };
@@ -479,10 +483,7 @@ export function QuestionBank({ notify }: { notify: Notify }) {
       if (selectedBank === bank.id) setSelectedBank("all");
       notify("Bank soal berhasil dihapus");
     } catch (error) {
-      notify(
-        error instanceof Error ? error.message : "Bank soal gagal dihapus",
-        true,
-      );
+      notify(errorMessage(error, "Bank soal gagal dihapus"), true);
     }
   };
 
@@ -501,16 +502,6 @@ export function QuestionBank({ notify }: { notify: Notify }) {
     );
   }, [difficultyFilter, questions, search, selectedBank, typeFilter]);
 
-  const addedThisMonth = questions.filter((question) => {
-    if (!question.createdAt) return false;
-    const created = new Date(question.createdAt);
-    const now = new Date();
-    return (
-      created.getMonth() === now.getMonth() &&
-      created.getFullYear() === now.getFullYear()
-    );
-  }).length;
-
   return (
     <div className="portal-page">
       <div className="page-title">
@@ -522,22 +513,7 @@ export function QuestionBank({ notify }: { notify: Notify }) {
             {new Set(questions.map((q) => q.subject)).size} mata pelajaran.
           </span>
         </div>
-        <div className="title-actions">
-          <button onClick={() => setCreateBank(true)}>
-            <BookOpen /> Bank baru
-          </button>
-          <button
-            onClick={() => setImportPdf(true)}
-            disabled={!banks.length}
-            title={!banks.length ? "Buat bank soal terlebih dahulu" : undefined}
-          >
-            <FileUp /> Impor soal
-          </button>
-          {selectedQuestionIds.size > 0 && (
-            <button onClick={() => setBulkTools(true)}>
-              <ListChecks /> Kelola {selectedQuestionIds.size}
-            </button>
-          )}
+        <div className="title-actions question-primary-actions">
           <button
             className="primary"
             onClick={() => setCreateQuestion(true)}
@@ -546,21 +522,32 @@ export function QuestionBank({ notify }: { notify: Notify }) {
           >
             <Plus /> Tambah soal
           </button>
+          <details className="question-more-actions">
+            <summary>
+              <MoreHorizontal /> Lainnya <ChevronDown />
+            </summary>
+            <div>
+              <button
+                onClick={(event) => {
+                  setCreateBank(true);
+                  event.currentTarget.closest("details")?.removeAttribute("open");
+                }}
+              >
+                <BookOpen /> Buat bank soal
+              </button>
+              <button
+                onClick={(event) => {
+                  setImportPdf(true);
+                  event.currentTarget.closest("details")?.removeAttribute("open");
+                }}
+                disabled={!banks.length}
+                title={!banks.length ? "Buat bank soal terlebih dahulu" : undefined}
+              >
+                <FileUp /> Impor banyak soal
+              </button>
+            </div>
+          </details>
         </div>
-      </div>
-
-      <div className="bank-summary">
-        <Summary icon={<BookOpen />} label="TOTAL BANK" value={banks.length} />
-        <Summary
-          icon={<FileQuestion />}
-          label="SOAL AKTIF"
-          value={questions.length}
-        />
-        <Summary
-          icon={<Sparkles />}
-          label="DITAMBAHKAN BULAN INI"
-          value={addedThisMonth}
-        />
       </div>
 
       <div className="toolbar question-toolbar">
@@ -613,6 +600,23 @@ export function QuestionBank({ notify }: { notify: Notify }) {
           ))}
         </select>
       </label>
+
+      {selectedQuestionIds.size > 0 && (
+        <div className="question-selection-bar" role="status">
+          <span>
+            <b>{selectedQuestionIds.size} soal dipilih</b>
+            <small>Salin atau ubah beberapa soal sekaligus.</small>
+          </span>
+          <div>
+            <button onClick={() => setSelectedQuestionIds(new Set())}>
+              Batalkan
+            </button>
+            <button className="primary" onClick={() => setBulkTools(true)}>
+              <ListChecks /> Kelola pilihan
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="question-layout">
         <aside className="bank-list">
@@ -670,7 +674,7 @@ export function QuestionBank({ notify }: { notify: Notify }) {
                 <th>TIPE</th>
                 <th>TINGKAT</th>
                 <th>BOBOT</th>
-                <th>DIPAKAI</th>
+                <th>STATUS</th>
                 <th />
               </tr>
             </thead>
@@ -712,7 +716,18 @@ export function QuestionBank({ notify }: { notify: Notify }) {
                       </span>
                     </td>
                     <td data-label="Bobot">{question.weight ?? 1}</td>
-                    <td data-label="Dipakai">{question.used} ujian</td>
+                    <td data-label="Status">
+                      {question.used > 0 ? (
+                        <span
+                          className="question-usage used"
+                          title="Soal dapat terkunci jika ujian sudah dijadwalkan atau dikerjakan."
+                        >
+                          <LockKeyhole /> Dipakai {question.used} ujian
+                        </span>
+                      ) : (
+                        <span className="question-usage">Belum dipakai</span>
+                      )}
+                    </td>
                     <td data-label="Aksi">
                       <div className="question-actions">
                         <button
@@ -793,26 +808,6 @@ export function QuestionBank({ notify }: { notify: Notify }) {
           save={saveBank}
         />
       )}
-    </div>
-  );
-}
-
-function Summary({
-  icon,
-  label,
-  value,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: number;
-}) {
-  return (
-    <div>
-      <span>{icon}</span>
-      <p>
-        <small>{label}</small>
-        <b>{value}</b>
-      </p>
     </div>
   );
 }
@@ -963,7 +958,19 @@ function QuestionModal({
         </header>
         <div className="modal-content">
           {error && <p className="question-form-error">{error}</p>}
-          <div className="form-grid question-form-grid">
+          {initial && initial.used > 0 && (
+            <div className="question-lock-notice">
+              <LockKeyhole />
+              <p>
+                <b>Soal ini dipakai dalam {initial.used} ujian.</b>
+                <span>
+                  Jika ujian sudah dijadwalkan atau dikerjakan, isi soal dikunci
+                  untuk menjaga hasil siswa.
+                </span>
+              </p>
+            </div>
+          )}
+          <div className="form-grid question-form-grid question-core-settings">
             <FormField label="Bank soal">
               <select
                 value={bankId}
@@ -988,28 +995,6 @@ function QuestionModal({
                 <option>Pilihan Ganda</option>
                 <option>Essay</option>
               </select>
-            </FormField>
-            <FormField label="Tingkat kesulitan">
-              <select
-                value={difficulty}
-                onChange={(event) =>
-                  setDifficulty(event.target.value as Question["difficulty"])
-                }
-              >
-                <option>Mudah</option>
-                <option>Sedang</option>
-                <option>Sulit</option>
-              </select>
-            </FormField>
-            <FormField label="Bobot nilai">
-              <input
-                type="number"
-                min="0.01"
-                step="0.01"
-                value={weight}
-                onChange={(event) => setWeight(Number(event.target.value))}
-                required
-              />
             </FormField>
           </div>
           <FormField label="Pertanyaan">
@@ -1084,6 +1069,39 @@ function QuestionModal({
               />
             </FormField>
           )}
+          <details className="question-advanced-settings">
+            <summary>
+              Pengaturan nilai
+              <span>
+                {difficulty} · bobot {weight}
+              </span>
+              <ChevronDown />
+            </summary>
+            <div className="form-grid question-form-grid">
+              <FormField label="Tingkat kesulitan">
+                <select
+                  value={difficulty}
+                  onChange={(event) =>
+                    setDifficulty(event.target.value as Question["difficulty"])
+                  }
+                >
+                  <option>Mudah</option>
+                  <option>Sedang</option>
+                  <option>Sulit</option>
+                </select>
+              </FormField>
+              <FormField label="Bobot nilai">
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={weight}
+                  onChange={(event) => setWeight(Number(event.target.value))}
+                  required
+                />
+              </FormField>
+            </div>
+          </details>
         </div>
         <footer>
           <button type="button" onClick={close}>
