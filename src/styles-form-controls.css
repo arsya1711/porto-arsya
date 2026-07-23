@@ -1,0 +1,43 @@
+/*
+ * Input teks di dalam modal menggunakan lebar penuh. Checkbox dan radio harus
+ * dikecualikan; jika tidak, kontrol mengambil satu baris penuh dan menekan
+ * label menjadi kolom yang sangat sempit.
+ */
+.modal-content input[type="checkbox"],
+.modal-content input[type="radio"],
+.form-field input[type="checkbox"],
+.form-field input[type="radio"] {
+  appearance: auto;
+  width: 17px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0;
+  flex: 0 0 17px;
+  border: initial;
+  border-radius: 0;
+  background: initial;
+  box-shadow: none;
+  accent-color: #315ce8;
+}
+
+.switch-list label {
+  gap: 12px;
+}
+
+.switch-list label > span {
+  min-width: 0;
+}
+
+.switch-list label > input[type="checkbox"] {
+  margin: 0 0 0 auto;
+}
+
+.real-remove-access-code {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -3px 0 15px;
+  color: #697286;
+  font-size: 12px;
+  font-weight: 700;
+}
