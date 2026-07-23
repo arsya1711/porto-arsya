@@ -36,6 +36,10 @@ migrate_working_dir/
 # Local Supabase configuration. Keep the template in version control.
 .env
 
+# Kredensial Google Play dan virtualenv uploader hanya disimpan lokal.
+/android/play-service-account.json
+/tool/.venv/
+
 # Symbolication related
 app.*.symbols
 

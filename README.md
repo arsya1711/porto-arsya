@@ -111,10 +111,39 @@ debug key.
 
 ### Rilis ke Play Store
 
-Play Store menerima Android App Bundle, bukan APK:
+Rilis otomatis akan menaikkan versi, memasukkan `.env`, membangun Android App
+Bundle, mengunggahnya, lalu memperbarui track Google Play:
 
 ```bash
-flutter build appbundle --release --dart-define-from-file=.env
+./release.sh
+```
+
+Perintah tanpa argumen memakai track `internal`, status `completed`, dan bump
+`patch`. Contoh lain:
+
+```bash
+./release.sh production
+./release.sh production draft
+BUMP=build ./release.sh
+BUMP=minor ./release.sh production
+BUMP=none ./release.sh internal
+```
+
+Sebelum penggunaan pertama, simpan service account Google Play sebagai
+`android/play-service-account.json`, aktifkan Google Play Android Developer API,
+dan beri akun tersebut izin untuk mengelola rilis aplikasi di Play Console.
+File JSON sudah masuk `.gitignore` dan tidak boleh dikirim ke Git.
+
+Perintah Makefile yang setara:
+
+```bash
+make release TRACK=internal STATUS=completed BUMP=patch
+```
+
+Jika hanya ingin membuat AAB tanpa mengunggahnya:
+
+```bash
+make build-release VERSION=1.0.1 BUILD=2
 ```
 
 Hasilnya di `build/app/outputs/bundle/release/app-release.aab`.
@@ -138,9 +167,10 @@ dan Play Console menolaknya. Verifikasi sebelum unggah:
   build/app/outputs/flutter-apk/app-release.apk
 ```
 
-Naikkan `version:` di `pubspec.yaml` setiap unggahan. Angka setelah `+` adalah
-`versionCode` dan **wajib naik** di tiap rilis; Play Console menolak versionCode
-yang sudah pernah dipakai.
+`release.sh` menaikkan `version:` di `pubspec.yaml` secara otomatis. Angka
+setelah `+` adalah `versionCode` dan **wajib unik** di setiap upload. Jika build
+atau upload gagal setelah versi dinaikkan, perbaiki penyebabnya lalu ulangi
+dengan `BUMP=none` agar nomor yang sama digunakan kembali.
 
 ### Distribusi langsung (di luar Play Store)
 

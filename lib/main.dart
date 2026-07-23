@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -13,8 +14,19 @@ import 'data/supabase_exam_repository.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
-  const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+  // Release tetap memprioritaskan nilai hasil kompilasi dari dart-define.
+  // File .env menjadi fallback agar `flutter run` biasa tetap terhubung ke
+  // Supabase seperti workflow Time420s. Jangan pernah menaruh service_role
+  // atau secret server lain di file yang dibundel ke aplikasi ini.
+  await dotenv.load(fileName: '.env');
+  const compiledSupabaseUrl = String.fromEnvironment('SUPABASE_URL');
+  const compiledSupabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+  final supabaseUrl = compiledSupabaseUrl.isNotEmpty
+      ? compiledSupabaseUrl
+      : dotenv.env['SUPABASE_URL'] ?? '';
+  final supabaseAnonKey = compiledSupabaseAnonKey.isNotEmpty
+      ? compiledSupabaseAnonKey
+      : dotenv.env['SUPABASE_ANON_KEY'] ?? '';
   const allowDemo = bool.fromEnvironment('ALLOW_DEMO');
   late final ExamRepository repository;
 
