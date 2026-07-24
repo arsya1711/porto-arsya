@@ -16,6 +16,7 @@ import {
   extractQtiQuestions,
   parseGiftQuestions,
 } from "../lib/question-import-formats";
+import { useAccessibleDialog } from "../lib/use-accessible-dialog";
 import {
   extractImageQuestions,
   type ImageOcrProgress,
@@ -249,13 +250,16 @@ export function PdfQuestionImportModal({
     );
     if (!saved) setSaving(false);
   };
+  const dialogRef = useAccessibleDialog(close, parsing || saving);
 
   return (
     <div className="modal-overlay">
       <div
+        ref={dialogRef}
         className="modal pdf-import-modal"
         role="dialog"
         aria-modal="true"
+        tabIndex={-1}
       >
         <div className="simple-modal">
           <header>

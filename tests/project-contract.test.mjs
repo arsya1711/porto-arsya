@@ -103,3 +103,21 @@ test('form login mengikuti lebar viewport ponsel tanpa overflow', async () => {
   )
   assert.match(styles, /\.login-help \{[\s\S]*?flex-wrap: wrap;/)
 })
+
+test('aksesibilitas modal, refresh siswa, dan validasi profil sekolah aktif', async () => {
+  const [dialog, dashboard, settings, assessment] = await Promise.all([
+    read('src/lib/use-accessible-dialog.ts'),
+    read('src/components/Dashboards.tsx'),
+    read('src/components/SettingsPage.tsx'),
+    read('src/components/AssessmentPages.tsx'),
+  ])
+  assert.match(dialog, /event\.key === "Escape"/)
+  assert.match(dialog, /event\.key !== "Tab"/)
+  assert.match(dialog, /previouslyFocused\?\.focus\(\)/)
+  assert.match(dashboard, /student-dashboard:/)
+  assert.match(dashboard, /Perbarui jadwal/)
+  assert.match(settings, /NPSN harus terdiri dari tepat 8 angka/)
+  assert.doesNotMatch(settings, /image\/svg\+xml/)
+  assert.match(assessment, /fetchAllPages/)
+  assert.match(assessment, /grading-pagination/)
+})

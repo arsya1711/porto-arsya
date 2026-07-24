@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../auth/auth-context";
 import { fetchAllPages } from "../lib/supabase-pagination";
+import { useAccessibleDialog } from "../lib/use-accessible-dialog";
 import { supabase } from "../lib/supabase";
 import type { ParsedPdfQuestion } from "../lib/pdf-question-parser";
 import { findSimilarQuestion, normalizeQuestion } from "../lib/question-similarity";
@@ -1376,20 +1377,16 @@ function Modal({
   close: () => void;
   wide?: boolean;
 }) {
-  useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
-    };
-    document.addEventListener("keydown", closeOnEscape);
-    return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [close]);
+  const dialogRef = useAccessibleDialog(close);
 
   return (
     <div className="modal-overlay">
       <div
+        ref={dialogRef}
         className={`modal ${wide ? "wide" : ""}`}
         role="dialog"
         aria-modal="true"
+        tabIndex={-1}
       >
         {children}
       </div>

@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import type { Profile } from "../auth/auth-context";
 import { supabase } from "../lib/supabase";
+import { useAccessibleDialog } from "../lib/use-accessible-dialog";
 
 type Notify = (text: string, error?: boolean) => void;
 
@@ -1068,6 +1069,7 @@ function GradeEditor({
   );
   const [description, setDescription] = useState(row.description);
   const [saving, setSaving] = useState(false);
+  const dialogRef = useAccessibleDialog(close, saving);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -1120,7 +1122,7 @@ function GradeEditor({
 
   return (
     <div className="modal-overlay">
-      <div className="modal report-grade-modal" role="dialog" aria-modal="true">
+      <div ref={dialogRef} className="modal report-grade-modal" role="dialog" aria-modal="true" tabIndex={-1}>
         <form className="simple-modal" onSubmit={submit}>
           <header>
             <div>
@@ -1192,9 +1194,10 @@ function ComponentEditor({
   close: () => void;
   save: () => void;
 }) {
+  const dialogRef = useAccessibleDialog(close);
   return (
     <div className="modal-overlay">
-      <div className="modal wide report-component-modal" role="dialog" aria-modal="true">
+      <div ref={dialogRef} className="modal wide report-component-modal" role="dialog" aria-modal="true" tabIndex={-1}>
         <div className="simple-modal">
           <header>
             <div>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Copy, Pencil, X } from "lucide-react";
 import type { Question } from "../types";
+import { useAccessibleDialog } from "../lib/use-accessible-dialog";
 
 type BankOption = { id: string; name: string; subject: string };
 type BulkUpdate = {
@@ -44,10 +45,11 @@ export function QuestionBulkToolsModal({
 
   const hasEdit = Boolean(bankId || difficulty !== "keep" || weight);
   const invalidWeight = Boolean(weight) && (!Number.isFinite(Number(weight)) || Number(weight) <= 0);
+  const dialogRef = useAccessibleDialog(close, saving);
 
   return (
     <div className="modal-overlay">
-      <div className="modal" role="dialog" aria-modal="true">
+      <div ref={dialogRef} className="modal" role="dialog" aria-modal="true" tabIndex={-1}>
         <div className="simple-modal bulk-question-modal">
           <header>
             <div><p>AKSI MASSAL</p><h2>Kelola {questions.length} soal</h2></div>

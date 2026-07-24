@@ -92,6 +92,10 @@ export function RealSettingsPage({ profile, notify }: { profile: Profile; notify
 
   const saveSchoolSettings = async (nextSettings = settings) => {
     if (!supabase || profile.role !== "admin" || !nextSettings.school_name.trim()) return;
+    if (nextSettings.npsn.trim() && !/^\d{8}$/.test(nextSettings.npsn.trim())) {
+      notify("NPSN harus terdiri dari tepat 8 angka.", true);
+      return;
+    }
     setSaving(true);
     const { error } = await supabase.from("school_profile_settings").upsert({
       id: 1,
@@ -127,12 +131,17 @@ export function RealSettingsPage({ profile, notify }: { profile: Profile; notify
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file || !supabase) return;
-    if (!file.type.startsWith("image/") || file.size > 2 * 1024 * 1024) {
-      notify("Logo harus berupa gambar dengan ukuran maksimal 2 MB.", true);
+    const allowedTypes: Record<string, string> = {
+      "image/png": "png",
+      "image/jpeg": "jpg",
+      "image/webp": "webp",
+    };
+    if (!allowedTypes[file.type] || file.size > 2 * 1024 * 1024) {
+      notify("Logo harus berupa PNG, JPEG, atau WebP dengan ukuran maksimal 2 MB.", true);
       return;
     }
     setUploading(true);
-    const extension = file.name.split(".").pop()?.toLowerCase() || "png";
+    const extension = allowedTypes[file.type];
     const path = `school-logo.${extension}`;
     const { error: uploadError } = await supabase.storage.from("school-assets").upload(path, file, { upsert: true, contentType: file.type, cacheControl: "3600" });
     if (uploadError) {
@@ -172,10 +181,10 @@ export function RealSettingsPage({ profile, notify }: { profile: Profile; notify
               <div className="school-logo">
                 <span>{settings.logo_url ? <img src={settings.logo_url} alt="Logo sekolah" /> : <GraduationCap />}</span>
                 <div><b>{profile.role === "admin" ? settings.school_name || "Nama sekolah" : profile.full_name}</b><small>{profile.email}</small></div>
-                {profile.role === "admin" && <label className="logo-upload"><ImagePlus />{uploading ? "Mengunggah…" : "Ganti logo"}<input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" disabled={uploading} onChange={(event) => void uploadLogo(event)} /></label>}
+                {profile.role === "admin" && <label className="logo-upload"><ImagePlus />{uploading ? "Mengunggah…" : "Ganti logo"}<input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} onChange={(event) => void uploadLogo(event)} /></label>}
               </div>
               {profile.role === "admin" ? <>
-                <div className="form-grid"><label className="form-field"><span>Nama sekolah</span><input value={settings.school_name} onChange={(event) => setSettings({ ...settings, school_name: event.target.value })} /></label><label className="form-field"><span>NPSN</span><input value={settings.npsn} onChange={(event) => setSettings({ ...settings, npsn: event.target.value })} /></label></div>
+                <div className="form-grid"><label className="form-field"><span>Nama sekolah</span><input value={settings.school_name} onChange={(event) => setSettings({ ...settings, school_name: event.target.value })} /></label><label className="form-field"><span>NPSN</span><input value={settings.npsn} inputMode="numeric" maxLength={8} pattern="[0-9]{8}" placeholder="8 angka" onChange={(event) => setSettings({ ...settings, npsn: event.target.value.replace(/\D/g, "").slice(0, 8) })} /></label></div>
                 <label className="form-field"><span>Alamat</span><textarea rows={3} value={settings.address} onChange={(event) => setSettings({ ...settings, address: event.target.value })} /></label>
                 <div className="settings-save"><button type="button" className="primary" disabled={saving || !settings.school_name.trim()} onClick={() => void saveSchoolSettings()}><Save />{saving ? "Menyimpan…" : "Simpan profil"}</button></div>
               </> : <><div className="form-grid"><label className="form-field"><span>Nama lengkap</span><input value={profile.full_name} readOnly /></label><label className="form-field"><span>Email</span><input value={profile.email} readOnly /></label></div><div className="settings-save"><CheckCircle2 /><span>Supabase {isSupabaseConfigured ? "terhubung" : "belum dikonfigurasi"} · Hak akses {profile.role}</span></div></>}

@@ -10,6 +10,13 @@ alter table public.school_profile_settings
       )
     );
 
+alter table public.school_profile_settings
+  drop constraint if exists school_profile_settings_npsn_format;
+
+alter table public.school_profile_settings
+  add constraint school_profile_settings_npsn_format
+  check (npsn is null or npsn ~ '^[0-9]{8}$') not valid;
+
 alter table public.academic_years
   drop constraint if exists academic_years_name_format;
 

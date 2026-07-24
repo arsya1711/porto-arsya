@@ -13,6 +13,7 @@ import {
   LogOut,
   Plus,
   Radio,
+  RefreshCw,
   ShieldCheck,
   Users,
   Wifi,
@@ -571,9 +572,13 @@ export function StudentDashboard({
   const [className, setClassName] = useState("Belum ada kelas");
   const [exams, setExams] = useState<StudentExam[]>([]);
   const [online, setOnline] = useState(navigator.onLine);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    const markOnline = () => setOnline(true);
+    const markOnline = () => {
+      setOnline(true);
+      setRefreshKey((value) => value + 1);
+    };
     const markOffline = () => setOnline(false);
     window.addEventListener("online", markOnline);
     window.addEventListener("offline", markOffline);
@@ -662,6 +667,41 @@ export function StudentDashboard({
     return () => {
       active = false;
     };
+  }, [profile.id, refreshKey]);
+
+  useEffect(() => {
+    if (!supabase) return;
+    const channel = supabase
+      .channel(`student-dashboard:${profile.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "attempts",
+          filter: `student_id=eq.${profile.id}`,
+        },
+        () => setRefreshKey((value) => value + 1),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "exams" },
+        () => setRefreshKey((value) => value + 1),
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "class_students",
+          filter: `student_id=eq.${profile.id}`,
+        },
+        () => setRefreshKey((value) => value + 1),
+      )
+      .subscribe();
+    return () => {
+      void supabase?.removeChannel(channel);
+    };
   }, [profile.id]);
 
   const available = exams
@@ -734,6 +774,15 @@ export function StudentDashboard({
             {profile.full_name}
           </h1>
           <span>Siapkan dirimu dan kerjakan ujian dengan jujur.</span>
+          <button
+            type="button"
+            className="student-refresh"
+            disabled={loading}
+            onClick={() => setRefreshKey((value) => value + 1)}
+          >
+            <RefreshCw className={loading ? "spin" : ""} />
+            Perbarui jadwal
+          </button>
         </div>
 
         {error && (

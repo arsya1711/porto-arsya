@@ -7,3 +7,25 @@
 
 .exam-modal-progress{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:13px 20px;border-bottom:1px solid #edf0f4;background:#fbfcfe}.exam-modal-progress span{display:flex;align-items:center;gap:7px;min-width:0;color:#9aa3b2}.exam-modal-progress i{width:23px;height:23px;border-radius:50%;background:#edf0f5;display:grid;place-items:center;flex:0 0 auto;font-size:11px;font-style:normal;font-weight:800}.exam-modal-progress i svg{width:13px}.exam-modal-progress b{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.exam-modal-progress span.active,.exam-modal-progress span.done{color:#315ce8}.exam-modal-progress span.active i{background:#315ce8;color:#fff}.exam-modal-progress span.done i{background:#e6ecff}.exam-step{min-height:280px}.exam-step-intro{margin:0 0 16px;padding:11px 13px;border-radius:8px;background:#f4f7fd;color:#6f7b90;font-size:12px;line-height:1.55}.exam-step-intro b{color:#315ce8}.exam-review{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:17px}.exam-review>div{min-width:0;padding:12px;border:1px solid #e3e7ee;border-radius:9px;background:#fbfcfe}.exam-review small,.exam-review b{display:block}.exam-review small{color:#939dad;font-size:10px;margin-bottom:4px}.exam-review b{color:#334055;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.real-exam-modal .real-question-picker{max-height:340px}.real-exam-modal .form-grid .form-field:last-child:nth-child(odd){grid-column:1/-1}.real-remove-access-code{display:flex;align-items:center;gap:8px;margin:-5px 0 14px;color:#687489;font-size:12px}.real-remove-access-code input{width:auto}
 .report-filter label{display:grid;grid-template-columns:auto minmax(180px,1fr);align-items:center;gap:10px;flex:1;min-width:0}.report-filter label>span{color:#6c778a;font-size:12px;font-weight:700}.report-filter label>select{width:100%;min-width:0}.report-filter button{display:flex;align-items:center;justify-content:center;gap:6px}.report-filter button svg{width:14px}.real-empty-state .primary{background:#315ce8;color:#fff;border-color:#315ce8}
+.student-refresh {
+  min-height: 38px;
+  margin-top: 14px;
+  padding: 0 13px;
+  border: 1px solid #dce2eb;
+  border-radius: 9px;
+  background: #fff;
+  color: #46536a;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.student-refresh svg {
+  width: 15px;
+}
+
+.student-refresh:disabled {
+  opacity: 0.55;
+}

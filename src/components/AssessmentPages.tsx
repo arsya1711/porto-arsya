@@ -22,6 +22,7 @@ import {
   schoolDateTimeToIso,
 } from "../lib/school-timezone";
 import { fetchAllPages } from "../lib/supabase-pagination";
+import { useAccessibleDialog } from "../lib/use-accessible-dialog";
 
 type Notify = (text: string, error?: boolean) => void;
 
@@ -461,6 +462,7 @@ export function RealExamManagement({
     setDraft(null);
     setExamStep(0);
   };
+  const examDialogRef = useAccessibleDialog(closeExamModal, saving, Boolean(draft));
 
   const selectedSubjectName = subjects.find((item) => item.id === draft?.subjectId)?.name ?? "Belum dipilih";
   const selectedClassName = classes.find((item) => item.id === draft?.classId)?.name ?? "Belum dipilih";
@@ -534,7 +536,7 @@ export function RealExamManagement({
       )}
       {draft && (
         <div className="modal-overlay">
-          <div className="modal wide" role="dialog" aria-modal="true">
+          <div ref={examDialogRef} className="modal wide" role="dialog" aria-modal="true" tabIndex={-1}>
             <div className="simple-modal real-exam-modal">
               <header>
                 <div>
@@ -622,20 +624,25 @@ export function RealGrading({ notify }: { notify: Notify }) {
   const [score, setScore] = useState("");
   const [comment, setComment] = useState("");
   const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(1);
 
   const load = useCallback(async () => {
-    if (!supabase) {
+    const client = supabase;
+    if (!client) {
       setError("Supabase belum dikonfigurasi.");
       setLoading(false);
       return;
     }
     setLoading(true);
     setError("");
-    const { data, error: loadError } = await supabase
-      .from("answers")
-      .select("id,attempt_id,question_id,essay_text,score,teacher_comment,answered_at,questions!inner(id,body,answer_key,weight,type),attempts!inner(id,status,student_id,exam_id,submitted_at)")
-      .eq("questions.type", "essay")
-      .order("answered_at");
+    const { data, error: loadError } = await fetchAllPages((from, to) =>
+      client
+        .from("answers")
+        .select("id,attempt_id,question_id,essay_text,score,teacher_comment,answered_at,questions!inner(id,body,answer_key,weight,type),attempts!inner(id,status,student_id,exam_id,submitted_at)")
+        .eq("questions.type", "essay")
+        .order("answered_at")
+        .range(from, to),
+    );
     if (loadError) {
       setError(loadError.message);
       setLoading(false);
@@ -649,8 +656,8 @@ export function RealGrading({ notify }: { notify: Notify }) {
     const studentIds = [...new Set(baseRows.map(({ attempt }) => String(attempt.student_id)))];
     const examIds = [...new Set(baseRows.map(({ attempt }) => String(attempt.exam_id)))];
     const [profileResult, examResult] = await Promise.all([
-      studentIds.length ? supabase.from("profiles").select("id,full_name").in("id", studentIds) : Promise.resolve({ data: [], error: null }),
-      examIds.length ? supabase.from("exams").select("id,title,classes(name)").in("id", examIds) : Promise.resolve({ data: [], error: null }),
+      studentIds.length ? client.from("profiles").select("id,full_name").in("id", studentIds) : Promise.resolve({ data: [], error: null }),
+      examIds.length ? client.from("exams").select("id,title,classes(name)").in("id", examIds) : Promise.resolve({ data: [], error: null }),
     ]);
     const secondaryError = profileResult.error ?? examResult.error;
     if (secondaryError) {
@@ -682,6 +689,7 @@ export function RealGrading({ notify }: { notify: Notify }) {
     });
     normalized.sort((a, b) => Number(a.score !== null) - Number(b.score !== null));
     setItems(normalized);
+    setPage(1);
     setSelectedId((current) => current && normalized.some((item) => item.answerId === current) ? current : normalized[0]?.answerId ?? "");
     setLoading(false);
   }, []);
@@ -717,6 +725,18 @@ export function RealGrading({ notify }: { notify: Notify }) {
   };
 
   const graded = items.filter((item) => item.score !== null).length;
+  const pageSize = 50;
+  const pageCount = Math.max(1, Math.ceil(items.length / pageSize));
+  const safePage = Math.min(page, pageCount);
+  const pagedItems = items.slice(
+    (safePage - 1) * pageSize,
+    safePage * pageSize,
+  );
+  useEffect(() => {
+    if (!pagedItems.some((item) => item.answerId === selectedId)) {
+      setSelectedId(pagedItems[0]?.answerId ?? "");
+    }
+  }, [pagedItems, selectedId]);
   return (
     <div className="portal-page">
       <PageHeader eyebrow="PENILAIAN" title="Koreksi Essay" description="Jawaban yang dikumpulkan siswa tampil otomatis untuk dinilai." />
@@ -727,8 +747,15 @@ export function RealGrading({ notify }: { notify: Notify }) {
           <aside>
             <div className="grading-progress"><p><b>{graded} dari {items.length} dinilai</b><span>{Math.round((graded / items.length) * 100)}%</span></p><i><span style={{ width: `${(graded / items.length) * 100}%` }} /></i></div>
             <div className="student-answer-list">
-              {items.map((item) => <button type="button" key={item.answerId} className={selectedId === item.answerId ? "active" : ""} onClick={() => setSelectedId(item.answerId)}><span>{initials(item.studentName)}</span><p><b>{item.studentName}</b><small>{item.score === null ? "Belum dinilai" : `Skor ${item.score}/${item.weight}`}</small></p>{item.score !== null ? <CheckCircle2 /> : null}</button>)}
+              {pagedItems.map((item) => <button type="button" key={item.answerId} className={selectedId === item.answerId ? "active" : ""} onClick={() => setSelectedId(item.answerId)}><span>{initials(item.studentName)}</span><p><b>{item.studentName}</b><small>{item.score === null ? "Belum dinilai" : `Skor ${item.score}/${item.weight}`}</small></p>{item.score !== null ? <CheckCircle2 /> : null}</button>)}
             </div>
+            {items.length > pageSize && (
+              <nav className="grading-pagination" aria-label="Halaman jawaban essay">
+                <button type="button" disabled={safePage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Sebelumnya</button>
+                <span>{safePage}/{pageCount}</span>
+                <button type="button" disabled={safePage === pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>Berikutnya</button>
+              </nav>
+            )}
           </aside>
           <main className="grading-main">
             <div className="question-reference"><small>{selected.examTitle.toUpperCase()} · BOBOT {selected.weight} POIN</small><h3>{selected.question}</h3><details><summary>Lihat kunci jawaban</summary><p>{selected.answerKey}</p></details></div>
@@ -754,15 +781,23 @@ export function RealReports() {
   const [passingScore, setPassingScore] = useState(75);
 
   const loadAttempts = useCallback(async () => {
-    if (!supabase) {
+    const client = supabase;
+    if (!client) {
       setError("Supabase belum dikonfigurasi.");
       setLoading(false);
       return;
     }
     setLoading(true);
     const [attemptResult, settingsResult] = await Promise.all([
-      supabase.from("attempts").select("id,exam_id,student_id,status,final_score,objective_score,essay_score,submitted_at,exams(title,classes(name)),profiles(full_name)").in("status", ["submitted", "grading", "final"]).order("submitted_at", { ascending: false }),
-      supabase.from("school_profile_settings").select("passing_score").eq("id", 1).maybeSingle(),
+      fetchAllPages((from, to) =>
+        client
+          .from("attempts")
+          .select("id,exam_id,student_id,status,final_score,objective_score,essay_score,submitted_at,exams(title,classes(name)),profiles(full_name)")
+          .in("status", ["submitted", "grading", "final"])
+          .order("submitted_at", { ascending: false })
+          .range(from, to),
+      ),
+      client.from("school_profile_settings").select("passing_score").eq("id", 1).maybeSingle(),
     ]);
     const data = attemptResult.data;
     const loadError = attemptResult.error ?? settingsResult.error;
@@ -785,9 +820,17 @@ export function RealReports() {
   useEffect(() => { void loadAttempts(); }, [loadAttempts]);
 
   useEffect(() => {
-    if (!supabase || !selectedExam) { setAnalysis([]); return; }
+    const client = supabase;
+    if (!client || !selectedExam) { setAnalysis([]); return; }
     let active = true;
-    supabase.from("answers").select("question_id,selected_option,score,questions(body,type,correct_option,weight,difficulty),attempts!inner(exam_id,status)").eq("attempts.exam_id", selectedExam).in("attempts.status", ["submitted", "grading", "final"]).then(({ data, error: analysisError }) => {
+    void fetchAllPages((from, to) =>
+      client
+        .from("answers")
+        .select("question_id,selected_option,score,questions(body,type,correct_option,weight,difficulty),attempts!inner(exam_id,status)")
+        .eq("attempts.exam_id", selectedExam)
+        .in("attempts.status", ["submitted", "grading", "final"])
+        .range(from, to),
+    ).then(({ data, error: analysisError }) => {
       if (!active) return;
       if (analysisError) {
         setError(analysisError.message);

@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import {
+  AlertTriangle,
   BookOpen,
   CalendarDays,
   CheckCircle2,
@@ -16,7 +17,6 @@ import {
   RefreshCw,
   ShieldCheck,
   Trash2,
-  Users,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -52,6 +52,16 @@ type IntegrityRow = {
   student_id: string;
   profiles: unknown;
   attempts: unknown;
+};
+
+type FrontendErrorRow = {
+  id: string;
+  reference_id: string;
+  error_message: string;
+  path: string;
+  user_agent: string | null;
+  created_at: string;
+  profiles: unknown;
 };
 
 function relatedName(value: unknown, fallback = "—") {
@@ -419,16 +429,17 @@ export function AuditSecurityPage({ notify }: { notify: Notify }) {
   const [audits, setAudits] = useState<AuditRow[]>([]);
   const [actorNames, setActorNames] = useState<Record<string, string>>({});
   const [integrityEvents, setIntegrityEvents] = useState<IntegrityRow[]>([]);
+  const [frontendErrors, setFrontendErrors] = useState<FrontendErrorRow[]>([]);
   const [integrityCount, setIntegrityCount] = useState(0);
   const [activeUsers, setActiveUsers] = useState(0);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
-  const [view, setView] = useState<"activity" | "integrity">("activity");
+  const [view, setView] = useState<"activity" | "integrity" | "errors">("activity");
 
   const load = useCallback(async () => {
     if (!supabase) return;
     setLoading(true);
-    const [auditResult, integrityResult, usersResult] = await Promise.all([
+    const [auditResult, integrityResult, usersResult, errorResult] = await Promise.all([
       supabase
         .from("audit_logs")
         .select("id,actor_id,action,entity_type,entity_id,metadata,created_at")
@@ -443,8 +454,17 @@ export function AuditSecurityPage({ notify }: { notify: Notify }) {
         .from("profiles")
         .select("id", { count: "exact", head: true })
         .eq("active", true),
+      supabase
+        .from("frontend_error_logs")
+        .select("id,reference_id,error_message,path,user_agent,created_at,profiles(full_name,email)")
+        .order("created_at", { ascending: false })
+        .limit(100),
     ]);
-    const requestError = auditResult.error ?? integrityResult.error ?? usersResult.error;
+    const requestError =
+      auditResult.error ??
+      integrityResult.error ??
+      usersResult.error ??
+      errorResult.error;
     if (requestError) notify(requestError.message, true);
     if (auditResult.error) setAudits([]);
     else {
@@ -457,6 +477,11 @@ export function AuditSecurityPage({ notify }: { notify: Notify }) {
       } else setActorNames({});
     }
     setIntegrityEvents(integrityResult.error ? [] : (integrityResult.data ?? []) as unknown as IntegrityRow[]);
+    setFrontendErrors(
+      errorResult.error
+        ? []
+        : (errorResult.data ?? []) as unknown as FrontendErrorRow[],
+    );
     setIntegrityCount(integrityResult.count ?? 0);
     setActiveUsers(usersResult.count ?? 0);
     setLoading(false);
@@ -485,6 +510,18 @@ export function AuditSecurityPage({ notify }: { notify: Notify }) {
       ].some((item) => item.toLowerCase().includes(value)),
     );
   }, [integrityEvents, query]);
+  const filteredFrontendErrors = useMemo(() => {
+    const value = query.trim().toLowerCase();
+    if (!value) return frontendErrors;
+    return frontendErrors.filter((item) =>
+      [
+        item.reference_id,
+        item.error_message,
+        item.path,
+        relatedName(item.profiles),
+      ].some((text) => text.toLowerCase().includes(value)),
+    );
+  }, [frontendErrors, query]);
 
   return (
     <div className="portal-page">
@@ -498,7 +535,7 @@ export function AuditSecurityPage({ notify }: { notify: Notify }) {
         <div className="card"><span className="admin-card-icon green"><CheckCircle2 /></span><p><small>AKUN AKTIF</small><b>{activeUsers}</b><span>pengguna dapat masuk</span></p></div>
         <div className="card"><span className="admin-card-icon amber"><ShieldCheck /></span><p><small>EVENT INTEGRITAS</small><b>{integrityCount}</b><span>tercatat di seluruh ujian</span></p></div>
         <div className="card"><span className="admin-card-icon blue"><History /></span><p><small>LOG TERBARU</small><b>{audits.length}</b><span>maksimal 100 aktivitas</span></p></div>
-        <div className="card"><span className="admin-card-icon purple"><Users /></span><p><small>AKSES ADMIN</small><b>Terbatas</b><span>data master & pengawasan</span></p></div>
+        <div className="card"><span className="admin-card-icon purple"><AlertTriangle /></span><p><small>ERROR FRONTEND</small><b>{frontendErrors.length}</b><span>maksimal 100 laporan terbaru</span></p></div>
       </div>
       <div className="section-switcher" aria-label="Jenis catatan keamanan">
         <button
@@ -517,14 +554,22 @@ export function AuditSecurityPage({ notify }: { notify: Notify }) {
         >
           <ShieldCheck /> Integritas ujian <span>{integrityCount}</span>
         </button>
+        <button
+          type="button"
+          className={view === "errors" ? "active" : ""}
+          aria-pressed={view === "errors"}
+          onClick={() => { setView("errors"); setQuery(""); }}
+        >
+          <AlertTriangle /> Error aplikasi <span>{frontendErrors.length}</span>
+        </button>
       </div>
       <div className="toolbar">
         <div>
-          {view === "activity" ? <History /> : <ShieldCheck />}
+          {view === "activity" ? <History /> : view === "integrity" ? <ShieldCheck /> : <AlertTriangle />}
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder={view === "activity" ? "Cari tindakan, aktor, atau entitas…" : "Cari siswa, ujian, atau event…"}
+            placeholder={view === "activity" ? "Cari tindakan, aktor, atau entitas…" : view === "integrity" ? "Cari siswa, ujian, atau event…" : "Cari referensi, pengguna, halaman, atau pesan error…"}
           />
         </div>
       </div>
@@ -547,7 +592,7 @@ export function AuditSecurityPage({ notify }: { notify: Notify }) {
           </tbody>
         </table>
         <div className="table-footer"><span>Menampilkan maksimal 100 aktivitas terbaru</span></div>
-      </div> : <div className="table-card audit-table integrity-table">
+      </div> : view === "integrity" ? <div className="table-card audit-table integrity-table">
         <table>
           <thead><tr><th>WAKTU</th><th>SISWA</th><th>UJIAN</th><th>EVENT</th><th>DETAIL</th></tr></thead>
           <tbody>
@@ -567,6 +612,26 @@ export function AuditSecurityPage({ notify }: { notify: Notify }) {
           </tbody>
         </table>
         <div className="table-footer"><span>Menampilkan maksimal 100 event terbaru</span></div>
+      </div> : <div className="table-card audit-table frontend-error-table">
+        <table>
+          <thead><tr><th>WAKTU</th><th>REFERENSI</th><th>PENGGUNA</th><th>HALAMAN</th><th>PESAN</th></tr></thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={5}>Memuat error aplikasi…</td></tr>
+            ) : filteredFrontendErrors.length === 0 ? (
+              <tr><td colSpan={5}>Belum ada error frontend yang tercatat.</td></tr>
+            ) : filteredFrontendErrors.map((item) => (
+              <tr key={item.id}>
+                <td data-label="Waktu">{new Date(item.created_at).toLocaleString("id-ID")}</td>
+                <td data-label="Referensi"><code>{item.reference_id.slice(0, 8)}</code></td>
+                <td data-label="Pengguna"><b className="table-main">{relatedName(item.profiles)}</b></td>
+                <td data-label="Halaman"><code>{item.path}</code></td>
+                <td data-label="Pesan"><span title={item.error_message}>{item.error_message}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="table-footer"><span>Gunakan ID referensi dari layar error untuk menemukan laporan terkait</span></div>
       </div>}
     </div>
   );

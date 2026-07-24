@@ -89,6 +89,7 @@ import {
 } from "./lib/exam-timer";
 import { StudentReportPage } from "./components/StudentReportPage";
 import { fetchAllPages } from "./lib/supabase-pagination";
+import { useAccessibleDialog } from "./lib/use-accessible-dialog";
 
 type Toast = { text: string; error?: boolean } | null;
 
@@ -941,20 +942,16 @@ function Modal({
   close: () => void;
   wide?: boolean;
 }) {
-  useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
-    };
-    document.addEventListener("keydown", closeOnEscape);
-    return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [close]);
+  const dialogRef = useAccessibleDialog(close);
 
   return (
     <div className="modal-overlay">
       <div
+        ref={dialogRef}
         className={`modal ${wide ? "wide" : ""}`}
         role="dialog"
         aria-modal="true"
+        tabIndex={-1}
       >
         {children}
       </div>
