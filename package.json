@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "test": "node --import tsx --test tests/*.test.mjs tests/*.test.ts",
     "check": "npm run lint && npm run test && npm run build",
-    "check:functions": "npx -y deno check supabase/functions/admin-users/index.ts supabase/functions/student-login/index.ts",
+    "check:functions": "npx -y deno check supabase/functions/admin-users/index.ts supabase/functions/student-login/index.ts supabase/functions/import-questions/index.ts",
     "preview": "vite preview"
   },
   "dependencies": {

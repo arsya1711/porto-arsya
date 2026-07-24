@@ -7,7 +7,6 @@ import {
   BookOpen,
   CalendarDays,
   CheckCircle2,
-  ChevronDown,
   Clock3,
   FileQuestion,
   LayoutDashboard,
@@ -23,6 +22,7 @@ import { BrandLogo } from "./BrandLogo";
 import type { Profile } from "../auth/auth-context";
 import { supabase } from "../lib/supabase";
 import type { ExamStatus, StudentExamCatalogRow } from "../types";
+import { deriveExamStatus } from "../lib/exam-status";
 
 type StaffExam = {
   id: string;
@@ -141,21 +141,6 @@ function relativeTime(value: string) {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours} jam lalu`;
   return shortDate(value);
-}
-
-function deriveExamStatus(
-  stored: ExamStatus,
-  startsAt: string,
-  endsAt: string | null,
-  duration: number,
-): ExamStatus {
-  if (stored === "draft") return "draft";
-  const now = Date.now();
-  const start = new Date(startsAt).getTime();
-  const end = endsAt ? new Date(endsAt).getTime() : start + duration * 60_000;
-  if (now < start) return "terjadwal";
-  if (now <= end) return "berlangsung";
-  return "selesai";
 }
 
 function currentExamStatus(exam: StaffExam): ExamStatus {
@@ -717,19 +702,25 @@ export function StudentDashboard({
             {online ? <Wifi /> : <WifiOff />}
             {online ? "Online" : "Offline"}
           </span>
-          <button aria-label="Notifikasi">
+          <button
+            aria-label="Lihat jadwal ujian"
+            onClick={() =>
+              document
+                .getElementById("student-schedule")
+                ?.scrollIntoView({ behavior: "smooth", block: "start" })
+            }
+          >
             <Bell />
           </button>
-          <button className="student-profile">
+          <Link className="student-profile" to="/siswa/rapor">
             <span>{getInitials(profile.full_name)}</span>
             <b>
               {profile.full_name}
               <small>
-                {className} · {profile.student_number ?? "NIS belum diisi"}
+                Nilai & rapor · {className}
               </small>
             </b>
-            <ChevronDown />
-          </button>
+          </Link>
           <button className="logout-icon" onClick={logout} aria-label="Keluar">
             <LogOut />
           </button>
@@ -804,7 +795,7 @@ export function StudentDashboard({
           </section>
         )}
 
-        <div className="student-columns">
+        <div className="student-columns" id="student-schedule">
           <section>
             <h3>AKAN DATANG</h3>
             {upcoming.length ? (

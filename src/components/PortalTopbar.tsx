@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import type { Profile } from "../auth/auth-context";
 import { supabase } from "../lib/supabase";
+import { deriveExamStatus } from "../lib/exam-status";
+import type { ExamStatus } from "../types";
 
 type SearchResult = { id: string; title: string; detail: string; href: string; icon: "user" | "class" | "subject" | "exam" | "question" };
 type Notice = { id: string; title: string; detail: string; time: string; href: string };
@@ -146,13 +148,40 @@ export function PortalTopbar({
           : supabase.from("attempts").select("id,submitted_at,exams(title)").eq("status", "grading").order("submitted_at", { ascending: false }).limit(5),
         preferences?.exam_updates === false
           ? Promise.resolve({ data: [], error: null })
-          : supabase.from("exams").select("id,title,starts_at,status").in("status", ["terjadwal", "berlangsung"]).order("starts_at").limit(5),
+          : supabase
+              .from("exams")
+              .select("id,title,starts_at,ends_at,duration_minutes,status")
+              .neq("status", "draft")
+              .gte("starts_at", new Date(Date.now() - 24 * 60 * 60_000).toISOString())
+              .order("starts_at")
+              .limit(20),
       ]);
       const gradingNotices = (gradingResult.data ?? []).map((item) => {
         const exam = Array.isArray(item.exams) ? item.exams[0] : item.exams;
         return { id: `grading-${item.id}`, title: "Jawaban menunggu koreksi", detail: exam?.title ?? "Ujian", time: item.submitted_at ? new Date(item.submitted_at).toLocaleString("id-ID") : "Baru saja", href: "/app/koreksi" };
       });
-      const examNotices = (examResult.data ?? []).map((item) => ({ id: `exam-${item.id}`, title: item.status === "berlangsung" ? "Ujian sedang berlangsung" : "Ujian terjadwal", detail: item.title, time: new Date(item.starts_at).toLocaleString("id-ID"), href: "/app/ujian" }));
+      const examNotices = (examResult.data ?? [])
+        .map((item) => ({
+          item,
+          status: deriveExamStatus(
+            item.status as ExamStatus,
+            item.starts_at,
+            item.ends_at,
+            Number(item.duration_minutes),
+          ),
+        }))
+        .filter(({ status }) => status === "terjadwal" || status === "berlangsung")
+        .slice(0, 5)
+        .map(({ item, status }) => ({
+          id: `exam-${item.id}`,
+          title:
+            status === "berlangsung"
+              ? "Ujian sedang berlangsung"
+              : "Ujian terjadwal",
+          detail: item.title,
+          time: new Date(item.starts_at).toLocaleString("id-ID"),
+          href: "/app/ujian",
+        }));
       setNotices([...gradingNotices, ...examNotices].slice(0, 8));
     }
     setNoticeLoading(false);

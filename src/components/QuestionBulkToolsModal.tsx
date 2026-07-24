@@ -46,8 +46,8 @@ export function QuestionBulkToolsModal({
   const invalidWeight = Boolean(weight) && (!Number.isFinite(Number(weight)) || Number(weight) <= 0);
 
   return (
-    <div className="modal-overlay" onMouseDown={close}>
-      <div className="modal" onMouseDown={(event) => event.stopPropagation()}>
+    <div className="modal-overlay">
+      <div className="modal" role="dialog" aria-modal="true">
         <div className="simple-modal bulk-question-modal">
           <header>
             <div><p>AKSI MASSAL</p><h2>Kelola {questions.length} soal</h2></div>

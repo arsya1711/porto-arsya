@@ -87,6 +87,8 @@ import {
   parseExamDeadline,
   remainingSecondsFromDeadline,
 } from "./lib/exam-timer";
+import { StudentReportPage } from "./components/StudentReportPage";
+import { fetchAllPages } from "./lib/supabase-pagination";
 
 type Toast = { text: string; error?: boolean } | null;
 
@@ -196,10 +198,24 @@ function Application() {
             )
           }
         />
+        <Route
+          path="/siswa/rapor"
+          element={
+            profile && role === "siswa" ? (
+              <StudentReportPage profile={profile} logout={logout} />
+            ) : (
+              <Navigate to="/" />
+            )
+          }
+        />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
       {toast && (
-        <div className={`toast ${toast.error ? "error" : ""}`}>
+        <div
+          className={`toast ${toast.error ? "error" : ""}`}
+          role={toast.error ? "alert" : "status"}
+          aria-live={toast.error ? "assertive" : "polite"}
+        >
           {toast.error ? <AlertTriangle /> : <CheckCircle2 />}
           {toast.text}
         </div>
@@ -413,9 +429,7 @@ function Login({
             </div>
           </label>
           <div className="login-help">
-            <label>
-              <input type="checkbox" defaultChecked /> Ingat saya
-            </label>
+            <span>Sesi tersimpan aman di perangkat ini</span>
             <button type="button" onClick={forgotPassword}>
               Lupa kata sandi?
             </button>
@@ -427,7 +441,7 @@ function Login({
           <p className="connection">
             <i className={isSupabaseConfigured ? "online" : ""} />
             {isSupabaseConfigured
-              ? "Autentikasi Supabase aktif"
+              ? "Konfigurasi server tersedia"
               : "Konfigurasi server belum tersedia"}
           </p>
         </form>
@@ -927,11 +941,20 @@ function Modal({
   close: () => void;
   wide?: boolean;
 }) {
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [close]);
+
   return (
-    <div className="modal-overlay" onMouseDown={close}>
+    <div className="modal-overlay">
       <div
         className={`modal ${wide ? "wide" : ""}`}
-        onMouseDown={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
       >
         {children}
       </div>
@@ -944,14 +967,20 @@ type ManagedUser = Profile & {
   class_id: string | null;
   class_name: string | null;
 };
+type ManagedUserQueryRow = Profile & {
+  created_at: string;
+  class_students: unknown;
+};
 type ClassOption = {
   id: string;
   name: string;
   academic_year_id: string | null;
   academic_year_name: string;
+  homeroom_teacher_id: string | null;
 };
 type AcademicYearOption = { id: string; name: string; active: boolean };
 type SubjectOption = { id: string; name: string };
+type TeacherOption = { id: string; full_name: string };
 
 function UserManagement({
   notify,
@@ -975,40 +1004,47 @@ function UserManagement({
   const [query, setQuery] = useState("");
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [subjects, setSubjects] = useState<SubjectOption[]>([]);
+  const [teachers, setTeachers] = useState<TeacherOption[]>([]);
   const [classFilter, setClassFilter] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
+  const [page, setPage] = useState(1);
   const [academicYears, setAcademicYears] = useState<AcademicYearOption[]>([]);
   const [classEditor, setClassEditor] = useState<ClassOption | "new" | null>(
     null,
   );
   const loadUsers = useCallback(async () => {
-    if (!supabase) return;
+    const client = supabase;
+    if (!client) return;
     setLoading(true);
-    const profileQuery = supabase
-      .from("profiles")
-      .select(
-        "id,full_name,email,role,student_number,active,created_at,class_students(class_id,classes(name))",
-      )
-      .eq("role", roleFilter)
-      .order("created_at", { ascending: false });
+    const profileQuery = fetchAllPages<ManagedUserQueryRow>((from, to) =>
+      client
+        .from("profiles")
+        .select(
+          "id,full_name,email,role,student_number,active,created_at,class_students(class_id,classes(name))",
+        )
+        .eq("role", roleFilter)
+        .order("created_at", { ascending: false })
+        .range(from, to),
+    );
     const classQuery =
       roleFilter === "siswa" || roleFilter === "guru"
-        ? supabase
+        ? client
             .from("classes")
-            .select("id,name,academic_year_id,academic_years(name)")
+            .select("id,name,academic_year_id,homeroom_teacher_id,academic_years(name)")
             .order("name")
         : Promise.resolve({
             data: [] as {
               id: string;
               name: string;
               academic_year_id: string | null;
+              homeroom_teacher_id: string | null;
               academic_years: unknown;
             }[],
             error: null,
           });
     const academicYearQuery =
       roleFilter === "siswa" && canManage
-        ? supabase
+        ? client
             .from("academic_years")
             .select("id,name,active")
             .order("name", { ascending: false })
@@ -1018,14 +1054,24 @@ function UserManagement({
           });
     const subjectQuery =
       roleFilter === "guru"
-        ? supabase.from("subjects").select("id,name").order("name")
+        ? client.from("subjects").select("id,name").order("name")
         : Promise.resolve({ data: [] as SubjectOption[], error: null });
-    const [profileResult, classResult, subjectResult, academicYearResult] =
+    const teacherQuery =
+      roleFilter === "siswa" && canManage
+        ? client
+            .from("profiles")
+            .select("id,full_name")
+            .eq("role", "guru")
+            .eq("active", true)
+            .order("full_name")
+        : Promise.resolve({ data: [] as TeacherOption[], error: null });
+    const [profileResult, classResult, subjectResult, academicYearResult, teacherResult] =
       await Promise.all([
         profileQuery,
         classQuery,
         subjectQuery,
         academicYearQuery,
+        teacherQuery,
       ]);
     if (profileResult.error) notify(profileResult.error.message, true);
     else {
@@ -1055,6 +1101,7 @@ function UserManagement({
             academic_year_id: item.academic_year_id,
             academic_year_name:
               academicYearName === "—" ? "Belum diatur" : academicYearName,
+            homeroom_teacher_id: item.homeroom_teacher_id,
           };
         }),
       );
@@ -1068,6 +1115,8 @@ function UserManagement({
         (academicYearResult.data ?? []) as AcademicYearOption[],
       );
     }
+    if (teacherResult.error) notify(teacherResult.error.message, true);
+    else setTeachers((teacherResult.data ?? []) as TeacherOption[]);
     setLoading(false);
   }, [canManage, notify, roleFilter]);
   useEffect(() => {
@@ -1186,11 +1235,13 @@ function UserManagement({
     id?: string;
     name: string;
     academicYearId: string;
+    homeroomTeacherId: string;
   }) => {
     if (!supabase) return;
     const payload = {
       name: draft.name.trim(),
       academic_year_id: draft.academicYearId,
+      homeroom_teacher_id: draft.homeroomTeacherId || null,
     };
     const result = draft.id
       ? await supabase.from("classes").update(payload).eq("id", draft.id)
@@ -1238,6 +1289,16 @@ function UserManagement({
         user.role,
       ].some((value) => value.toLowerCase().includes(normalizedQuery)),
   );
+  const pageSize = 25;
+  const pageCount = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
+  const safePage = Math.min(page, pageCount);
+  const pagedUsers = filteredUsers.slice(
+    (safePage - 1) * pageSize,
+    safePage * pageSize,
+  );
+  useEffect(() => {
+    setPage(1);
+  }, [activeFilter, classFilter, query]);
   const selectedClassOption = classes.find(
     (item) => item.id === classFilter,
   );
@@ -1387,7 +1448,7 @@ function UserManagement({
                 <td colSpan={roleFilter === "siswa" ? 6 : 5}>Belum ada pengguna yang cocok.</td>
               </tr>
             ) : (
-              filteredUsers.map((user) => (
+              pagedUsers.map((user) => (
                 <tr key={user.id}>
                   <td data-label="Pengguna">
                     <div className="student-cell">
@@ -1480,6 +1541,34 @@ function UserManagement({
           </tbody>
         </table>
       </div>
+      {filteredUsers.length > pageSize && (
+        <nav className="pagination-controls" aria-label="Halaman daftar pengguna">
+          <span>
+            Menampilkan {(safePage - 1) * pageSize + 1}–
+            {Math.min(safePage * pageSize, filteredUsers.length)} dari{" "}
+            {filteredUsers.length}
+          </span>
+          <div>
+            <button
+              type="button"
+              disabled={safePage === 1}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+            >
+              Sebelumnya
+            </button>
+            <b>{safePage} / {pageCount}</b>
+            <button
+              type="button"
+              disabled={safePage === pageCount}
+              onClick={() =>
+                setPage((current) => Math.min(pageCount, current + 1))
+              }
+            >
+              Berikutnya
+            </button>
+          </div>
+        </nav>
+      )}
       {create && (
         <CreateUserModal
           close={() => setCreate(false)}
@@ -1517,6 +1606,7 @@ function UserManagement({
         <ClassEditorModal
           initial={classEditor === "new" ? undefined : classEditor}
           academicYears={academicYears}
+          teachers={teachers}
           close={() => setClassEditor(null)}
           save={saveClass}
         />
@@ -1528,16 +1618,19 @@ function UserManagement({
 function ClassEditorModal({
   initial,
   academicYears,
+  teachers,
   close,
   save,
 }: {
   initial?: ClassOption;
   academicYears: AcademicYearOption[];
+  teachers: TeacherOption[];
   close: () => void;
   save: (draft: {
     id?: string;
     name: string;
     academicYearId: string;
+    homeroomTeacherId: string;
   }) => Promise<boolean | undefined>;
 }) {
   const defaultAcademicYearId =
@@ -1549,6 +1642,9 @@ function ClassEditorModal({
   const [academicYearId, setAcademicYearId] = useState(
     defaultAcademicYearId,
   );
+  const [homeroomTeacherId, setHomeroomTeacherId] = useState(
+    initial?.homeroom_teacher_id ?? "",
+  );
   const [saving, setSaving] = useState(false);
 
   const submit = async (event: FormEvent) => {
@@ -1559,6 +1655,7 @@ function ClassEditorModal({
       id: initial?.id,
       name,
       academicYearId,
+      homeroomTeacherId,
     });
     if (!saved) setSaving(false);
   };
@@ -1606,6 +1703,19 @@ function ClassEditorModal({
                 <option key={item.id} value={item.id}>
                   {item.name}
                   {item.active ? " — Aktif" : ""}
+                </option>
+              ))}
+            </select>
+          </FormField>
+          <FormField label="Wali kelas">
+            <select
+              value={homeroomTeacherId}
+              onChange={(event) => setHomeroomTeacherId(event.target.value)}
+            >
+              <option value="">Belum ditentukan</option>
+              {teachers.map((teacher) => (
+                <option key={teacher.id} value={teacher.id}>
+                  {teacher.full_name}
                 </option>
               ))}
             </select>
@@ -2171,8 +2281,11 @@ function ExamRunner({
   const pendingEssay = useRef<{ questionId: string; value: string } | null>(null);
   const answerSaveQueue = useRef<Record<string, Promise<boolean>>>({});
   const finishingRef = useRef(false);
+  const finishRetryTimer = useRef<number | null>(null);
   const deadlineRef = useRef<number | null>(null);
   const [pendingSaves, setPendingSaves] = useState(0);
+  const unsyncedAnswersRef = useRef(new Set<string>());
+  const [unsyncedCount, setUnsyncedCount] = useState(0);
   const [submittingExam, setSubmittingExam] = useState(false);
   const [studentId, setStudentId] = useState<string | null>(null);
   const question = questions[current];
@@ -2311,6 +2424,12 @@ function ExamRunner({
       const localAnswers = normalizeStoredAnswers(
         loadLocal<unknown>(`answers:${examId}`, {}),
       );
+      unsyncedAnswersRef.current = new Set(
+        Object.entries(localAnswers)
+          .filter(([questionId, value]) => remoteAnswers[questionId] !== value)
+          .map(([questionId]) => questionId),
+      );
+      setUnsyncedCount(unsyncedAnswersRef.current.size);
       setAnswers({ ...remoteAnswers, ...localAnswers });
       setLoadingExam(false);
     };
@@ -2401,8 +2520,16 @@ function ExamRunner({
   );
   const time = useMemo(() => formatExamRemaining(remaining), [remaining]);
   const persistAnswer = useCallback((questionId: string, value: number | string) => {
+    const markUnsynced = (unsynced: boolean) => {
+      if (unsynced) unsyncedAnswersRef.current.add(questionId);
+      else unsyncedAnswersRef.current.delete(questionId);
+      setUnsyncedCount(unsyncedAnswersRef.current.size);
+    };
     const save = async () => {
-      if (!supabase || !attemptId) return false;
+      if (!supabase || !attemptId) {
+        markUnsynced(true);
+        return false;
+      }
       setPendingSaves((count) => count + 1);
       try {
         const { error } = await supabase.rpc("save_exam_answer", {
@@ -2412,10 +2539,16 @@ function ExamRunner({
           target_essay_text: typeof value === "string" ? value : null,
         });
         if (error) {
+          markUnsynced(true);
           notify(`Jawaban belum tersinkron: ${error.message}`, true);
           return false;
         }
+        markUnsynced(false);
         return true;
+      } catch {
+        markUnsynced(true);
+        notify("Jawaban belum tersinkron. Periksa koneksi internet.", true);
+        return false;
       } finally {
         setPendingSaves((count) => Math.max(0, count - 1));
       }
@@ -2430,6 +2563,23 @@ function ExamRunner({
     });
     return queued;
   }, [attemptId, notify]);
+  useEffect(() => {
+    const retryUnsyncedAnswers = () => {
+      if (!attemptId || !unsyncedAnswersRef.current.size) {
+        if (remaining === 0 && attemptId && !finishingRef.current) void finishRef.current?.();
+        return;
+      }
+      const stored = normalizeStoredAnswers(
+        loadLocal<unknown>(`answers:${examId}`, {}),
+      );
+      for (const questionId of [...unsyncedAnswersRef.current]) {
+        const value = stored[questionId];
+        if (value !== undefined) void persistAnswer(questionId, value);
+      }
+    };
+    window.addEventListener("online", retryUnsyncedAnswers);
+    return () => window.removeEventListener("online", retryUnsyncedAnswers);
+  }, [attemptId, examId, persistAnswer, remaining]);
   const answer = (value: number | string) => {
     const next = { ...answers, [question.id]: value };
     setAnswers(next);
@@ -2503,10 +2653,21 @@ function ExamRunner({
       finishingRef.current = false;
       setSubmittingExam(false);
       notify(error instanceof Error ? error.message : "Jawaban gagal dikumpulkan. Coba lagi sebelum meninggalkan halaman.", true);
+      if (remaining === 0 && finishRetryTimer.current === null) {
+        finishRetryTimer.current = window.setTimeout(() => {
+          finishRetryTimer.current = null;
+          void finishRef.current?.();
+        }, 8_000);
+      }
     }
-  }, [answers, attemptId, examId, navigate, notify, persistAnswer]);
+  }, [answers, attemptId, examId, navigate, notify, persistAnswer, remaining]);
+  const finishRef = useRef<(() => Promise<void>) | null>(null);
+  useEffect(() => {
+    finishRef.current = finish;
+  }, [finish]);
   useEffect(() => () => {
     if (essaySaveTimer.current !== null) window.clearTimeout(essaySaveTimer.current);
+    if (finishRetryTimer.current !== null) window.clearTimeout(finishRetryTimer.current);
   }, []);
   useEffect(() => {
     if (!loadingExam && remaining === 0 && attemptId) void finish();
@@ -2552,6 +2713,8 @@ function ExamRunner({
   }
   const saveStatus = pendingSaves > 0
     ? `Menyimpan ${pendingSaves} jawaban…`
+    : unsyncedCount > 0
+      ? `${unsyncedCount} jawaban belum tersinkron`
     : "Semua jawaban tersimpan";
   return (
     <div className="runner">
@@ -2564,8 +2727,8 @@ function ExamRunner({
           </span>
         </div>
         <div className="runner-stats">
-          <span className={pendingSaves > 0 ? "syncing" : "synced"} role="status" aria-live="polite" title={saveStatus}>
-            <Wifi />
+          <span className={pendingSaves > 0 ? "syncing" : unsyncedCount > 0 ? "sync-error" : "synced"} role="status" aria-live="polite" title={saveStatus}>
+            {unsyncedCount > 0 ? <AlertTriangle /> : <Wifi />}
             {saveStatus}
           </span>
           <time

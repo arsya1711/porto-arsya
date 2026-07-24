@@ -251,10 +251,11 @@ export function PdfQuestionImportModal({
   };
 
   return (
-    <div className="modal-overlay" onMouseDown={close}>
+    <div className="modal-overlay">
       <div
         className="modal pdf-import-modal"
-        onMouseDown={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
       >
         <div className="simple-modal">
           <header>

@@ -93,6 +93,10 @@ Deno.serve(async (request) => {
   if (!originAllowed(request)) return json(request, { error: 'Origin tidak diizinkan.' }, 403)
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders(request) })
   if (request.method !== 'POST') return json(request, { error: 'Metode tidak didukung.' }, 405)
+  const contentLength = Number(request.headers.get('content-length') ?? 0)
+  if (contentLength > 1_000_000) {
+    return json(request, { error: 'Request impor terlalu besar.' }, 413)
+  }
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
@@ -123,6 +127,17 @@ Deno.serve(async (request) => {
       .single()
     if (!caller?.active || (caller.role !== 'admin' && caller.role !== 'guru')) {
       return json(request, { error: 'Hanya admin dan guru yang dapat mengimpor soal.' }, 403)
+    }
+    const reservation = await admin.rpc('reserve_ai_import_attempt', {
+      target_user_id: callerData.user.id,
+    })
+    if (reservation.error) {
+      return json(request, { error: 'Kuota impor belum dapat diperiksa. Coba kembali.' }, 500)
+    }
+    if (!reservation.data) {
+      return json(request, {
+        error: 'Batas impor AI tercapai. Maksimal 10 kali per jam untuk setiap pengguna.',
+      }, 429)
     }
 
     const body = await request.json() as { text?: unknown }

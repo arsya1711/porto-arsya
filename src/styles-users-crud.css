@@ -33,3 +33,47 @@
   .class-year-context{margin-top:-6px}
   .class-year-context>button{min-height:36px}
 }
+.pagination-controls {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid #e1e6ee;
+  border-radius: 10px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #758095;
+  font-size: 12px;
+}
+
+.pagination-controls > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pagination-controls button {
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid #dce2eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #3f4b60;
+  font-weight: 700;
+}
+
+.pagination-controls button:disabled {
+  opacity: 0.45;
+}
+
+@media (max-width: 560px) {
+  .pagination-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pagination-controls > div {
+    justify-content: space-between;
+  }
+}

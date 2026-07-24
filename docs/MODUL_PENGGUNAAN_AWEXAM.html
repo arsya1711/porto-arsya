@@ -507,7 +507,7 @@
     <div class="flow">
       <div class="node"><b>4. Sistem menilai</b><span>Pilihan ganda otomatis, essay menunggu koreksi</span></div>
       <div class="arrow">→</div>
-      <div class="node"><b>5. Guru memfinalkan</b><span>Koreksi essay dan periksa hasil ujian</span></div>
+      <div class="node"><b>5. Guru menyelesaikan koreksi</b><span>Nilai final terbentuk otomatis setelah seluruh essay dinilai</span></div>
       <div class="arrow">→</div>
       <div class="node"><b>6. Sekolah melaporkan</b><span>Analitik, leger, rapor, cetak, atau ekspor CSV</span></div>
     </div>
@@ -563,7 +563,7 @@
       <tbody>
         <tr><td>Sidebar kiri</td><td>Berpindah antarbagian. Menu dikelompokkan sesuai pekerjaan: Akademik, Persiapan Ujian, Penilaian, atau Pemantauan.</td></tr>
         <tr><td>Ringkasan</td><td>Menampilkan statistik, jadwal terdekat, dan aktivitas terbaru.</td></tr>
-        <tr><td>Kolom pencarian</td><td>Mencari data pada halaman aktif. Gunakan nama, email, NIS, kelas, bank, atau judul ujian sesuai halaman.</td></tr>
+        <tr><td>Pencarian atas</td><td>Tekan <span class="kbd">Ctrl/Cmd + K</span> untuk mencari pengguna, kelas, mapel, ujian, atau soal secara global. Kolom pencarian di dalam halaman menyaring daftar pada halaman tersebut.</td></tr>
         <tr><td>Tombol utama berwarna biru</td><td>Aksi utama halaman, misalnya Tambah siswa, Tambah soal, atau Buat ujian.</td></tr>
         <tr><td>Menu “Lainnya” / “Aksi lain”</td><td>Menyimpan aksi sekunder atau sensitif agar halaman tidak penuh tombol.</td></tr>
         <tr><td>Notifikasi dan profil</td><td>Menampilkan informasi akun, status, bantuan, dan akses keluar.</td></tr>
@@ -691,8 +691,8 @@
     <table class="menu-map">
       <thead><tr><th>Tab</th><th>Pengaturan</th></tr></thead>
       <tbody>
-        <tr><td>Profil sekolah</td><td>Logo, nama sekolah, NPSN, dan alamat yang tampil pada sidebar dan rapor.</td></tr>
-        <tr><td>Keamanan</td><td>Default layar penuh, pencatatan perpindahan tab, dan batas sesi tidak aktif.</td></tr>
+        <tr><td>Profil sekolah</td><td>Unggah logo, isi nama sekolah, NPSN, dan alamat, lalu simpan agar identitas tampil pada sidebar dan rapor.</td></tr>
+        <tr><td>Keamanan</td><td>Default layar penuh, pencatatan perpindahan tab, dan batas sesi tidak aktif. Batas sesi akan mengeluarkan akun otomatis setelah tidak ada aktivitas.</td></tr>
         <tr><td>Tahun ajaran</td><td>Melihat periode aktif dan mengatur KKM/nilai ketuntasan.</td></tr>
         <tr><td>Notifikasi</td><td>Pembaruan ujian, pengingat koreksi, dan peringatan keamanan.</td></tr>
       </tbody>
@@ -711,14 +711,38 @@
       <li>Jangan langsung menyimpulkan pelanggaran; cocokkan waktu dan konteks kejadian.</li>
     </ol>
 
-    <h3>3.11 Hasil dan Rapor Semester</h3>
-    <ul>
-      <li><strong>Hasil Ujian:</strong> pilih ujian, lihat rata-rata, nilai tertinggi, ketuntasan, menunggu koreksi, distribusi, dan analisis soal.</li>
-      <li><strong>Rapor Siswa:</strong> pilih periode, kelas, siswa, lalu tinjau nilai per mata pelajaran.</li>
-      <li><strong>Leger Kelas:</strong> melihat seluruh siswa dan mapel dalam satu tabel serta mengekspor CSV.</li>
-      <li><strong>Komponen Nilai:</strong> menentukan ujian yang masuk rapor dan bobot relatifnya.</li>
-      <li><strong>Publikasi:</strong> lakukan setelah seluruh nilai, catatan, dan absensi final.</li>
-    </ul>
+    <footer class="doc-footer"><span>AWExam · Panduan Admin</span><span>Bab 3</span></footer>
+  </section>
+
+  <section class="page page-break">
+    <header class="doc-header"><div><img src="../public/logo.png" alt=""><b>AWExam</b></div><span>BAB 3 · PANDUAN ADMIN</span></header>
+    <p class="eyebrow">Admin · Hasil dan Rapor</p>
+    <h2>Meninjau hasil dan menerbitkan rapor</h2>
+
+    <h3>3.11 Hasil Ujian</h3>
+    <ol class="steps">
+      <li><div><b>Pilih ujian</b><p>Buka Hasil Ujian, lalu pilih ujian yang akan dianalisis.</p></div></li>
+      <li><div><b>Periksa status penilaian</b><p>Tinjau rata-rata, nilai tertinggi, ketuntasan KKM, dan jumlah jawaban yang masih menunggu koreksi.</p></div></li>
+      <li><div><b>Baca analitik</b><p>Gunakan distribusi nilai dan analisis butir untuk menemukan soal yang terlalu mudah, sulit, atau bermasalah.</p></div></li>
+      <li><div><b>Ambil hasil terbaru</b><p>Tekan Muat ulang setelah koreksi. Nilai final terbentuk otomatis saat seluruh essay pada percobaan siswa selesai dinilai.</p></div></li>
+      <li><div><b>Ekspor bila diperlukan</b><p>Gunakan Ekspor CSV untuk arsip atau pengolahan lanjutan.</p></div></li>
+    </ol>
+
+    <h3>3.12 Rapor Semester</h3>
+    <ol>
+      <li>Pilih <strong>periode, kelas, dan siswa</strong>. Jika muncul peringatan, tautkan kelas ke tahun ajaran melalui Kelas &amp; Siswa.</li>
+      <li>Buka <strong>Komponen nilai</strong>, pilih ujian yang disertakan, lalu atur bobot relatifnya.</li>
+      <li>Tinjau nilai otomatis. Bila perlu, masukkan nilai akhir dan deskripsi capaian; pilih <strong>Gunakan nilai otomatis</strong> untuk membatalkan penyesuaian.</li>
+      <li>Lengkapi catatan wali kelas, ekstrakurikuler, sakit, izin, dan alpa.</li>
+      <li>Buka <strong>Leger kelas</strong> untuk membandingkan seluruh siswa dan gunakan <strong>Ekspor CSV</strong> bila diperlukan.</li>
+      <li>Periksa ulang data, lalu publikasikan. Publikasi dapat dibatalkan jika masih ada koreksi.</li>
+      <li>Pilih siswa dan tekan <strong>Cetak / PDF</strong> untuk menghasilkan dokumen rapor.</li>
+    </ol>
+
+    <div class="callout warning">
+      <span class="callout-icon">!</span>
+      <div><b>Publikasi dibatasi oleh peran</b><p>Hanya Admin atau Guru yang menjadi wali kelas terpilih yang dapat mengubah catatan/absensi serta memublikasikan rapor. Publikasi rapor berbeda dari nilai final ujian.</p></div>
+    </div>
     <footer class="doc-footer"><span>AWExam · Panduan Admin</span><span>Bab 3</span></footer>
   </section>
 
@@ -823,6 +847,7 @@
       <li><div><b>Pilih soal</b><p>AWExam hanya menampilkan soal dari mata pelajaran yang dipilih. Pilih minimal satu soal dan pastikan seluruh kunci lengkap.</p></div></li>
       <li><div><b>Keamanan &amp; publikasi</b><p>Tinjau ringkasan, lalu atur kode akses opsional, acak urutan soal, acak opsi, layar penuh, dan pencatatan perpindahan tab.</p></div></li>
     </ol>
+    <p class="small"><strong>Saat mengedit:</strong> mengganti mata pelajaran akan mengosongkan pilihan soal. Kolom kode yang dibiarkan kosong mempertahankan kode lama; centang <em>Hapus kode akses yang tersimpan</em> untuk menghapusnya. Gunakan aksi hapus ujian hanya setelah memastikan data ujian memang tidak lagi diperlukan.</p>
 
     <h3>4.7 Memahami status ujian</h3>
     <table>
@@ -831,7 +856,7 @@
         <tr><td><span class="status draft">DRAFT</span></td><td>Ujian masih disiapkan.</td><td>Periksa soal, jadwal, kelas, dan keamanan.</td></tr>
         <tr><td><span class="status scheduled">TERJADWAL</span></td><td>Ujian siap dan menunggu waktu mulai.</td><td>Informasikan jadwal kepada siswa/pengawas.</td></tr>
         <tr><td><span class="status live">BERLANGSUNG</span></td><td>Waktu ujian sedang aktif.</td><td>Pantau peserta dan koneksi.</td></tr>
-        <tr><td><span class="status done">SELESAI</span></td><td>Waktu atau pengerjaan telah berakhir.</td><td>Koreksi essay dan finalkan hasil.</td></tr>
+        <tr><td><span class="status done">SELESAI</span></td><td>Waktu atau pengerjaan telah berakhir.</td><td>Koreksi seluruh essay; nilai final terbentuk otomatis setelah lengkap.</td></tr>
       </tbody>
     </table>
 
@@ -865,7 +890,7 @@
       <li><div><b>Pilih siswa</b><p>Daftar kiri menunjukkan status sudah/belum dinilai dan skor.</p></div></li>
       <li><div><b>Baca pertanyaan, kunci, dan jawaban</b><p>Buka <strong>Lihat kunci jawaban</strong> sebagai pedoman.</p></div></li>
       <li><div><b>Masukkan skor</b><p>Skor harus berada antara 0 dan bobot maksimum soal. Tambahkan komentar yang membantu siswa.</p></div></li>
-      <li><div><b>Simpan nilai</b><p>Lanjutkan sampai progress koreksi mencapai 100%.</p></div></li>
+      <li><div><b>Simpan nilai</b><p>Lanjutkan sampai progress koreksi mencapai 100%. Setelah jawaban essay terakhir dinilai, sistem otomatis membentuk nilai final percobaan siswa.</p></div></li>
     </ol>
 
     <h3>4.10 Hasil Ujian</h3>
@@ -879,17 +904,18 @@
 
     <h3>4.11 Rapor Semester</h3>
     <ul>
-      <li>Pilih periode, kelas, dan siswa.</li>
+      <li>Pilih periode, kelas, dan siswa; laporkan kepada Admin jika kelas belum ditautkan ke tahun ajaran.</li>
       <li>Periksa ujian yang masuk melalui <strong>Komponen nilai</strong> serta bobot relatifnya.</li>
-      <li>Guru wali kelas atau Admin dapat menulis catatan, prestasi, dan ketidakhadiran.</li>
-      <li>Gunakan tampilan <strong>Leger kelas</strong> untuk perbandingan seluruh siswa.</li>
-      <li>Lakukan publikasi hanya setelah data final.</li>
+      <li>Guru wali kelas atau Admin dapat menulis catatan, kegiatan ekstrakurikuler, serta data sakit, izin, dan alpa.</li>
+      <li>Jika berwenang, sesuaikan nilai akhir beserta deskripsi capaian; pilih <strong>Gunakan nilai otomatis</strong> untuk membatalkan penyesuaian.</li>
+      <li>Gunakan <strong>Leger kelas</strong> untuk membandingkan seluruh siswa dan mengekspor CSV.</li>
+      <li>Hanya Admin atau Guru wali kelas yang dapat memublikasikan rapor. Lakukan setelah seluruh data diperiksa.</li>
       <li>Tekan <strong>Cetak / PDF</strong> untuk menghasilkan dokumen rapor.</li>
     </ul>
 
     <div class="callout success">
       <span class="callout-icon">✓</span>
-      <div><b>Praktik penilaian yang baik</b><p>Gunakan pedoman konsisten, berikan komentar singkat dan objektif, lalu periksa sampel nilai sebelum memfinalkan satu kelas.</p></div>
+      <div><b>Praktik penilaian yang baik</b><p>Gunakan pedoman konsisten, berikan komentar singkat dan objektif, lalu periksa sampel nilai sebelum rapor satu kelas dipublikasikan.</p></div>
     </div>
     <footer class="doc-footer"><span>AWExam · Panduan Guru</span><span>Bab 4</span></footer>
   </section>
@@ -949,7 +975,7 @@
       <tbody>
         <tr><td>Ujian aktif</td><td>Ujian yang sudah dapat dimulai atau attempt yang masih berlangsung.</td></tr>
         <tr><td>Agenda berikutnya</td><td>Ujian yang belum masuk waktu mulai.</td></tr>
-        <tr><td>Riwayat</td><td>Ujian selesai, nilai yang sudah difinalisasi, rata-rata, dan predikat.</td></tr>
+        <tr><td>Riwayat</td><td>Ujian yang sudah dikumpulkan, nilai final yang tersedia, rata-rata, dan predikat.</td></tr>
         <tr><td>Profil</td><td>Nama, NIS, kelas, statistik, sinkronisasi, bantuan, dan tombol keluar.</td></tr>
         <tr><td>Tersinkron / Offline</td><td>Status hubungan aplikasi dengan server. Tarik halaman ke bawah atau pilih pembaruan jadwal bila data belum muncul.</td></tr>
       </tbody>
@@ -1012,7 +1038,7 @@
       <li><div><b>Pilih Kembali memeriksa bila perlu</b><p>Gunakan navigator untuk membuka nomor kosong atau bertanda.</p></div></li>
       <li><div><b>Tekan Kumpulkan ujian</b><p>Baca konfirmasi bahwa jawaban tidak dapat diubah setelah dikirim.</p></div></li>
       <li><div><b>Tekan Ya, kumpulkan</b><p>Tunggu sampai layar <strong>Ujian berhasil dikirim!</strong> muncul.</p></div></li>
-      <li><div><b>Tekan Kembali ke beranda</b><p>Aplikasi membuka tab Riwayat. Nilai tampil setelah guru menyelesaikan koreksi dan finalisasi.</p></div></li>
+      <li><div><b>Tekan Kembali ke beranda</b><p>Aplikasi membuka tab Riwayat. Untuk ujian dengan essay, nilai tampil setelah seluruh essay selesai dikoreksi dan sistem membentuk nilai final otomatis.</p></div></li>
     </ol>
 
     <div class="callout danger">
@@ -1129,14 +1155,14 @@
         <tr><td>Gagal membuat pengguna / Edge Function</td><td>Fungsi admin-users belum aktif, origin tidak diizinkan, atau sesi Admin kedaluwarsa.</td><td>Login ulang. Jika tetap gagal, minta pengelola teknis memeriksa deployment fungsi dan APP_ORIGIN.</td></tr>
         <tr><td>Ujian tidak muncul pada siswa</td><td>Status masih Draft, jadwal belum mulai, siswa salah kelas, akun nonaktif, atau penugasan belum tersedia.</td><td>Periksa status, waktu, kelas peserta, dan data siswa.</td></tr>
         <tr><td>Kode akses ditolak</td><td>Kode salah atau batas percobaan tercapai.</td><td>Ketik ulang sesuai kode pengawas. Guru memeriksa kode ujian bila tetap gagal.</td></tr>
-        <tr><td>Timer tidak terlihat</td><td>Ujian belum selesai dimuat atau data jadwal/durasi tidak valid.</td><td>Muat ulang sekali, tunggu soal tampil, lalu laporkan bila timer tetap hilang.</td></tr>
-        <tr><td>Jawaban “belum tersinkron”</td><td>Koneksi internet terputus atau server tidak dapat dijangkau.</td><td>Jangan tutup tab. Pulihkan koneksi dan tunggu “Semua jawaban tersimpan”.</td></tr>
+        <tr><td>Timer tidak terlihat</td><td>Ruang ujian belum selesai dimuat atau data jadwal/durasi tidak valid.</td><td>Jangan mulai menjawab. Muat ulang layar sekali, tunggu soal dan timer tampil, lalu laporkan jika tetap hilang.</td></tr>
+        <tr><td>Jawaban belum tersinkron</td><td>Koneksi internet terputus atau server tidak dapat dijangkau.</td><td>Jangan keluar dari ujian. Pulihkan koneksi; di aplikasi tunggu status <strong>Tersinkron</strong> dan di web tunggu <strong>Semua jawaban tersimpan</strong>.</td></tr>
         <tr><td>Halaman putih setelah klik</td><td>Asset deployment lama tersimpan di browser atau terjadi error render.</td><td>Muat ulang, gunakan hard refresh <span class="kbd">Ctrl/Cmd + Shift + R</span>, lalu buka ulang. Laporkan halaman dan waktu kejadian.</td></tr>
         <tr><td>Pesan MIME <code>text/html</code></td><td>Browser meminta file JavaScript lama tetapi hosting mengirim halaman HTML.</td><td>Hard refresh dan bersihkan cache situs. Pengelola melakukan deployment ulang bila banyak pengguna mengalami.</td></tr>
         <tr><td>PDF tidak terbaca</td><td>PDF berupa scan, format tidak konsisten, atau berkas terlalu besar.</td><td>Pakai Foto/OCR, format SOAL 1, atau unggah DOCX. Pastikan maksimal 10 MB.</td></tr>
         <tr><td>Soal tidak dapat diedit</td><td>Soal sudah dipakai pada ujian terjadwal/dikerjakan.</td><td>Salin soal ke bank lain lalu edit salinannya untuk ujian berikutnya.</td></tr>
         <tr><td>Hasil belum final</td><td>Masih ada jawaban essay yang belum dikoreksi.</td><td>Buka Koreksi Essay dan selesaikan seluruh penilaian.</td></tr>
-        <tr><td>Rapor kosong</td><td>Belum ada nilai final, komponen belum disertakan, periode/kelas salah.</td><td>Periksa filter, finalisasi ujian, dan atur Komponen nilai.</td></tr>
+        <tr><td>Rapor kosong</td><td>Belum ada nilai final, komponen belum disertakan, periode/kelas salah, atau kelas belum terkait tahun ajaran.</td><td>Periksa filter dan relasi kelas, selesaikan seluruh koreksi essay, lalu atur Komponen nilai.</td></tr>
       </tbody>
     </table>
 

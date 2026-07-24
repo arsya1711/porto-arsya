@@ -25,6 +25,7 @@ type Settings = {
   record_tab_switches: boolean;
   session_timeout_minutes: number;
   passing_score: number;
+  school_timezone: string;
 };
 type Preferences = {
   exam_updates: boolean;
@@ -43,6 +44,7 @@ const EMPTY_SETTINGS: Settings = {
   record_tab_switches: true,
   session_timeout_minutes: 120,
   passing_score: 75,
+  school_timezone: "Asia/Jakarta",
 };
 const DEFAULT_PREFERENCES: Preferences = {
   exam_updates: true,
@@ -64,7 +66,7 @@ export function RealSettingsPage({ profile, notify }: { profile: Profile; notify
     if (!supabase) { setLoading(false); return; }
     setLoading(true);
     const [settingsResult, preferenceResult, yearResult] = await Promise.all([
-      supabase.from("school_profile_settings").select("school_name,npsn,address,logo_url,require_fullscreen_default,record_tab_switches,session_timeout_minutes,passing_score").eq("id", 1).maybeSingle(),
+      supabase.from("school_profile_settings").select("school_name,npsn,address,logo_url,require_fullscreen_default,record_tab_switches,session_timeout_minutes,passing_score,school_timezone").eq("id", 1).maybeSingle(),
       supabase.from("user_notification_preferences").select("exam_updates,grading_reminders,security_alerts,email_notifications").eq("user_id", profile.id).maybeSingle(),
       supabase.from("academic_years").select("name").eq("active", true).maybeSingle(),
     ]);
@@ -77,6 +79,7 @@ export function RealSettingsPage({ profile, notify }: { profile: Profile; notify
       record_tab_switches: settingsResult.data.record_tab_switches ?? true,
       session_timeout_minutes: settingsResult.data.session_timeout_minutes ?? 120,
       passing_score: Number(settingsResult.data.passing_score ?? 75),
+      school_timezone: settingsResult.data.school_timezone ?? "Asia/Jakarta",
     });
     if (preferenceResult.data) setPreferences(preferenceResult.data as Preferences);
     if (yearResult.data) setActiveYear(yearResult.data.name);
@@ -100,6 +103,7 @@ export function RealSettingsPage({ profile, notify }: { profile: Profile; notify
       record_tab_switches: nextSettings.record_tab_switches,
       session_timeout_minutes: nextSettings.session_timeout_minutes,
       passing_score: nextSettings.passing_score,
+      school_timezone: nextSettings.school_timezone,
       updated_by: profile.id,
     });
     setSaving(false);
@@ -190,6 +194,7 @@ export function RealSettingsPage({ profile, notify }: { profile: Profile; notify
               <h2>Tahun ajaran</h2><p>Periode aktif digunakan ketika Admin membuat kelas baru.</p>
               <div className="academic-setting-card"><span><CalendarDays /></span><div><small>TAHUN AJARAN AKTIF</small><b>{activeYear}</b></div><Link to="/app/tahun-ajaran">Kelola tahun ajaran</Link></div>
               <label className="form-field"><span>KKM / nilai ketuntasan</span><input type="number" min={0} max={100} step={1} value={settings.passing_score} onChange={(event) => setSettings({ ...settings, passing_score: Number(event.target.value) })} /></label>
+              <label className="form-field"><span>Zona waktu jadwal sekolah</span><select value={settings.school_timezone} onChange={(event) => setSettings({ ...settings, school_timezone: event.target.value })}><option value="Asia/Jakarta">WIB · Asia/Jakarta</option><option value="Asia/Makassar">WITA · Asia/Makassar</option><option value="Asia/Jayapura">WIT · Asia/Jayapura</option></select></label>
               <div className="settings-save"><button type="button" className="primary" disabled={saving || settings.passing_score < 0 || settings.passing_score > 100} onClick={() => void saveSchoolSettings()}><Save />{saving ? "Menyimpan…" : "Simpan pengaturan akademik"}</button></div>
             </section>}
             {tab === "notifications" && <section className="card settings-form">

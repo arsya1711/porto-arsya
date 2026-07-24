@@ -120,6 +120,15 @@ export function AcademicYearsPage({ notify }: { notify: Notify }) {
     event.preventDefault();
     const value = name.trim();
     if (!supabase || !value) return;
+    if (!/^\d{4}\/\d{4}$/.test(value)) {
+      notify("Gunakan format tahun ajaran YYYY/YYYY, misalnya 2026/2027.", true);
+      return;
+    }
+    const [startYear, endYear] = value.split("/").map(Number);
+    if (endYear !== startYear + 1) {
+      notify("Tahun kedua harus tepat satu tahun setelah tahun pertama.", true);
+      return;
+    }
     setSaving(true);
     const { error } = editingYear
       ? await supabase.from("academic_years").update({ name: value }).eq("id", editingYear.id)
@@ -184,6 +193,8 @@ export function AcademicYearsPage({ notify }: { notify: Notify }) {
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="2027/2028"
+              pattern="[0-9]{4}/[0-9]{4}"
+              title="Gunakan format YYYY/YYYY, misalnya 2027/2028"
               required
             />
           </label>

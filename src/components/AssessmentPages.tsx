@@ -16,6 +16,12 @@ import {
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import type { ExamStatus } from "../types";
+import { deriveExamStatus } from "../lib/exam-status";
+import {
+  isoToSchoolDateTimeInput,
+  schoolDateTimeToIso,
+} from "../lib/school-timezone";
+import { fetchAllPages } from "../lib/supabase-pagination";
 
 type Notify = (text: string, error?: boolean) => void;
 
@@ -122,18 +128,22 @@ function nestedRecord(value: unknown): Record<string, unknown> {
   return (value ?? {}) as Record<string, unknown>;
 }
 
-function formatDate(value: string | null) {
+function formatDate(value: string | null, timeZone?: string) {
   if (!value) return "—";
   return new Intl.DateTimeFormat("id-ID", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone,
   }).format(new Date(value));
 }
 
-function toLocalInput(value?: string | null) {
-  const date = value ? new Date(value) : new Date(Date.now() + 60 * 60 * 1000);
-  const offset = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+function currentExamStatus(exam: ExamRow) {
+  return deriveExamStatus(
+    exam.status,
+    exam.starts_at,
+    exam.ends_at,
+    exam.duration_minutes,
+  );
 }
 
 function initials(name: string) {
@@ -213,9 +223,12 @@ export function RealExamManagement({
   const [examStep, setExamStep] = useState<0 | 1 | 2>(0);
   const [saving, setSaving] = useState(false);
   const [securityDefaults, setSecurityDefaults] = useState({ fullscreen: true, recordTabs: true });
+  const [schoolTimezone, setSchoolTimezone] = useState("Asia/Jakarta");
+  const [page, setPage] = useState(1);
 
   const load = useCallback(async () => {
-    if (!supabase) {
+    const client = supabase;
+    if (!client) {
       setError("Supabase belum dikonfigurasi. Isi VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY.");
       setLoading(false);
       return;
@@ -223,18 +236,24 @@ export function RealExamManagement({
     setLoading(true);
     setError("");
     const [examResult, subjectResult, classResult, questionResult, settingsResult] = await Promise.all([
-      supabase
-        .from("exams")
-        .select("id,title,description,subject_id,class_id,starts_at,ends_at,duration_minutes,status,has_access_code,shuffle_questions,shuffle_options,fullscreen_mode,record_tab_switches,subjects(name),classes(name),exam_questions(count),exam_assignments(count)")
-        .order("starts_at", { ascending: false }),
-      supabase.from("subjects").select("id,name").order("name"),
-      supabase.from("classes").select("id,name").order("name"),
-      supabase
-        .from("questions")
-        .select("id,body,type,question_banks(name,subject_id)")
-        .eq("archived", false)
-        .order("created_at", { ascending: false }),
-      supabase.from("school_profile_settings").select("require_fullscreen_default,record_tab_switches").eq("id", 1).maybeSingle(),
+      fetchAllPages((from, to) =>
+        client
+          .from("exams")
+          .select("id,title,description,subject_id,class_id,starts_at,ends_at,duration_minutes,status,has_access_code,shuffle_questions,shuffle_options,fullscreen_mode,record_tab_switches,subjects(name),classes(name),exam_questions(count),exam_assignments(count)")
+          .order("starts_at", { ascending: false })
+          .range(from, to),
+      ),
+      client.from("subjects").select("id,name").order("name"),
+      client.from("classes").select("id,name").order("name"),
+      fetchAllPages((from, to) =>
+        client
+          .from("questions")
+          .select("id,body,type,question_banks(name,subject_id)")
+          .eq("archived", false)
+          .order("created_at", { ascending: false })
+          .range(from, to),
+      ),
+      client.from("school_profile_settings").select("require_fullscreen_default,record_tab_switches,school_timezone").eq("id", 1).maybeSingle(),
     ]);
     const requestError = examResult.error ?? subjectResult.error ?? classResult.error ?? questionResult.error;
     if (requestError) {
@@ -256,7 +275,10 @@ export function RealExamManagement({
           };
         }),
       );
-      if (settingsResult.data) setSecurityDefaults({ fullscreen: settingsResult.data.require_fullscreen_default ?? true, recordTabs: settingsResult.data.record_tab_switches ?? true });
+      if (settingsResult.data) {
+        setSecurityDefaults({ fullscreen: settingsResult.data.require_fullscreen_default ?? true, recordTabs: settingsResult.data.record_tab_switches ?? true });
+        setSchoolTimezone(settingsResult.data.school_timezone ?? "Asia/Jakarta");
+      }
     }
     setLoading(false);
   }, []);
@@ -269,12 +291,26 @@ export function RealExamManagement({
     const term = search.trim().toLowerCase();
     if (!term) return exams;
     return exams.filter((exam) =>
-      [exam.title, relationName(exam.subjects), relationName(exam.classes), exam.status]
+      [
+        exam.title,
+        relationName(exam.subjects),
+        relationName(exam.classes),
+        currentExamStatus(exam),
+      ]
         .join(" ")
         .toLowerCase()
         .includes(term),
     );
   }, [exams, search]);
+  const pageSize = 25;
+  const pageCount = Math.max(1, Math.ceil(visibleExams.length / pageSize));
+  const safePage = Math.min(page, pageCount);
+  const pagedExams = visibleExams.slice(
+    (safePage - 1) * pageSize,
+    safePage * pageSize,
+  );
+
+  useEffect(() => setPage(1), [search]);
 
   const openCreate = () => {
     setExamStep(0);
@@ -283,7 +319,7 @@ export function RealExamManagement({
       description: "",
       subjectId: subjects[0]?.id ?? "",
       classId: classes[0]?.id ?? "",
-      startsAt: toLocalInput(),
+      startsAt: isoToSchoolDateTimeInput(null, schoolTimezone),
       duration: 90,
       accessCode: "",
       hadAccessCode: false,
@@ -315,7 +351,7 @@ export function RealExamManagement({
       description: exam.description ?? "",
       subjectId: exam.subject_id ?? "",
       classId: exam.class_id ?? "",
-      startsAt: toLocalInput(exam.starts_at),
+      startsAt: isoToSchoolDateTimeInput(exam.starts_at, schoolTimezone),
       duration: exam.duration_minutes,
       accessCode: "",
       hadAccessCode: exam.has_access_code,
@@ -340,14 +376,19 @@ export function RealExamManagement({
       return;
     }
     setSaving(true);
-    const startsAt = new Date(draft.startsAt);
+    const startsAt = schoolDateTimeToIso(draft.startsAt, schoolTimezone);
+    if (!startsAt) {
+      setSaving(false);
+      notify("Tanggal dan waktu mulai tidak valid.", true);
+      return;
+    }
     const { error: saveError } = await supabase.rpc("save_managed_exam", {
       target_exam_id: draft.id ?? null,
       exam_title: draft.title.trim(),
       exam_description: draft.description.trim() || null,
       target_subject_id: draft.subjectId,
       target_class_id: draft.classId,
-      start_time: startsAt.toISOString(),
+      start_time: startsAt,
       duration_in_minutes: draft.duration,
       target_status: draft.status,
       question_ids: draft.questionIds,
@@ -403,7 +444,7 @@ export function RealExamManagement({
         notify("Lengkapi judul, mata pelajaran, dan kelas peserta.", true);
         return;
       }
-      if (!draft.startsAt || Number.isNaN(new Date(draft.startsAt).getTime()) || draft.duration < 1) {
+      if (!draft.startsAt || !schoolDateTimeToIso(draft.startsAt, schoolTimezone) || draft.duration < 1) {
         notify("Periksa kembali jadwal mulai dan durasi ujian.", true);
         return;
       }
@@ -457,24 +498,43 @@ export function RealExamManagement({
           <table>
             <thead><tr><th>UJIAN</th><th>KELAS</th><th>JADWAL</th><th>PESERTA</th><th>STATUS</th><th>AKSI</th></tr></thead>
             <tbody>
-              {visibleExams.map((exam) => (
+              {pagedExams.map((exam) => (
                 <tr key={exam.id}>
                   <td data-label="Ujian"><div className="exam-cell"><span>{relationName(exam.subjects, "UJ").slice(0, 2).toUpperCase()}</span><p><b>{exam.title}</b><small>{relationName(exam.subjects)} · {relationCount(exam.exam_questions)} soal</small></p></div></td>
                   <td data-label="Kelas">{relationName(exam.classes)}</td>
-                  <td data-label="Jadwal"><b className="table-main">{formatDate(exam.starts_at)}</b><small>{exam.duration_minutes} menit</small></td>
+                  <td data-label="Jadwal"><b className="table-main">{formatDate(exam.starts_at, schoolTimezone)}</b><small>{exam.duration_minutes} menit · {schoolTimezone}</small></td>
                   <td data-label="Peserta"><div className="participant"><Users /> <span>{relationCount(exam.exam_assignments)} siswa</span></div></td>
-                  <td data-label="Status"><span className={`status ${exam.status}`}><i />{exam.status[0].toUpperCase() + exam.status.slice(1)}</span></td>
+                  <td data-label="Status">
+                    {(() => {
+                      const status = currentExamStatus(exam);
+                      return (
+                        <span className={`status ${status}`}>
+                          <i />
+                          {status[0].toUpperCase() + status.slice(1)}
+                        </span>
+                      );
+                    })()}
+                  </td>
                   <td data-label="Aksi"><div className="row-actions"><button type="button" title="Edit ujian" onClick={() => void openEdit(exam)}><Pencil /></button><button type="button" className="danger" title="Hapus ujian" onClick={() => void removeExam(exam)}><Trash2 /></button></div></td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <div className="table-footer"><span>Menampilkan {visibleExams.length} ujian dari Supabase</span></div>
+          <div className="table-footer"><span>Menampilkan {pagedExams.length} dari {visibleExams.length} ujian</span></div>
+          {visibleExams.length > pageSize && (
+            <nav className="pagination-controls" aria-label="Halaman daftar ujian">
+              <span>Halaman {safePage} dari {pageCount}</span>
+              <div>
+                <button type="button" disabled={safePage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Sebelumnya</button>
+                <button type="button" disabled={safePage === pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>Berikutnya</button>
+              </div>
+            </nav>
+          )}
         </div>
       )}
       {draft && (
-        <div className="modal-overlay" onMouseDown={closeExamModal}>
-          <div className="modal wide" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal wide" role="dialog" aria-modal="true">
             <div className="simple-modal real-exam-modal">
               <header>
                 <div>
@@ -500,7 +560,7 @@ export function RealExamManagement({
                     <div className="form-grid">
                       <label className="form-field"><span>Mata pelajaran</span><select value={draft.subjectId} onChange={(event) => setDraft({ ...draft, subjectId: event.target.value, questionIds: [] })}>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
                       <label className="form-field"><span>Kelas peserta</span><select value={draft.classId} onChange={(event) => setDraft({ ...draft, classId: event.target.value })}>{classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-                      <label className="form-field"><span>Mulai</span><input type="datetime-local" value={draft.startsAt} onChange={(event) => setDraft({ ...draft, startsAt: event.target.value })} /></label>
+                      <label className="form-field"><span>Mulai <small>(zona waktu sekolah: {schoolTimezone})</small></span><input type="datetime-local" value={draft.startsAt} onChange={(event) => setDraft({ ...draft, startsAt: event.target.value })} /></label>
                       <label className="form-field"><span>Durasi (menit)</span><input type="number" min={1} value={draft.duration} onChange={(event) => setDraft({ ...draft, duration: Math.max(1, Number(event.target.value)) })} /></label>
                       <label className="form-field"><span>Status awal</span><select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as ExamDraft["status"] })}><option value="draft">Simpan sebagai draft</option><option value="terjadwal">Jadwalkan untuk peserta</option></select></label>
                     </div>

@@ -1,0 +1,405 @@
+.student-report-page {
+  min-height: 100vh;
+  background: #f5f7fb;
+  color: #17233c;
+}
+
+.student-report-topbar {
+  min-height: 66px;
+  padding: 0 clamp(20px, 6vw, 90px);
+  border-bottom: 1px solid #e3e7ef;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.student-report-topbar > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.student-report-topbar > div > a,
+.student-report-topbar > div > button {
+  min-height: 40px;
+  padding: 0 13px;
+  border: 1px solid #dbe1ea;
+  border-radius: 9px;
+  background: #fff;
+  color: #46536a;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font: 700 12px inherit;
+}
+
+.student-report-topbar svg {
+  width: 16px;
+}
+
+.student-report-page > main {
+  width: min(1080px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 38px 0 70px;
+}
+
+.student-report-heading {
+  margin-bottom: 22px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.student-report-heading p {
+  margin: 0 0 8px;
+  color: #315ce8;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.student-report-heading h1 {
+  margin: 0 0 6px;
+  font: 800 30px "Manrope", sans-serif;
+  letter-spacing: -0.8px;
+}
+
+.student-report-heading span {
+  color: #768299;
+  font-size: 14px;
+}
+
+.student-report-heading > div:last-child {
+  width: min(320px, 100%);
+}
+
+.student-report-heading label {
+  display: block;
+  margin-bottom: 6px;
+  color: #566278;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.student-report-heading select {
+  width: 100%;
+  min-height: 43px;
+  border: 1px solid #d9dfe9;
+  border-radius: 9px;
+  background: #fff;
+  padding: 0 12px;
+}
+
+.student-report-state {
+  min-height: 300px;
+  border: 1px solid #e0e5ed;
+  border-radius: 16px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 30px;
+}
+
+.student-report-state > svg {
+  width: 38px;
+  height: 38px;
+  color: #315ce8;
+}
+
+.student-report-state h2 {
+  margin: 15px 0 6px;
+  font: 800 20px "Manrope", sans-serif;
+}
+
+.student-report-state p {
+  margin: 0;
+  color: #7c8799;
+}
+
+.student-report-state button {
+  margin-top: 16px;
+  border: 0;
+  border-radius: 8px;
+  background: #315ce8;
+  color: #fff;
+  padding: 10px 16px;
+  font-weight: 700;
+}
+
+.student-report-sheet {
+  overflow: hidden;
+  border: 1px solid #dfe4ec;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 12px 35px rgba(23, 35, 60, 0.06);
+}
+
+.student-report-sheet > header {
+  padding: 25px 28px;
+  border-bottom: 1px solid #e5e9ef;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.student-report-sheet > header > img,
+.student-report-sheet > header > span {
+  width: 54px;
+  height: 54px;
+  border-radius: 12px;
+  object-fit: contain;
+  background: #eef2ff;
+  color: #315ce8;
+  display: grid;
+  place-items: center;
+}
+
+.student-report-sheet > header svg {
+  width: 25px;
+}
+
+.student-report-sheet > header > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.student-report-sheet > header small {
+  color: #315ce8;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.student-report-sheet > header h2 {
+  margin: 4px 0;
+  font: 800 19px "Manrope", sans-serif;
+}
+
+.student-report-sheet > header p {
+  margin: 0;
+  color: #7a8496;
+  font-size: 12px;
+}
+
+.student-report-sheet > header button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid #d7deea;
+  border-radius: 9px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #344055;
+  font-weight: 700;
+}
+
+.student-report-identity {
+  margin: 0;
+  padding: 20px 28px;
+  border-bottom: 1px solid #e9ecf1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.student-report-identity dt {
+  margin-bottom: 4px;
+  color: #8993a4;
+  font-size: 11px;
+}
+
+.student-report-identity dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.student-report-table-wrap {
+  overflow-x: auto;
+}
+
+.student-report-table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.student-report-table-wrap th,
+.student-report-table-wrap td {
+  padding: 13px 15px;
+  border-bottom: 1px solid #edf0f4;
+  text-align: left;
+  font-size: 12px;
+  vertical-align: top;
+}
+
+.student-report-table-wrap th {
+  background: #f7f8fb;
+  color: #687489;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.student-report-table-wrap td small {
+  margin-top: 3px;
+  color: #8d97a8;
+  display: block;
+}
+
+.student-report-table-wrap td > span {
+  min-width: 27px;
+  height: 27px;
+  border-radius: 7px;
+  background: #edf1ff;
+  color: #315ce8;
+  display: inline-grid;
+  place-items: center;
+  font-weight: 800;
+}
+
+.student-report-table-wrap tfoot td {
+  background: #fafbfc;
+  font-weight: 800;
+}
+
+.student-report-notes {
+  padding: 22px 28px 28px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.student-report-notes section {
+  min-height: 100px;
+  padding: 16px;
+  border: 1px solid #e3e7ee;
+  border-radius: 11px;
+}
+
+.student-report-notes section:last-child {
+  grid-column: 1 / -1;
+}
+
+.student-report-notes h3 {
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+
+.student-report-notes p {
+  margin: 0;
+  color: #6f7a8d;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.student-report-notes dl {
+  margin: 0;
+  display: flex;
+  gap: 25px;
+}
+
+.student-report-notes dl div {
+  display: flex;
+  gap: 6px;
+}
+
+.student-report-notes dt {
+  color: #7d8798;
+}
+
+.student-report-notes dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.runner-stats > span.sync-error {
+  color: #fda4af;
+}
+
+@media (max-width: 700px) {
+  .student-report-topbar {
+    padding: 0 14px;
+  }
+
+  .student-report-topbar > div > a {
+    font-size: 0;
+  }
+
+  .student-report-page > main {
+    width: calc(100% - 28px);
+    padding-top: 26px;
+  }
+
+  .student-report-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .student-report-heading h1 {
+    font-size: 25px;
+  }
+
+  .student-report-heading > div:last-child {
+    width: 100%;
+  }
+
+  .student-report-sheet > header {
+    padding: 18px;
+    flex-wrap: wrap;
+  }
+
+  .student-report-sheet > header button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .student-report-identity {
+    padding: 18px;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .student-report-table-wrap table {
+    min-width: 720px;
+  }
+
+  .student-report-notes {
+    padding: 18px;
+    grid-template-columns: 1fr;
+  }
+
+  .student-report-notes section:last-child {
+    grid-column: auto;
+  }
+
+  .student-report-notes dl {
+    flex-direction: column;
+    gap: 6px;
+  }
+}
+
+@media print {
+  .student-report-topbar,
+  .student-report-heading,
+  .student-report-sheet > header button {
+    display: none !important;
+  }
+
+  .student-report-page,
+  .student-report-page > main {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: #fff;
+  }
+
+  .student-report-sheet {
+    border: 0;
+    box-shadow: none;
+  }
+}

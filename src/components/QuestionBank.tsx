@@ -23,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "../auth/auth-context";
+import { fetchAllPages } from "../lib/supabase-pagination";
 import { supabase } from "../lib/supabase";
 import type { ParsedPdfQuestion } from "../lib/pdf-question-parser";
 import { findSimilarQuestion, normalizeQuestion } from "../lib/question-similarity";
@@ -120,9 +121,11 @@ export function QuestionBank({ notify }: { notify: Notify }) {
   const [keyFilter, setKeyFilter] = useState<"all" | "missing" | "ready">(
     "all",
   );
+  const [page, setPage] = useState(1);
 
   const loadData = useCallback(async () => {
-    if (!supabase) {
+    const client = supabase;
+    if (!client) {
       setLoading(false);
       notify("Server belum dikonfigurasi. Bank soal tidak dapat digunakan.", true);
       return;
@@ -130,18 +133,21 @@ export function QuestionBank({ notify }: { notify: Notify }) {
 
     setLoading(true);
     const [subjectResult, bankResult, questionResult] = await Promise.all([
-      supabase.from("subjects").select("id,name").order("name"),
-      supabase
+      client.from("subjects").select("id,name").order("name"),
+      client
         .from("question_banks")
         .select("id,name,subject_id,grade_level,subjects(name)")
         .order("name"),
-      supabase
-        .from("questions")
-        .select(
-          "id,bank_id,body,type,options,correct_option,answer_key,difficulty,weight,usage_count,created_at,question_banks(name,subjects(name))",
-        )
-        .eq("archived", false)
-        .order("created_at", { ascending: false }),
+      fetchAllPages((from, to) =>
+        client
+          .from("questions")
+          .select(
+            "id,bank_id,body,type,options,correct_option,answer_key,difficulty,weight,usage_count,created_at,question_banks(name,subjects(name))",
+          )
+          .eq("archived", false)
+          .order("created_at", { ascending: false })
+          .range(from, to),
+      ),
     ]);
 
     const loadError =
@@ -532,6 +538,17 @@ export function QuestionBank({ notify }: { notify: Notify }) {
     (question) => question.type === "Essay" && needsAnswerKey(question),
   ).length;
   const missingKeys = missingChoiceKeys + missingEssayGuides;
+  const pageSize = 30;
+  const pageCount = Math.max(1, Math.ceil(visibleQuestions.length / pageSize));
+  const safePage = Math.min(page, pageCount);
+  const pagedQuestions = visibleQuestions.slice(
+    (safePage - 1) * pageSize,
+    safePage * pageSize,
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [difficultyFilter, keyFilter, search, selectedBank, typeFilter]);
 
   return (
     <div className="portal-page">
@@ -725,10 +742,10 @@ export function QuestionBank({ notify }: { notify: Notify }) {
                   <input
                     type="checkbox"
                     aria-label="Pilih semua soal yang tampil"
-                    checked={visibleQuestions.length > 0 && visibleQuestions.every((question) => selectedQuestionIds.has(question.id))}
+                    checked={pagedQuestions.length > 0 && pagedQuestions.every((question) => selectedQuestionIds.has(question.id))}
                     onChange={(event) => setSelectedQuestionIds((current) => {
                       const next = new Set(current);
-                      for (const question of visibleQuestions) {
+                      for (const question of pagedQuestions) {
                         if (event.target.checked) next.add(question.id);
                         else next.delete(question.id);
                       }
@@ -747,8 +764,8 @@ export function QuestionBank({ notify }: { notify: Notify }) {
             <tbody>
               {loading ? (
                 <EmptyRow text="Memuat bank soal…" />
-              ) : visibleQuestions.length ? (
-                visibleQuestions.map((question) => {
+              ) : pagedQuestions.length ? (
+                pagedQuestions.map((question) => {
                   const missingKey = needsAnswerKey(question);
                   return (
                   <tr
@@ -858,8 +875,19 @@ export function QuestionBank({ notify }: { notify: Notify }) {
           </table>
           {!loading && (
             <div className="table-footer">
-              <span>Menampilkan {visibleQuestions.length} soal</span>
+              <span>
+                Menampilkan {pagedQuestions.length} dari {visibleQuestions.length} soal
+              </span>
             </div>
+          )}
+          {visibleQuestions.length > pageSize && (
+            <nav className="pagination-controls question-pagination" aria-label="Halaman bank soal">
+              <span>Halaman {safePage} dari {pageCount}</span>
+              <div>
+                <button type="button" disabled={safePage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Sebelumnya</button>
+                <button type="button" disabled={safePage === pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>Berikutnya</button>
+              </div>
+            </nav>
           )}
         </div>
       </div>
@@ -1348,11 +1376,20 @@ function Modal({
   close: () => void;
   wide?: boolean;
 }) {
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [close]);
+
   return (
-    <div className="modal-overlay" onMouseDown={close}>
+    <div className="modal-overlay">
       <div
         className={`modal ${wide ? "wide" : ""}`}
-        onMouseDown={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
       >
         {children}
       </div>

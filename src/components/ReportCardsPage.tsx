@@ -85,6 +85,7 @@ type ExamComponent = {
   startsAt: string;
   included: boolean;
   weight: number;
+  manageable: boolean;
 };
 
 type School = {
@@ -145,6 +146,9 @@ export function ReportCardsPage({
   const [published, setPublished] = useState(false);
   const [gradeEditor, setGradeEditor] = useState<ReportRow | null>(null);
   const [showComponents, setShowComponents] = useState(false);
+  const [manageableSubjectIds, setManageableSubjectIds] = useState<Set<string>>(
+    new Set(),
+  );
 
   const loadOptions = useCallback(async () => {
     if (!supabase) {
@@ -153,7 +157,7 @@ export function ReportCardsPage({
       return;
     }
     setLoading(true);
-    const [periodResult, classResult, schoolResult] = await Promise.all([
+    const [periodResult, classResult, schoolResult, assignmentResult, ownedExamResult] = await Promise.all([
       supabase
         .from("report_periods")
         .select(
@@ -171,9 +175,26 @@ export function ReportCardsPage({
         .select("school_name,npsn,address,logo_url")
         .eq("id", 1)
         .maybeSingle(),
+      profile.role === "guru"
+        ? supabase
+            .from("teacher_subjects")
+            .select("class_id")
+            .eq("teacher_id", profile.id)
+        : Promise.resolve({ data: [], error: null }),
+      profile.role === "guru"
+        ? supabase
+            .from("exams")
+            .select("class_id")
+            .eq("created_by", profile.id)
+            .not("class_id", "is", null)
+        : Promise.resolve({ data: [], error: null }),
     ]);
     const loadError =
-      periodResult.error ?? classResult.error ?? schoolResult.error;
+      periodResult.error ??
+      classResult.error ??
+      schoolResult.error ??
+      assignmentResult.error ??
+      ownedExamResult.error;
     if (loadError) {
       setError(loadError.message);
       setLoading(false);
@@ -193,16 +214,25 @@ export function ReportCardsPage({
         activeYear: Boolean(year.active),
       };
     });
-    const normalizedClasses: ClassOption[] = (classResult.data ?? []).map(
-      (item) => ({
+    const allowedClassIds = new Set([
+      ...(assignmentResult.data ?? []).map((item) => item.class_id),
+      ...(ownedExamResult.data ?? []).map((item) => item.class_id),
+      ...(classResult.data ?? [])
+        .filter((item) => item.homeroom_teacher_id === profile.id)
+        .map((item) => item.id),
+    ]);
+    const normalizedClasses: ClassOption[] = (classResult.data ?? [])
+      .filter(
+        (item) => profile.role === "admin" || allowedClassIds.has(item.id),
+      )
+      .map((item) => ({
         id: item.id,
         name: item.name,
         academic_year_id: item.academic_year_id,
         academicYear: String(record(item.academic_years).name ?? "Belum diatur"),
         homeroom_teacher_id: item.homeroom_teacher_id,
         studentCount: countRelation(item.class_students),
-      }),
-    );
+      }));
     setPeriods(normalizedPeriods);
     setClasses(normalizedClasses);
     const today = localDateKey();
@@ -234,7 +264,7 @@ export function ReportCardsPage({
     }
     setError("");
     setLoading(false);
-  }, []);
+  }, [profile.id, profile.role]);
 
   useEffect(() => {
     void loadOptions();
@@ -244,7 +274,7 @@ export function ReportCardsPage({
     if (!supabase || !selectedPeriod || !selectedClass) return;
     setLoadingReport(true);
     const period = periods.find((item) => item.id === selectedPeriod);
-    const [studentResult, reportResult, noteResult, publicationResult, examResult, weightResult] =
+    const [studentResult, reportResult, noteResult, publicationResult, examResult, weightResult, assignmentResult] =
       await Promise.all([
         supabase
           .from("class_students")
@@ -270,7 +300,7 @@ export function ReportCardsPage({
         period
           ? supabase
               .from("exams")
-              .select("id,title,starts_at,subjects(name)")
+              .select("id,title,starts_at,subject_id,created_by,subjects(name)")
               .eq("class_id", selectedClass)
               .gte("starts_at", `${period.starts_on}T00:00:00`)
               .lte("starts_at", `${period.ends_on}T23:59:59`)
@@ -280,6 +310,13 @@ export function ReportCardsPage({
           .from("report_exam_weights")
           .select("exam_id,weight,included")
           .eq("period_id", selectedPeriod),
+        profile.role === "guru"
+          ? supabase
+              .from("teacher_subjects")
+              .select("subject_id")
+              .eq("class_id", selectedClass)
+              .eq("teacher_id", profile.id)
+          : Promise.resolve({ data: [], error: null }),
       ]);
 
     const loadError =
@@ -288,7 +325,8 @@ export function ReportCardsPage({
       noteResult.error ??
       publicationResult.error ??
       examResult.error ??
-      weightResult.error;
+      weightResult.error ??
+      assignmentResult.error;
     if (loadError) {
       setError(loadError.message);
       setLoadingReport(false);
@@ -308,6 +346,20 @@ export function ReportCardsPage({
     const weights = new Map(
       (weightResult.data ?? []).map((item) => [item.exam_id, item]),
     );
+    const nextManageableSubjects = new Set<string>(
+      profile.role === "admin"
+        ? (reportResult.data ?? []).map((item: Record<string, unknown>) =>
+            String(item.subject_id),
+          )
+        : [
+            ...(assignmentResult.data ?? []).map((item) => item.subject_id),
+            ...(examResult.data ?? [])
+              .filter((item) => item.created_by === profile.id)
+              .map((item) => item.subject_id)
+              .filter((value): value is string => Boolean(value)),
+          ],
+    );
+    setManageableSubjectIds(nextManageableSubjects);
     setStudents(normalizedStudents);
     setRows(
       (reportResult.data ?? []).map((item: Record<string, unknown>) => ({
@@ -330,6 +382,8 @@ export function ReportCardsPage({
           startsAt: item.starts_at,
           included: weight?.included ?? true,
           weight: Number(weight?.weight ?? 1),
+          manageable:
+            profile.role === "admin" || item.created_by === profile.id,
         };
       }),
     );
@@ -340,7 +394,7 @@ export function ReportCardsPage({
     );
     setError("");
     setLoadingReport(false);
-  }, [periods, selectedClass, selectedPeriod]);
+  }, [periods, profile.id, profile.role, selectedClass, selectedPeriod]);
 
   useEffect(() => {
     void loadReport();
@@ -373,7 +427,7 @@ export function ReportCardsPage({
     const { error: saveError } = await supabase
       .from("report_exam_weights")
       .upsert(
-        components.map((component) => ({
+        components.filter((component) => component.manageable).map((component) => ({
           period_id: selectedPeriod,
           exam_id: component.id,
           weight: component.weight,
@@ -557,9 +611,11 @@ export function ReportCardsPage({
           </button>
         </div>
         <div>
-          <button onClick={() => setShowComponents(true)}>
-            <Settings2 /> Komponen nilai
-          </button>
+          {components.some((component) => component.manageable) && (
+            <button onClick={() => setShowComponents(true)}>
+              <Settings2 /> Komponen nilai
+            </button>
+          )}
           {canManageNotes && (
             <button
               className={published ? "published" : ""}
@@ -599,6 +655,7 @@ export function ReportCardsPage({
           profile={profile}
           notify={notify}
           onEditGrade={setGradeEditor}
+          canEditGrade={(row) => manageableSubjectIds.has(row.subject_id)}
           onSaved={() => void loadReport()}
         />
       ) : (
@@ -606,6 +663,7 @@ export function ReportCardsPage({
           students={students}
           rows={rows}
           onEditGrade={setGradeEditor}
+          canEditGrade={(row) => manageableSubjectIds.has(row.subject_id)}
           onExport={exportLedger}
         />
       )}
@@ -651,6 +709,7 @@ function ReportSheet({
   profile,
   notify,
   onEditGrade,
+  canEditGrade,
   onSaved,
 }: {
   school: School;
@@ -666,6 +725,7 @@ function ReportSheet({
   profile: Profile;
   notify: Notify;
   onEditGrade: (row: ReportRow) => void;
+  canEditGrade: (row: ReportRow) => boolean;
   onSaved: () => void;
 }) {
   const [homeroomNote, setHomeroomNote] = useState("");
@@ -792,9 +852,11 @@ function ReportSheet({
                   </td>
                   <td>{row.description}</td>
                   <td className="report-screen-only">
-                    <button onClick={() => onEditGrade(row)}>
-                      <FilePenLine /> Ubah
-                    </button>
+                    {canEditGrade(row) ? (
+                      <button onClick={() => onEditGrade(row)}>
+                        <FilePenLine /> Ubah
+                      </button>
+                    ) : "—"}
                   </td>
                 </tr>
               ))
@@ -892,11 +954,13 @@ function Ledger({
   students,
   rows,
   onEditGrade,
+  canEditGrade,
   onExport,
 }: {
   students: Student[];
   rows: ReportRow[];
   onEditGrade: (row: ReportRow) => void;
+  canEditGrade: (row: ReportRow) => boolean;
   onExport: () => void;
 }) {
   const subjects = useMemo(
@@ -958,12 +1022,12 @@ function Ledger({
                     );
                     return (
                       <td key={subject.id}>
-                        {row ? (
+                        {row && canEditGrade(row) ? (
                           <button onClick={() => onEditGrade(row)}>
                             {scoreText(row.final_score)}
                             {row.manually_adjusted && <i />}
                           </button>
-                        ) : (
+                        ) : row ? scoreText(row.final_score) : (
                           "—"
                         )}
                       </td>
@@ -1055,8 +1119,8 @@ function GradeEditor({
   };
 
   return (
-    <div className="modal-overlay" onMouseDown={close}>
-      <div className="modal report-grade-modal" onMouseDown={(event) => event.stopPropagation()}>
+    <div className="modal-overlay">
+      <div className="modal report-grade-modal" role="dialog" aria-modal="true">
         <form className="simple-modal" onSubmit={submit}>
           <header>
             <div>
@@ -1129,8 +1193,8 @@ function ComponentEditor({
   save: () => void;
 }) {
   return (
-    <div className="modal-overlay" onMouseDown={close}>
-      <div className="modal wide report-component-modal" onMouseDown={(event) => event.stopPropagation()}>
+    <div className="modal-overlay">
+      <div className="modal wide report-component-modal" role="dialog" aria-modal="true">
         <div className="simple-modal">
           <header>
             <div>
@@ -1153,6 +1217,7 @@ function ComponentEditor({
                     <input
                       type="checkbox"
                       checked={component.included}
+                      disabled={!component.manageable}
                       aria-label={`Sertakan ${component.title}`}
                       onChange={(event) =>
                         setComponents((current) =>
@@ -1181,7 +1246,7 @@ function ComponentEditor({
                         max={100}
                         step={0.01}
                         value={component.weight}
-                        disabled={!component.included}
+                        disabled={!component.included || !component.manageable}
                         onChange={(event) =>
                           setComponents((current) =>
                             current.map((item) =>
@@ -1204,7 +1269,7 @@ function ComponentEditor({
           </div>
           <footer>
             <button onClick={close}>Batal</button>
-            <button className="primary" disabled={!components.length} onClick={save}>
+            <button className="primary" disabled={!components.some((component) => component.manageable)} onClick={save}>
               Simpan komponen
             </button>
           </footer>

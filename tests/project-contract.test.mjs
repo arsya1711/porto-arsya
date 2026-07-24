@@ -34,6 +34,9 @@ test('submit ujian menyinkronkan seluruh jawaban sebelum finalisasi', async () =
   assert.match(app, /remaining > 3 \|\| !pendingEssay\.current/)
   assert.match(app, /expiredSaves\.some\(\(\{ error \}\) => Boolean\(error\)\)/)
   assert.match(app, /if \(!expiredSaveFailed\) \{\s*localStorage\.removeItem/)
+  assert.match(app, /unsyncedAnswersRef/)
+  assert.match(app, /window\.addEventListener\("online", retryUnsyncedAnswers\)/)
+  assert.match(app, /jawaban belum tersinkron/)
 })
 
 test('Edge Function membatasi origin dan memakai RPC transaksional', async () => {
@@ -49,9 +52,10 @@ test('Edge Function membatasi origin dan memakai RPC transaksional', async () =>
 })
 
 test('rapor memakai nilai final, akses terkontrol, dan menyediakan cetak A4', async () => {
-  const [migration, page, styles, app] = await Promise.all([
+  const [migration, page, studentPage, styles, app] = await Promise.all([
     read('supabase/migrations/019_report_cards.sql'),
     read('src/components/ReportCardsPage.tsx'),
+    read('src/components/StudentReportPage.tsx'),
     read('src/styles-report-cards.css'),
     read('src/App.tsx'),
   ])
@@ -65,6 +69,25 @@ test('rapor memakai nilai final, akses terkontrol, dan menyediakan cetak A4', as
   assert.match(page, /window\.print\(\)/)
   assert.match(styles, /@page\{size:A4 portrait/)
   assert.match(app, /path="rapor"/)
+  assert.match(app, /path="\/siswa\/rapor"/)
+  assert.match(studentPage, /get_report_card_data/)
+  assert.match(studentPage, /Rapor yang telah dipublikasikan/)
+})
+
+test('deployment SPA dan hardening operasional tersedia', async () => {
+  const [vercel, migration, importer, boundary] = await Promise.all([
+    read('vercel.json'),
+    read('supabase/migrations/020_operational_hardening.sql'),
+    read('supabase/functions/import-questions/index.ts'),
+    read('src/components/ErrorBoundary.tsx'),
+  ])
+  assert.match(vercel, /index\.html/)
+  assert.match(vercel, /Content-Security-Policy/)
+  assert.match(migration, /academic_years_name_format/)
+  assert.match(migration, /reserve_ai_import_attempt/)
+  assert.match(migration, /frontend_error_logs/)
+  assert.match(importer, /reserve_ai_import_attempt/)
+  assert.match(boundary, /frontend_error_logs/)
 })
 
 test('form login mengikuti lebar viewport ponsel tanpa overflow', async () => {
