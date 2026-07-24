@@ -55,6 +55,12 @@ npm run dev
    - `supabase/migrations/013_safe_subject_deletion.sql`
    - `supabase/migrations/014_student_exam_contract.sql`
    - `supabase/migrations/015_exam_security_and_branding.sql`
+   - `supabase/migrations/016_minimum_app_version.sql`
+   - `supabase/migrations/017_optional_answer_key.sql`
+   - `supabase/migrations/018_fix_attempt_status_enum_casts.sql`
+   - `supabase/migrations/019_report_cards.sql`
+   - `supabase/migrations/020_operational_hardening.sql`
+   - `supabase/migrations/021_go_live_readiness.sql`
 3. Isi `.env.local`:
 
 ```env
@@ -140,11 +146,14 @@ oleh trigger database dan tidak dapat diubah.
 npm run build
 npm run lint
 npm test
+npm run test:e2e
 ```
 
 ## Checklist go-live
 
-- Jalankan seluruh migration `001` sampai `015` secara berurutan pada project Supabase tujuan.
+- Ikuti [`docs/GO_LIVE_RUNBOOK.md`](docs/GO_LIVE_RUNBOOK.md) dan jangan membuka
+  akses sebelum seluruh kriteria go/no-go lulus.
+- Jalankan seluruh migration `001` sampai `021` secara berurutan pada project Supabase tujuan.
 - Deploy Edge Function `admin-users` dan `student-login`, lalu pastikan secret service role hanya berada di Supabase.
 - Isi secret `APP_ORIGIN` dengan origin web production. Pisahkan beberapa origin menggunakan koma, misalnya origin production dan staging.
 - Isi `.env` deployment dengan URL dan anon key project production; jangan pernah memakai service-role key di Vite.
@@ -154,6 +163,13 @@ npm test
 - Uji alur lengkap menggunakan akun admin, guru, dan siswa pada staging sebelum ujian sebenarnya.
 - Aktifkan backup database, log monitoring, HTTPS, dan kebijakan retensi data sesuai aturan sekolah.
 - Pastikan jam server, jadwal ujian, dan zona waktu operator sudah benar sebelum menerbitkan ujian.
+
+Pemeriksaan production tanpa mengubah data:
+
+```bash
+APP_URL=https://porto-arsya.pages.dev npm run go-live:check
+APP_URL=https://porto-arsya.pages.dev npm run go-live:load-safe
+```
 
 Jika konfigurasi Supabase tidak tersedia, aplikasi akan berhenti pada halaman konfigurasi dan tidak menampilkan data contoh.
 

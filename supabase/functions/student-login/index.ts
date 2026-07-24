@@ -110,6 +110,7 @@ Deno.serve(async (request) => {
       .from('class_students')
       .select('classes(name)')
       .eq('student_id', profile.id)
+      .limit(1)
       .maybeSingle()
     const classRelation = classMembership?.classes as { name?: string } | { name?: string }[] | null | undefined
     const className = Array.isArray(classRelation)

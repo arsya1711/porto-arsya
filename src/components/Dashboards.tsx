@@ -604,6 +604,7 @@ export function StudentDashboard({
             .from("class_students")
             .select("classes(name)")
             .eq("student_id", profile.id)
+            .limit(1)
             .maybeSingle(),
           supabase.rpc("get_student_exam_catalog"),
           supabase
@@ -703,6 +704,20 @@ export function StudentDashboard({
       void supabase?.removeChannel(channel);
     };
   }, [profile.id]);
+
+  useEffect(() => {
+    const refreshVisibleDashboard = () => {
+      if (document.visibilityState === "visible" && navigator.onLine) {
+        setRefreshKey((value) => value + 1);
+      }
+    };
+    const intervalId = window.setInterval(refreshVisibleDashboard, 60_000);
+    document.addEventListener("visibilitychange", refreshVisibleDashboard);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", refreshVisibleDashboard);
+    };
+  }, []);
 
   const available = exams
     .filter(

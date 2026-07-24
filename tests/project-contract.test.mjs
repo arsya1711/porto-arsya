@@ -90,6 +90,25 @@ test('deployment SPA dan hardening operasional tersedia', async () => {
   assert.match(boundary, /frontend_error_logs/)
 })
 
+test('go-live memiliki Realtime, fallback refresh, dan pemeriksaan production', async () => {
+  const [migration, dashboard, packageJson, preflight, runbook] = await Promise.all([
+    read('supabase/migrations/021_go_live_readiness.sql'),
+    read('src/components/Dashboards.tsx'),
+    read('package.json'),
+    read('tool/go-live-check.mjs'),
+    read('docs/GO_LIVE_RUNBOOK.md'),
+  ])
+  assert.match(migration, /alter publication supabase_realtime add table/)
+  assert.match(migration, /array\['attempts', 'exams', 'class_students'\]/)
+  assert.match(dashboard, /window\.setInterval\(refreshVisibleDashboard, 60_000\)/)
+  assert.match(packageJson, /go-live:check/)
+  assert.match(packageJson, /go-live:roles/)
+  assert.match(packageJson, /go-live:load-safe/)
+  assert.match(preflight, /auth\/v1\/health/)
+  assert.match(preflight, /access-control-allow-origin/)
+  assert.match(runbook, /Keputusan: GO \/ NO-GO/)
+})
+
 test('form login mengikuti lebar viewport ponsel tanpa overflow', async () => {
   const styles = await read('src/styles-responsive.css')
   assert.match(styles, /@media \(max-width: 760px\)/)
