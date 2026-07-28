@@ -88,6 +88,7 @@ import {
   remainingSecondsFromDeadline,
 } from "./lib/exam-timer";
 import { StudentReportPage } from "./components/StudentReportPage";
+import { encodeCsv } from "./lib/csv";
 import { fetchAllPages } from "./lib/supabase-pagination";
 import { useAccessibleDialog } from "./lib/use-accessible-dialog";
 
@@ -1306,7 +1307,7 @@ function UserManagement({
     const rows = filteredUsers.map((user) => roleFilter === "siswa"
       ? [user.full_name, user.email, user.class_name ?? "Belum ditempatkan", user.student_number ?? "", user.active ? "Aktif" : "Nonaktif", new Date(user.created_at).toLocaleDateString("id-ID")]
       : [user.full_name, user.email, capitalize(user.role), user.active ? "Aktif" : "Nonaktif", new Date(user.created_at).toLocaleDateString("id-ID")]);
-    const csv = [headers, ...rows].map((columns) => columns.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const csv = encodeCsv([headers, ...rows]);
     const url = URL.createObjectURL(new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" }));
     const anchor = document.createElement("a");
     anchor.href = url;

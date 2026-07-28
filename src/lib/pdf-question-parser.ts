@@ -307,7 +307,11 @@ export async function extractPdfText(file: File) {
     return { text, pageCount: document.numPages };
   } catch (error) {
     if (error instanceof Error && error.message) throw error;
-    throw new Error("PDF tidak dapat dibaca atau dilindungi kata sandi.");
+    const wrapped = new Error(
+      "PDF tidak dapat dibaca atau dilindungi kata sandi.",
+    ) as Error & { cause?: unknown };
+    wrapped.cause = error;
+    throw wrapped;
   } finally {
     await loadingTask.destroy();
   }

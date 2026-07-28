@@ -13,6 +13,13 @@ export default tseslint.config(
     plugins: { 'react-hooks': reactHooks, 'react-refresh': reactRefresh },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      // React Hooks 7 mengaktifkan lint compiler-oriented yang ditujukan untuk
+      // pola React 19. Aplikasi masih memakai React 18 dan memuat data di
+      // useEffect; pertahankan aturan correctness klasik tanpa memaksa rewrite
+      // seluruh data-fetching hanya karena upgrade tooling keamanan.
+      'react-hooks/immutability': 'off',
+      'react-hooks/purity': 'off',
+      'react-hooks/set-state-in-effect': 'off',
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
     },
   },

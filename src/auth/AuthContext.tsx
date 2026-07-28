@@ -1,5 +1,6 @@
 import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
+import { clearLocalExamData } from '../lib/local-exam-storage'
 import { supabase } from '../lib/supabase'
 import { AuthContext, type AuthContextValue, type Profile } from './auth-context'
 
@@ -25,6 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const clearSession = () => {
       profileRequest += 1
+      clearLocalExamData()
       if (!active) return
       setSession(null)
       setProfile(null)
@@ -95,7 +97,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     logout: async () => {
       try { await supabase?.auth.signOut({ scope: 'local' }) }
-      finally { setSession(null); setProfile(null) }
+      finally {
+        clearLocalExamData()
+        setSession(null)
+        setProfile(null)
+      }
     },
     resetPassword: async (email) => {
       if (!supabase) throw new Error('Supabase belum dikonfigurasi.')

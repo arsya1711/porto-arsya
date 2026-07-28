@@ -40,14 +40,18 @@ test('submit ujian menyinkronkan seluruh jawaban sebelum finalisasi', async () =
 })
 
 test('Edge Function membatasi origin dan memakai RPC transaksional', async () => {
-  const [admin, login] = await Promise.all([
+  const [admin, login, loginRateLimit] = await Promise.all([
     read('supabase/functions/admin-users/index.ts'),
     read('supabase/functions/student-login/index.ts'),
+    read('supabase/migrations/022_student_login_rate_limit.sql'),
   ])
   assert.match(admin, /APP_ORIGIN/)
   assert.match(admin, /save_managed_user_profile/)
   assert.match(login, /APP_ORIGIN/)
   assert.match(login, /reserve_student_login_attempt/)
+  assert.match(login, /clear_student_login_attempts/)
+  assert.match(loginRateLimit, /ip_attempts >= 500/)
+  assert.match(loginRateLimit, /delete from public\.student_login_attempts/)
   assert.doesNotMatch(`${admin}\n${login}`, /Access-Control-Allow-Origin': '\*'/)
 })
 
@@ -75,17 +79,27 @@ test('rapor memakai nilai final, akses terkontrol, dan menyediakan cetak A4', as
 })
 
 test('deployment SPA dan hardening operasional tersedia', async () => {
-  const [vercel, migration, importer, boundary] = await Promise.all([
+  const [vercel, migration, securityMigration, indexMigration, importer, boundary] = await Promise.all([
     read('vercel.json'),
     read('supabase/migrations/020_operational_hardening.sql'),
+    read('supabase/migrations/023_security_advisor_hardening.sql'),
+    read('supabase/migrations/024_remove_duplicate_question_index.sql'),
     read('supabase/functions/import-questions/index.ts'),
     read('src/components/ErrorBoundary.tsx'),
   ])
   assert.match(vercel, /index\.html/)
   assert.match(vercel, /Content-Security-Policy/)
+  assert.match(vercel, /worker-src 'self' blob:/)
+  assert.doesNotMatch(vercel, /api\\.cerebras\\.ai/)
+  assert.doesNotMatch(vercel, /img-src[^;]*\shttps:(?:\s|;)/)
   assert.match(migration, /academic_years_name_format/)
   assert.match(migration, /reserve_ai_import_attempt/)
   assert.match(migration, /frontend_error_logs/)
+  assert.match(securityMigration, /procedure\.prosecdef/)
+  assert.match(securityMigration, /procedure\.prorettype = 'trigger'::regtype/)
+  assert.match(securityMigration, /get_minimum_app_version/)
+  assert.match(securityMigration, /drop policy if exists "public reads school assets"/)
+  assert.match(indexMigration, /drop index if exists public\.questions_bank_archived_created_idx/)
   assert.match(importer, /reserve_ai_import_attempt/)
   assert.match(boundary, /frontend_error_logs/)
 })

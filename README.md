@@ -61,6 +61,9 @@ npm run dev
    - `supabase/migrations/019_report_cards.sql`
    - `supabase/migrations/020_operational_hardening.sql`
    - `supabase/migrations/021_go_live_readiness.sql`
+   - `supabase/migrations/022_student_login_rate_limit.sql`
+   - `supabase/migrations/023_security_advisor_hardening.sql`
+   - `supabase/migrations/024_remove_duplicate_question_index.sql`
 3. Isi `.env.local`:
 
 ```env
@@ -153,7 +156,7 @@ npm run test:e2e
 
 - Ikuti [`docs/GO_LIVE_RUNBOOK.md`](docs/GO_LIVE_RUNBOOK.md) dan jangan membuka
   akses sebelum seluruh kriteria go/no-go lulus.
-- Jalankan seluruh migration `001` sampai `021` secara berurutan pada project Supabase tujuan.
+- Jalankan seluruh migration `001` sampai `024` secara berurutan pada project Supabase tujuan.
 - Deploy Edge Function `admin-users` dan `student-login`, lalu pastikan secret service role hanya berada di Supabase.
 - Isi secret `APP_ORIGIN` dengan origin web production. Pisahkan beberapa origin menggunakan koma, misalnya origin production dan staging.
 - Isi `.env` deployment dengan URL dan anon key project production; jangan pernah memakai service-role key di Vite.

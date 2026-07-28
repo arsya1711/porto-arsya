@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import { encodeCsv } from "../lib/csv";
 import type { ExamStatus } from "../types";
 import { deriveExamStatus } from "../lib/exam-status";
 import {
@@ -863,9 +864,17 @@ export function RealReports() {
 
   const exportCsv = () => {
     const header = ["Nama siswa", "Ujian", "Kelas", "Status", "Nilai", "Dikumpulkan"];
-    const csv = [header, ...rows.map((item) => [item.studentName, item.examTitle, item.className, item.status, item.score ?? "Belum final", formatDate(item.submittedAt)])]
-      .map((columns) => columns.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))
-      .join("\n");
+    const csv = encodeCsv([
+      header,
+      ...rows.map((item) => [
+        item.studentName,
+        item.examTitle,
+        item.className,
+        item.status,
+        item.score ?? "Belum final",
+        formatDate(item.submittedAt),
+      ]),
+    ]);
     const url = URL.createObjectURL(new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" }));
     const anchor = document.createElement("a");
     anchor.href = url;

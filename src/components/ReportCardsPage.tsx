@@ -22,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 import type { Profile } from "../auth/auth-context";
+import { encodeCsv } from "../lib/csv";
 import { supabase } from "../lib/supabase";
 import { useAccessibleDialog } from "../lib/use-accessible-dialog";
 
@@ -506,13 +507,7 @@ export function ReportCardsPage({
           : "",
       ];
     });
-    const csv = [header, ...body]
-      .map((columns) =>
-        columns
-          .map((value) => `"${String(value).replace(/"/g, '""')}"`)
-          .join(","),
-      )
-      .join("\n");
+    const csv = encodeCsv([header, ...body]);
     const url = URL.createObjectURL(
       new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" }),
     );

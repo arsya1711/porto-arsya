@@ -106,6 +106,13 @@ Deno.serve(async (request) => {
       return json(request, { error: 'NIS atau kata sandi salah.' }, 401)
     }
 
+    // Reservation hanya menjadi kegagalan permanen bila autentikasi ditolak.
+    // Login sah langsung dibersihkan agar siswa yang masuk ulang dan ratusan
+    // perangkat di balik satu NAT sekolah tidak saling mengunci.
+    await admin.rpc('clear_student_login_attempts', {
+      target_nis_hash: nisHash,
+    })
+
     const { data: classMembership } = await admin
       .from('class_students')
       .select('classes(name)')

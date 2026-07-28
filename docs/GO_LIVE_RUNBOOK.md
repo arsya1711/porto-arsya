@@ -58,7 +58,11 @@ npm run test:e2e
 supabase migration list
 ```
 
-Migrasi `021_go_live_readiness.sql` harus diterapkan sebelum web terbaru:
+Migrasi `021_go_live_readiness.sql`,
+`022_student_login_rate_limit.sql`, dan
+`023_security_advisor_hardening.sql`, serta
+`024_remove_duplicate_question_index.sql` harus diterapkan sebelum
+web/function terbaru:
 
 ```bash
 supabase db push
@@ -70,6 +74,26 @@ Karena fungsi login siswa juga diperbarui, deploy fungsi tersebut:
 ```bash
 supabase functions deploy student-login
 supabase functions list
+```
+
+Pastikan juga **Enforce SSL on incoming connections** aktif pada pengaturan
+database Supabase. Network restriction hanya boleh dipersempit setelah seluruh
+CIDR operator/migration runner diketahui; jangan menebak CIDR karena dapat
+memutus akses operasional. Untuk project Free, buat logical dump berkala dan
+simpan di lokasi terenkripsi di luar repositori karena PITR tidak tersedia.
+
+## Catatan audit dependency
+
+`react-router-dom` dipin sementara pada `7.18.1`. Audit npm tanggal
+29 Juli 2026 masih melaporkan `GHSA-qwww-vcr4-c8h2`, tetapi advisory tersebut
+hanya memengaruhi API RSC eksperimental yang tidak dipakai AWExam. Versi perbaikan
+`8.3.0` belum tersedia di registry saat audit dilakukan. Naikkan ke `8.3.0` atau
+lebih baru segera setelah dipublikasikan, lalu jalankan:
+
+```bash
+npm audit --omit=dev
+npm run check
+npm run test:e2e
 ```
 
 Commit dan push ke branch deployment hanya setelah pemeriksaan lokal lulus.
