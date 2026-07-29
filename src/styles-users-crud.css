@@ -67,6 +67,82 @@
   opacity: 0.45;
 }
 
+/* Keep row actions compact without letting the generic icon-button rule
+   collapse menu items that also contain an icon. */
+.users-table .user-row-menu {
+  position: relative;
+}
+
+.users-table .user-row-menu[open] {
+  z-index: 70;
+}
+
+.users-table .user-row-menu[open] > summary {
+  border-color: #b9c7ef;
+  background: #f6f8ff;
+  color: #315ce8;
+}
+
+.users-table .user-row-menu > div {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 70;
+  display: grid;
+  width: 194px;
+  margin-top: 0;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid #dfe4ec;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 16px 36px rgba(31, 43, 68, 0.16);
+}
+
+.users-table .user-row-menu > div button,
+.users-table .user-actions .user-row-menu > div button:has(svg) {
+  width: 100%;
+  height: auto;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 9px 10px;
+  border-color: transparent;
+  border-radius: 7px;
+  background: transparent;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.users-table .user-row-menu > div button:hover {
+  border-color: transparent;
+  background: #f3f6fc;
+  color: #315ce8;
+}
+
+.users-table .user-row-menu > div button.danger:hover {
+  background: #fff0f1;
+  color: #c94750;
+}
+
+.users-table .user-row-menu > div button svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+}
+
+.users-table tbody tr:has(.user-row-menu[open]) {
+  position: relative;
+  z-index: 60;
+}
+
+.users-table tbody td:has(.user-row-menu[open]) {
+  position: relative;
+  z-index: 60;
+}
+
 @media (max-width: 560px) {
   .pagination-controls {
     align-items: stretch;

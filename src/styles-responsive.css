@@ -420,6 +420,23 @@ img {
     flex-wrap: wrap;
     justify-content: flex-start;
   }
+
+  .users-table .user-row-menu > div {
+    position: static;
+    width: 100%;
+    margin-top: 6px;
+    box-shadow: none;
+  }
+
+  .users-table tbody tr:has(.user-row-menu[open]) {
+    z-index: auto;
+  }
+}
+
+@media (min-width: 861px) {
+  .users-table.responsive-card-table {
+    overflow: visible;
+  }
 }
 
 @media (max-width: 760px) {
