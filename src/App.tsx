@@ -91,6 +91,7 @@ import { StudentReportPage } from "./components/StudentReportPage";
 import { encodeCsv } from "./lib/csv";
 import { fetchAllPages } from "./lib/supabase-pagination";
 import { useAccessibleDialog } from "./lib/use-accessible-dialog";
+import { edgeFunctionErrorMessage } from "./lib/edge-function-error";
 
 type Toast = { text: string; error?: boolean } | null;
 
@@ -1125,7 +1126,14 @@ function UserManagement({
     const { data, error } = await supabase.functions.invoke("admin-users", {
       body,
     });
-    if (error) throw error;
+    if (error) {
+      throw new Error(
+        await edgeFunctionErrorMessage(
+          error,
+          "Akun belum dapat diproses. Silakan coba lagi.",
+        ),
+      );
+    }
     if (data?.error) throw new Error(data.error);
     return data;
   };
