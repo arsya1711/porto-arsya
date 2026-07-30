@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../data/screen_security.dart';
 import '../models/models.dart';
 import '../state/app_controller.dart';
 import '../theme/app_theme.dart';
@@ -28,6 +29,7 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
     WidgetsBinding.instance.addObserver(this);
     widget.controller.addListener(_handleControllerChange);
     if (widget.controller.activeExam?.lockdown ?? false) {
+      unawaited(ScreenSecurity.setSecure(true));
       unawaited(
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky),
       );
@@ -38,6 +40,7 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     widget.controller.removeListener(_handleControllerChange);
+    unawaited(ScreenSecurity.setSecure(false));
     unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
     essayController.dispose();
     super.dispose();
@@ -64,27 +67,34 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
       wasBackgrounded = true;
+      unawaited(widget.controller.flushDraft());
     }
     if (state == AppLifecycleState.resumed && wasBackgrounded) {
       wasBackgrounded = false;
       // Timer periodik berhenti selama suspensi, jadi sisa waktu dihitung ulang
       // dari deadline server sebelum layar dipakai lagi.
       widget.controller.syncRemainingSeconds();
-      widget.controller.recordIntegrityEvent();
+      unawaited(widget.controller.retryUnsyncedAnswers());
+      if (widget.controller.activeExam?.recordIntegrityEvents ?? false) {
+        unawaited(_recordIntegrityEvent());
+      }
       if (widget.controller.activeExam?.lockdown ?? false) {
         unawaited(
           SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky),
         );
       }
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Aktivitas keluar aplikasi telah dicatat.'),
-            backgroundColor: AppColors.amber,
-          ),
-        );
-      }
     }
+  }
+
+  Future<void> _recordIntegrityEvent() async {
+    final recorded = await widget.controller.recordIntegrityEvent();
+    if (!mounted || !recorded) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Aktivitas keluar aplikasi telah dicatat.'),
+        backgroundColor: AppColors.amber,
+      ),
+    );
   }
 
   @override
@@ -127,6 +137,8 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
                 children: [
                   Text(
                     controller.activeExam?.subject ?? 'Ujian',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 10,
                       color: Color(0xFFAAB5CA),
@@ -134,6 +146,8 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
                   ),
                   Text(
                     controller.activeExam?.title ?? '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
@@ -141,33 +155,6 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
                   ),
                 ],
               ),
-              actions: [
-                Padding(
-                  padding: const EdgeInsets.only(right: 16),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      const Text(
-                        'SISA WAKTU',
-                        style: TextStyle(
-                          fontSize: 8,
-                          letterSpacing: .8,
-                          color: Color(0xFFAAB5CA),
-                        ),
-                      ),
-                      Text(
-                        controller.formattedTime,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          fontFeatures: [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
             ),
             body: Column(
               children: [
@@ -178,7 +165,11 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 8,
+                          alignment: WrapAlignment.spaceBetween,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             StatusPill(
                               label:
@@ -187,7 +178,6 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
                                   : 'Essay',
                               color: AppColors.blue,
                             ),
-                            const Spacer(),
                             Text(
                               'Soal ${controller.currentQuestion + 1} dari ${controller.questions.length}',
                               style: const TextStyle(
@@ -329,24 +319,36 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
                             : () => controller.goToQuestion(
                                 controller.currentQuestion + 1,
                               ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              controller.currentQuestion ==
-                                      controller.questions.length - 1
-                                  ? 'Periksa jawaban'
-                                  : 'Soal berikutnya',
-                            ),
-                            const SizedBox(width: 7),
-                            Icon(
-                              controller.currentQuestion ==
-                                      controller.questions.length - 1
-                                  ? Icons.fact_check_outlined
-                                  : Icons.arrow_forward_rounded,
-                              size: 18,
-                            ),
-                          ],
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final compact = constraints.maxWidth < 120;
+                            final isLast =
+                                controller.currentQuestion ==
+                                controller.questions.length - 1;
+                            return Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  compact
+                                      ? isLast
+                                            ? 'Periksa'
+                                            : 'Lanjut'
+                                      : isLast
+                                      ? 'Periksa jawaban'
+                                      : 'Soal berikutnya',
+                                ),
+                                if (!compact) ...[
+                                  const SizedBox(width: 7),
+                                  Icon(
+                                    isLast
+                                        ? Icons.fact_check_outlined
+                                        : Icons.arrow_forward_rounded,
+                                    size: 18,
+                                  ),
+                                ],
+                              ],
+                            );
+                          },
                         ),
                       ),
                     ),
@@ -397,11 +399,61 @@ class _ExamStatusBar extends StatelessWidget {
     final progress =
         (controller.currentQuestion + 1) / controller.questions.length;
     final synced = controller.isOnline && controller.unsyncedCount == 0;
+    final timeCritical = controller.remainingSeconds <= 5 * 60;
+    final timerColor = timeCritical ? AppColors.red : AppColors.blue;
     return Container(
       color: AppColors.background,
       padding: const EdgeInsets.fromLTRB(18, 11, 18, 10),
       child: Column(
         children: [
+          Semantics(
+            label: 'Sisa waktu ${controller.formattedTime}',
+            child: Container(
+              key: const ValueKey('exam-countdown'),
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              decoration: BoxDecoration(
+                color: timerColor.withValues(alpha: .09),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: timerColor.withValues(alpha: .22)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.timer_outlined, size: 19, color: timerColor),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Sisa waktu',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: timerColor,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        controller.formattedTime,
+                        style: TextStyle(
+                          color: timerColor,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 9),
           Row(
             children: [
               Container(
@@ -491,7 +543,7 @@ class _AnswerOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const letters = ['A', 'B', 'C', 'D', 'E'];
+    final letter = String.fromCharCode('A'.codeUnitAt(0) + index);
     return Padding(
       padding: const EdgeInsets.only(bottom: 11),
       child: Material(
@@ -519,7 +571,7 @@ class _AnswerOption extends StatelessWidget {
                     borderRadius: BorderRadius.circular(9),
                   ),
                   child: Text(
-                    letters[index],
+                    letter,
                     style: TextStyle(
                       color: selected ? Colors.white : AppColors.muted,
                       fontWeight: FontWeight.w800,
@@ -562,7 +614,7 @@ class QuestionNavigator extends StatelessWidget {
     return ListenableBuilder(
       listenable: controller,
       builder: (context, _) => SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -714,7 +766,7 @@ class ReviewSheet extends StatelessWidget {
       }
     }
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -911,9 +963,18 @@ class SubmissionSummaryScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'Semua jawaban sudah diterima server. Nilai akan muncul setelah guru menyelesaikan koreksi.',
+                  controller.submissionWarning ??
+                      'Semua jawaban sudah diterima server. Nilai akan muncul setelah guru menyelesaikan koreksi.',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: AppColors.muted, height: 1.55),
+                  style: TextStyle(
+                    color: controller.submissionWarning == null
+                        ? AppColors.muted
+                        : AppColors.amber,
+                    height: 1.55,
+                    fontWeight: controller.submissionWarning == null
+                        ? FontWeight.normal
+                        : FontWeight.w700,
+                  ),
                 ),
                 const SizedBox(height: 28),
                 Card(

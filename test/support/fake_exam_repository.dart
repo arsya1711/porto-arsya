@@ -11,11 +11,16 @@ class FakeExamRepository implements ExamRepository {
     this.failSubmits = false,
     this.attemptId = 'attempt-1',
     this.startedAt,
+    this.serverNow,
     this.savedServerAnswers = const {},
     this.questions = defaultQuestions,
     this.minimumVersion,
     this.failVersionCheck = false,
     this.failRefresh = false,
+    this.recordIntegrityEvents = true,
+    this.failIntegrityEvents = false,
+    this.restoreSessionResult = false,
+    this.saveDelay = Duration.zero,
   });
 
   static const defaultQuestions = [
@@ -27,22 +32,31 @@ class FakeExamRepository implements ExamRepository {
     ),
   ];
 
-  final bool failSaves;
+  bool failSaves;
   final String? delayedValue;
   final bool expiredSession;
   final bool failSubmits;
-  final String attemptId;
+  String attemptId;
   final DateTime? startedAt;
+  final DateTime? serverNow;
   final Map<String, String> savedServerAnswers;
   final List<ExamQuestion> questions;
   final String? minimumVersion;
   final bool failVersionCheck;
   final bool failRefresh;
+  final bool recordIntegrityEvents;
+  final bool failIntegrityEvents;
+  final bool restoreSessionResult;
+  Duration saveDelay;
 
   final Map<String, String> savedAnswers = {};
+  final List<({String attemptId, String questionId, String value})>
+  saveHistory = [];
   final List<String> integrityEventTypes = [];
   String? submittedAttemptId;
   int saveCalls = 0;
+  int activeSaves = 0;
+  int maxConcurrentSaves = 0;
 
   @override
   StudentProfile get profile => const StudentProfile(
@@ -65,11 +79,12 @@ class FakeExamRepository implements ExamRepository {
       questionCount: questions.length,
       state: ExamState.available,
       instructions: const [],
+      recordIntegrityEvents: recordIntegrityEvents,
     ),
   ];
 
   @override
-  Future<bool> restoreSession() async => false;
+  Future<bool> restoreSession() async => restoreSessionResult;
 
   @override
   Future<void> authenticate(String studentNumber, String password) async {}
@@ -91,6 +106,7 @@ class FakeExamRepository implements ExamRepository {
     return ExamSession(
       attemptId: attemptId,
       startedAt: now,
+      serverNow: serverNow ?? now,
       deadline: expiredSession
           ? now.subtract(const Duration(seconds: 1))
           : now.add(const Duration(hours: 1)),
@@ -106,13 +122,29 @@ class FakeExamRepository implements ExamRepository {
     required String value,
   }) async {
     saveCalls++;
-    if (failSaves) {
-      throw const ExamOperationException('Jawaban belum tersimpan.');
+    activeSaves++;
+    if (activeSaves > maxConcurrentSaves) {
+      maxConcurrentSaves = activeSaves;
     }
-    if (value == delayedValue) {
-      await Future<void>.delayed(const Duration(milliseconds: 20));
+    try {
+      if (saveDelay > Duration.zero) {
+        await Future<void>.delayed(saveDelay);
+      }
+      if (failSaves) {
+        throw const ExamOperationException('Jawaban belum tersimpan.');
+      }
+      if (value == delayedValue) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      saveHistory.add((
+        attemptId: attemptId,
+        questionId: question.id,
+        value: value,
+      ));
+      savedAnswers[question.id] = value;
+    } finally {
+      activeSaves--;
     }
-    savedAnswers[question.id] = value;
   }
 
   @override
@@ -129,6 +161,11 @@ class FakeExamRepository implements ExamRepository {
     required String examId,
     required String eventType,
   }) async {
+    if (failIntegrityEvents) {
+      throw const ExamOperationException(
+        'Aktivitas integritas belum dapat dicatat.',
+      );
+    }
     integrityEventTypes.add(eventType);
   }
 

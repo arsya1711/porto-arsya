@@ -1,10 +1,37 @@
 import 'package:awexam/data/attempt_draft_store.dart';
 import 'package:awexam/data/demo_repository.dart';
+import 'package:awexam/models/models.dart';
 import 'package:awexam/state/app_controller.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/fake_exam_repository.dart';
+
+class _DelayedDraftStore implements AttemptDraftStore {
+  final List<AttemptDraft> writes = [];
+  int activeWrites = 0;
+  int maxConcurrentWrites = 0;
+
+  @override
+  Future<AttemptDraft?> load(String attemptId) async => null;
+
+  @override
+  Future<void> save(AttemptDraft draft) async {
+    activeWrites++;
+    maxConcurrentWrites = activeWrites > maxConcurrentWrites
+        ? activeWrites
+        : maxConcurrentWrites;
+    try {
+      await Future<void>.delayed(const Duration(milliseconds: 15));
+      writes.add(draft);
+    } finally {
+      activeWrites--;
+    }
+  }
+
+  @override
+  Future<void> clear() async {}
+}
 
 void main() {
   group('AppController login', () {
@@ -35,6 +62,19 @@ void main() {
         controller.operationError,
         'Login berhasil, tetapi jadwal ujian belum dapat dimuat. Coba muat ulang.',
       );
+    });
+
+    test('keeps a restored session when catalog refresh is offline', () async {
+      final controller = AppController(
+        FakeExamRepository(restoreSessionResult: true, failRefresh: true),
+      );
+      addTearDown(controller.dispose);
+
+      await controller.initialize();
+
+      expect(controller.isLoggedIn, isTrue);
+      expect(controller.isOnline, isFalse);
+      expect(controller.operationError, contains('Sesi dipulihkan'));
     });
   });
 
@@ -97,7 +137,80 @@ void main() {
       expect(controller.unsyncedCount, 0);
     });
 
-    test('finalizes an expired attempt without sending late answers', () async {
+    test('never redirects a queued save into a newer attempt', () async {
+      final repository = FakeExamRepository(delayedValue: '0');
+      final controller = AppController(repository);
+      addTearDown(controller.dispose);
+
+      await controller.startExam(repository.exams.single);
+      controller.answer('question-1', '0');
+      controller.answer('question-1', '2');
+
+      repository.attemptId = 'attempt-2';
+      await controller.startExam(repository.exams.single);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      final staleSave = repository.saveHistory.singleWhere(
+        (entry) => entry.value == '2',
+      );
+      expect(staleSave.attemptId, 'attempt-1');
+    });
+
+    test('retries an unsynced answer after the connection recovers', () async {
+      final repository = FakeExamRepository(failSaves: true);
+      final controller = AppController(repository);
+      addTearDown(controller.dispose);
+
+      await controller.startExam(repository.exams.single);
+      controller.answer('question-1', '2');
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.unsyncedCount, 1);
+
+      repository.failSaves = false;
+      await controller.retryUnsyncedAnswers();
+
+      expect(repository.savedAnswers['question-1'], '2');
+      expect(controller.unsyncedCount, 0);
+      expect(controller.isOnline, isTrue);
+      expect(controller.operationError, isNull);
+    });
+
+    test('limits retry bursts to four answer requests at once', () async {
+      final questions = List.generate(
+        12,
+        (index) => ExamQuestion(
+          id: 'question-$index',
+          type: QuestionType.multipleChoice,
+          body: 'Soal $index',
+          options: const ['A', 'B'],
+        ),
+      );
+      final repository = FakeExamRepository(
+        questions: questions,
+        failSaves: true,
+        saveDelay: const Duration(milliseconds: 2),
+      );
+      final controller = AppController(repository);
+      addTearDown(controller.dispose);
+
+      await controller.startExam(repository.exams.single);
+      for (final question in questions) {
+        controller.answer(question.id, '1');
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(controller.unsyncedCount, questions.length);
+
+      repository
+        ..failSaves = false
+        ..saveDelay = const Duration(milliseconds: 10)
+        ..maxConcurrentSaves = 0;
+      await controller.retryUnsyncedAnswers();
+
+      expect(controller.unsyncedCount, 0);
+      expect(repository.maxConcurrentSaves, lessThanOrEqualTo(4));
+    });
+
+    test('finalizes an expired attempt without answers', () async {
       final repository = FakeExamRepository(expiredSession: true);
       final controller = AppController(repository);
       addTearDown(controller.dispose);
@@ -109,9 +222,63 @@ void main() {
       expect(repository.saveCalls, 0);
       expect(repository.submittedAttemptId, 'attempt-1');
     });
+
+    test('reports answers that could not sync when time expires', () async {
+      final base = DateTime(2026, 1, 1, 8);
+      var now = base;
+      final repository = FakeExamRepository(startedAt: base, failSaves: true);
+      final controller = AppController(repository, clock: () => now);
+      addTearDown(controller.dispose);
+
+      await controller.startExam(repository.exams.single);
+      controller.answer('question-1', '1');
+      await Future<void>.delayed(Duration.zero);
+
+      now = base.add(const Duration(hours: 2));
+      controller.syncRemainingSeconds();
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repository.submittedAttemptId, 'attempt-1');
+      expect(controller.submissionCompleted, isTrue);
+      expect(controller.submissionWarning, contains('1 jawaban lokal'));
+    });
   });
 
   group('AppController countdown', () {
+    test('uses server time when the device clock is wrong', () async {
+      final serverNow = DateTime(2026, 1, 1, 8);
+      var deviceNow = serverNow.add(const Duration(hours: 5));
+      final repository = FakeExamRepository(
+        startedAt: serverNow,
+        serverNow: serverNow,
+      );
+      final controller = AppController(repository, clock: () => deviceNow);
+      addTearDown(controller.dispose);
+
+      await controller.startExam(repository.exams.single);
+      expect(controller.remainingSeconds, 3600);
+
+      deviceNow = deviceNow.add(const Duration(minutes: 25));
+      controller.syncRemainingSeconds();
+      expect(controller.remainingSeconds, 2100);
+    });
+
+    test('does not submit during the final partial second', () async {
+      final base = DateTime(2026, 1, 1, 8);
+      var now = base;
+      final repository = FakeExamRepository(startedAt: base);
+      final controller = AppController(repository, clock: () => now);
+      addTearDown(controller.dispose);
+
+      await controller.startExam(repository.exams.single);
+      now = base.add(const Duration(minutes: 59, seconds: 59, milliseconds: 1));
+      controller.syncRemainingSeconds();
+
+      expect(controller.remainingSeconds, 1);
+      expect(repository.submittedAttemptId, isNull);
+    });
+
     test('recomputes the countdown from the server deadline', () async {
       final base = DateTime(2026, 1, 1, 8);
       var now = base;
@@ -172,6 +339,41 @@ void main() {
   });
 
   group('AppController offline draft', () {
+    test('serializes draft writes so the newest snapshot wins', () async {
+      final store = _DelayedDraftStore();
+      final repository = FakeExamRepository();
+      final controller = AppController(repository, draftStore: store);
+      addTearDown(controller.dispose);
+
+      await controller.startExam(repository.exams.single);
+      controller.answer('question-1', '0');
+      final first = controller.flushDraft();
+      controller.answer('question-1', '2');
+      final second = controller.flushDraft();
+      await Future.wait([first, second]);
+
+      expect(store.maxConcurrentWrites, 1);
+      expect(store.writes.last.answers['question-1'], '2');
+    });
+
+    test('clears the active attempt draft on logout', () async {
+      final store = InMemoryAttemptDraftStore();
+      final repository = FakeExamRepository(failSaves: true);
+      final controller = AppController(repository, draftStore: store);
+      addTearDown(controller.dispose);
+
+      await controller.startExam(repository.exams.single);
+      controller.answer('question-1', '2');
+      await controller.flushDraft();
+      expect(await store.load('attempt-1'), isNotNull);
+
+      await controller.logout();
+
+      expect(await store.load('attempt-1'), isNull);
+      expect(controller.isLoggedIn, isFalse);
+      expect(controller.activeAttemptId, isNull);
+    });
+
     test('keeps unsynced answers when the attempt is resumed', () async {
       final store = InMemoryAttemptDraftStore();
       final offline = FakeExamRepository(failSaves: true);
@@ -180,7 +382,7 @@ void main() {
       await controller.startExam(offline.exams.single);
       controller.answer('question-1', '2');
       controller.toggleFlag('question-1');
-      await Future<void>.delayed(Duration.zero);
+      await controller.flushDraft();
       expect(controller.unsyncedCount, 1);
       // Aplikasi ditutup paksa sebelum jawaban sempat tersinkron.
       controller.dispose();
@@ -222,7 +424,7 @@ void main() {
 
       await controller.startExam(first.exams.single);
       controller.answer('question-1', '2');
-      await Future<void>.delayed(Duration.zero);
+      await controller.flushDraft();
       controller.dispose();
 
       final other = FakeExamRepository(attemptId: 'attempt-2');

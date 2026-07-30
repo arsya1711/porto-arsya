@@ -4,6 +4,125 @@ import '../models/models.dart';
 import 'exam_repository.dart';
 import 'student_login_response.dart';
 
+Exam parseExamCatalogEntry({
+  required Map<String, dynamic> row,
+  Map<String, dynamic>? attempt,
+  DateTime? now,
+}) {
+  final schedule = DateTime.parse(row['starts_at'] as String).toLocal();
+  final duration = (row['duration_minutes'] as num).toInt();
+  final endsAt = row['ends_at'] == null
+      ? schedule.add(Duration(minutes: duration))
+      : DateTime.parse(row['ends_at'] as String).toLocal();
+
+  return Exam(
+    id: row['exam_id'] as String,
+    title: row['title'] as String,
+    subject: row['subject_name'] as String? ?? 'Mata pelajaran',
+    subjectCode: row['subject_code'] as String? ?? '-',
+    teacher: row['teacher_name'] as String? ?? 'Guru pengampu',
+    schedule: schedule,
+    durationMinutes: duration,
+    questionCount: (row['question_count'] as num?)?.toInt() ?? 0,
+    state: examStateFromCatalog(
+      status: row['status'] as String,
+      attemptStatus: attempt?['status'] as String?,
+      startsAt: schedule,
+      endsAt: endsAt,
+      now: now,
+    ),
+    instructions: examInstructions(row['description'] as String?),
+    score: (attempt?['final_score'] as num?)?.toDouble(),
+    requiresCode: row['requires_access_code'] as bool? ?? false,
+    lockdown: row['fullscreen_mode'] as bool? ?? true,
+    recordIntegrityEvents: row['record_tab_switches'] as bool? ?? true,
+  );
+}
+
+ExamState examStateFromCatalog({
+  required String status,
+  required String? attemptStatus,
+  required DateTime startsAt,
+  required DateTime endsAt,
+  DateTime? now,
+}) {
+  if (const {'submitted', 'grading', 'final'}.contains(attemptStatus)) {
+    return ExamState.completed;
+  }
+  if (attemptStatus == 'in_progress') return ExamState.inProgress;
+  final currentTime = now ?? DateTime.now();
+  if (currentTime.isBefore(startsAt)) return ExamState.upcoming;
+  if (status == 'selesai' || currentTime.isAfter(endsAt)) {
+    return ExamState.expired;
+  }
+  return ExamState.available;
+}
+
+List<String> examInstructions(String? description) {
+  if (description == null || description.trim().isEmpty) {
+    return const ['Baca setiap soal dengan teliti sebelum menjawab.'];
+  }
+  return description
+      .split('\n')
+      .map((line) => line.trim())
+      .where((line) => line.isNotEmpty)
+      .toList(growable: false);
+}
+
+({List<ExamQuestion> questions, Map<String, String> savedAnswers})
+parseExamQuestionRows(List<dynamic> questionRows) {
+  final questions = <ExamQuestion>[];
+  final savedAnswers = <String, String>{};
+  for (final raw in questionRows) {
+    final row = Map<String, dynamic>.from(raw as Map);
+    final questionId = row['question_id'] as String;
+    questions.add(
+      ExamQuestion(
+        id: questionId,
+        type: row['kind'] == 'essay'
+            ? QuestionType.essay
+            : QuestionType.multipleChoice,
+        body: row['body'] as String? ?? '',
+        options: row['options'] is List
+            ? (row['options'] as List)
+                  .map((option) => option.toString())
+                  .toList(growable: false)
+            : const [],
+      ),
+    );
+    final value = row['essay_text'] ?? row['selected_option'];
+    if (value != null) savedAnswers[questionId] = value.toString();
+  }
+  return (questions: questions, savedAnswers: savedAnswers);
+}
+
+String safeExamOperationMessage(String serverMessage) {
+  final message = serverMessage.trim();
+  final lowerMessage = message.toLowerCase();
+  const safeFragments = [
+    'ujian tidak ditemukan',
+    'ujian belum dapat dimulai',
+    'waktu ujian sudah berakhir',
+    'kode akses ujian tidak sesuai',
+    'ujian ini sudah pernah dikumpulkan',
+    'attempt tidak ditemukan',
+    'attempt sudah dikumpulkan',
+    'attempt tidak aktif',
+    'soal tidak ditemukan',
+    'pilihan jawaban tidak valid',
+    'jawaban essay terlalu panjang',
+  ];
+  for (final fragment in safeFragments) {
+    if (lowerMessage.contains(fragment)) return message;
+  }
+  return 'Permintaan ujian tidak dapat diproses oleh server.';
+}
+
+DateTime? parseServerTime(dynamic value) {
+  if (value is! String) return null;
+  return DateTime.tryParse(value)?.toLocal();
+}
+
 class SupabaseExamRepository implements ExamRepository {
   SupabaseExamRepository(this.client);
 
@@ -45,14 +164,6 @@ class SupabaseExamRepository implements ExamRepository {
         className: _className(classMembership?['classes']),
         school: await _loadSchoolName(),
       );
-      try {
-        await refreshExams();
-      } catch (_) {
-        await client.auth.signOut();
-        throw const AuthenticationException(
-          'Login berhasil, tetapi jadwal ujian belum dapat dimuat.',
-        );
-      }
       return true;
     } catch (_) {
       await signOut();
@@ -163,6 +274,7 @@ class SupabaseExamRepository implements ExamRepository {
           .select('exam_id,status,final_score')
           .eq('student_id', userId),
     ]);
+    final serverNow = await _loadServerTime() ?? DateTime.now();
 
     final attempts = <String, Map<String, dynamic>>{
       for (final row in results[1] as List)
@@ -174,32 +286,10 @@ class SupabaseExamRepository implements ExamRepository {
         .map((raw) {
           final row = Map<String, dynamic>.from(raw as Map);
           final examId = row['exam_id'] as String;
-          final attempt = attempts[examId];
-          final schedule = DateTime.parse(row['starts_at'] as String).toLocal();
-          final duration = (row['duration_minutes'] as num).toInt();
-          final endsAt = row['ends_at'] == null
-              ? schedule.add(Duration(minutes: duration))
-              : DateTime.parse(row['ends_at'] as String).toLocal();
-
-          return Exam(
-            id: examId,
-            title: row['title'] as String,
-            subject: row['subject_name'] as String? ?? 'Mata pelajaran',
-            subjectCode: row['subject_code'] as String? ?? '-',
-            teacher: row['teacher_name'] as String? ?? 'Guru pengampu',
-            schedule: schedule,
-            durationMinutes: duration,
-            questionCount: (row['question_count'] as num?)?.toInt() ?? 0,
-            state: _examState(
-              status: row['status'] as String,
-              attemptStatus: attempt?['status'] as String?,
-              startsAt: schedule,
-              endsAt: endsAt,
-            ),
-            instructions: _instructions(row['description'] as String?),
-            score: (attempt?['final_score'] as num?)?.toDouble(),
-            requiresCode: row['requires_access_code'] as bool? ?? false,
-            lockdown: row['fullscreen_mode'] as bool? ?? true,
+          return parseExamCatalogEntry(
+            row: row,
+            attempt: attempts[examId],
+            now: serverNow,
           );
         })
         .toList(growable: false);
@@ -219,6 +309,14 @@ class SupabaseExamRepository implements ExamRepository {
       );
       final startRow = _firstRow(startRows);
       if (startRow == null) {
+        final requiresCode = _exams.any(
+          (exam) => exam.id == examId && exam.requiresCode,
+        );
+        if (requiresCode) {
+          throw const ExamOperationException(
+            'Kode akses ujian salah atau batas percobaan telah tercapai. Periksa kode dari pengawas.',
+          );
+        }
         throw const ExamOperationException(
           'Server tidak dapat memulai sesi ujian.',
         );
@@ -232,28 +330,31 @@ class SupabaseExamRepository implements ExamRepository {
           deadlineValue == null) {
         throw const ExamOperationException('Data sesi ujian tidak lengkap.');
       }
+      final startedAt = DateTime.parse(startedAtValue).toLocal();
+      final deadline = DateTime.parse(deadlineValue).toLocal();
+      final serverNow = await _loadServerTime() ?? DateTime.now();
+
+      // Attempt lama dapat tetap berstatus in_progress ketika aplikasi ditutup
+      // sampai melewati deadline. Finalisasikan jawaban yang sudah diterima
+      // server agar kartu ujian tidak terjebak sebagai "sedang dikerjakan".
+      if (!deadline.isAfter(serverNow)) {
+        await submitExam(attemptId);
+        try {
+          await refreshExams();
+        } catch (_) {
+          // Finalisasi sudah berhasil; refresh katalog dapat dicoba dari beranda.
+        }
+        throw const ExamOperationException(
+          'Waktu ujian sudah berakhir. Jawaban yang tersimpan di server telah dikumpulkan.',
+        );
+      }
 
       final questionRows = await client.rpc(
         'get_exam_questions',
         params: {'requested_exam_id': examId},
       );
-      final questions = (questionRows as List)
-          .map((raw) {
-            final row = Map<String, dynamic>.from(raw as Map);
-            return ExamQuestion(
-              id: row['question_id'] as String,
-              type: row['kind'] == 'essay'
-                  ? QuestionType.essay
-                  : QuestionType.multipleChoice,
-              body: row['body'] as String? ?? '',
-              options: row['options'] is List
-                  ? (row['options'] as List)
-                        .map((option) => option.toString())
-                        .toList(growable: false)
-                  : const [],
-            );
-          })
-          .toList(growable: false);
+      final parsedQuestions = parseExamQuestionRows(questionRows as List);
+      final questions = parsedQuestions.questions;
 
       if (questions.isEmpty) {
         throw const ExamOperationException(
@@ -261,31 +362,32 @@ class SupabaseExamRepository implements ExamRepository {
         );
       }
 
-      final savedAnswers = <String, String>{};
-      for (final raw in questionRows) {
-        final row = Map<String, dynamic>.from(raw);
-        final questionId = row['question_id'] as String?;
-        final value = row['essay_text'] ?? row['selected_option'];
-        if (questionId != null && value != null) {
-          savedAnswers[questionId] = value.toString();
-        }
-      }
-
       return ExamSession(
         attemptId: attemptId,
-        startedAt: DateTime.parse(startedAtValue).toLocal(),
-        deadline: DateTime.parse(deadlineValue).toLocal(),
+        startedAt: startedAt,
+        serverNow: serverNow,
+        deadline: deadline,
         questions: questions,
-        savedAnswers: savedAnswers,
+        savedAnswers: parsedQuestions.savedAnswers,
       );
     } on ExamOperationException {
       rethrow;
     } on PostgrestException catch (error) {
-      throw ExamOperationException(_operationMessage(error.message));
+      throw ExamOperationException(safeExamOperationMessage(error.message));
     } catch (_) {
       throw const ExamOperationException(
         'Tidak dapat memulai ujian. Periksa koneksi lalu coba lagi.',
       );
+    }
+  }
+
+  Future<DateTime?> _loadServerTime() async {
+    try {
+      return parseServerTime(await client.rpc('get_server_time'));
+    } catch (_) {
+      // Kompatibel selama migration waktu server belum dipasang. Backend tetap
+      // menjadi sumber kebenaran untuk deadline dan penolakan jawaban.
+      return null;
     }
   }
 
@@ -317,7 +419,7 @@ class SupabaseExamRepository implements ExamRepository {
         },
       );
     } on PostgrestException catch (error) {
-      throw ExamOperationException(_operationMessage(error.message));
+      throw ExamOperationException(safeExamOperationMessage(error.message));
     } catch (_) {
       throw const ExamOperationException(
         'Jawaban belum tersimpan. Periksa koneksi internet.',
@@ -333,7 +435,7 @@ class SupabaseExamRepository implements ExamRepository {
         params: {'target_attempt_id': attemptId},
       );
     } on PostgrestException catch (error) {
-      throw ExamOperationException(_operationMessage(error.message));
+      throw ExamOperationException(safeExamOperationMessage(error.message));
     } catch (_) {
       throw const ExamOperationException(
         'Ujian belum dapat dikumpulkan. Periksa koneksi lalu coba lagi.',
@@ -367,55 +469,6 @@ class SupabaseExamRepository implements ExamRepository {
     }
     if (value is Map) return Map<String, dynamic>.from(value);
     return null;
-  }
-
-  String _operationMessage(String serverMessage) {
-    final message = serverMessage.trim();
-    final lowerMessage = message.toLowerCase();
-    const safeFragments = [
-      'ujian tidak ditemukan',
-      'ujian belum dapat dimulai',
-      'waktu ujian sudah berakhir',
-      'kode akses ujian tidak sesuai',
-      'ujian ini sudah pernah dikumpulkan',
-      'attempt tidak ditemukan',
-      'attempt sudah dikumpulkan',
-      'attempt tidak aktif',
-      'soal tidak ditemukan',
-      'pilihan jawaban tidak valid',
-      'jawaban essay terlalu panjang',
-    ];
-    for (final fragment in safeFragments) {
-      if (lowerMessage.contains(fragment)) return message;
-    }
-    return 'Permintaan ujian tidak dapat diproses oleh server.';
-  }
-
-  List<String> _instructions(String? description) {
-    if (description == null || description.trim().isEmpty) {
-      return const ['Baca setiap soal dengan teliti sebelum menjawab.'];
-    }
-    return description
-        .split('\n')
-        .map((line) => line.trim())
-        .where((line) => line.isNotEmpty)
-        .toList(growable: false);
-  }
-
-  ExamState _examState({
-    required String status,
-    required String? attemptStatus,
-    required DateTime startsAt,
-    required DateTime endsAt,
-  }) {
-    if (const {'submitted', 'grading', 'final'}.contains(attemptStatus)) {
-      return ExamState.completed;
-    }
-    if (attemptStatus == 'in_progress') return ExamState.inProgress;
-    final now = DateTime.now();
-    if (now.isBefore(startsAt)) return ExamState.upcoming;
-    if (status == 'selesai' || now.isAfter(endsAt)) return ExamState.expired;
-    return ExamState.available;
   }
 
   @override

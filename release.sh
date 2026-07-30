@@ -143,6 +143,17 @@ if [ ! -s "$AAB_PATH" ]; then
   exit 1
 fi
 
+if ! command -v jarsigner >/dev/null 2>&1; then
+  echo "✗ jarsigner tidak tersedia; instal JDK sebelum memverifikasi AAB."
+  exit 1
+fi
+if ! verification_output="$(jarsigner -verify "$AAB_PATH" 2>&1)" ||
+  ! grep -q '^jar verified\.$' <<<"$verification_output"; then
+  echo "✗ AAB tidak memiliki tanda tangan release yang valid: $AAB_PATH"
+  exit 1
+fi
+echo "• Tanda tangan AAB terverifikasi"
+
 echo "• Upload ke Google Play (track: $TRACK, status: $STATUS)..."
 PLAY_JSON="$JSON" \
 PLAY_PACKAGE="${PLAY_PACKAGE:-awexam.com}" \

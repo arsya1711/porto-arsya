@@ -48,9 +48,9 @@ Jalankan Flutter menggunakan anon/publishable key, bukan service-role key. Salin
 flutter run --dart-define-from-file=.env
 ```
 
-`.env` tidak dibaca oleh kode aplikasi; Flutter memuatnya menjadi `String.fromEnvironment`
-saat kompilasi. File ini sudah masuk `.gitignore`. Nilainya juga bisa diberikan
-satu per satu bila diperlukan:
+`.env` tidak dibaca atau dibundel oleh kode aplikasi; Flutter memuat nilainya
+menjadi `String.fromEnvironment` saat kompilasi. File ini sudah masuk
+`.gitignore`. Nilainya juga bisa diberikan satu per satu bila diperlukan:
 
 ```bash
 flutter run \

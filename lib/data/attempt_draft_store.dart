@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'secure_value_store.dart';
+
 /// Salinan lokal dari pengerjaan satu attempt.
 ///
 /// Draft menjaga jawaban yang belum diterima server tetap ada ketika aplikasi
@@ -56,16 +58,28 @@ abstract interface class AttemptDraftStore {
   Future<void> clear();
 }
 
-/// Menyimpan satu draft aktif; siswa hanya bisa mengerjakan satu ujian sekaligus.
-class SharedPreferencesAttemptDraftStore implements AttemptDraftStore {
-  const SharedPreferencesAttemptDraftStore();
+/// Menyimpan satu draft aktif dalam penyimpanan terenkripsi.
+///
+/// Versi lama menaruh JSON di SharedPreferences. Saat pertama dibaca, draft itu
+/// dipindahkan ke secure storage dan salinan plaintext langsung dihapus.
+class SecureAttemptDraftStore implements AttemptDraftStore {
+  const SecureAttemptDraftStore({SecureValueStore? storage})
+    : _storage = storage ?? const FlutterSecureValueStore.standard();
 
   static const _key = 'awexam.attempt_draft';
+  final SecureValueStore _storage;
 
   @override
   Future<AttemptDraft?> load(String attemptId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key);
+    var raw = await _storage.read(_key);
+    if (raw == null) {
+      final prefs = await SharedPreferences.getInstance();
+      raw = prefs.getString(_key);
+      if (raw != null) {
+        await _storage.write(_key, raw);
+        await prefs.remove(_key);
+      }
+    }
     if (raw == null) return null;
     try {
       final decoded = jsonDecode(raw);
@@ -73,19 +87,21 @@ class SharedPreferencesAttemptDraftStore implements AttemptDraftStore {
       final draft = AttemptDraft.fromJson(decoded);
       return draft?.attemptId == attemptId ? draft : null;
     } on FormatException {
-      await prefs.remove(_key);
+      await _storage.delete(_key);
       return null;
     }
   }
 
   @override
   Future<void> save(AttemptDraft draft) async {
+    await _storage.write(_key, jsonEncode(draft.toJson()));
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, jsonEncode(draft.toJson()));
+    await prefs.remove(_key);
   }
 
   @override
   Future<void> clear() async {
+    await _storage.delete(_key);
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_key);
   }

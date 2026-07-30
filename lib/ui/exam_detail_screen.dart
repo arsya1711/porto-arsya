@@ -249,9 +249,16 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    exam.lockdown
-                        ? 'Mode aman aktif. Aktivitas keluar aplikasi akan dicatat untuk pengawas.'
-                        : 'Mode aman tidak diwajibkan untuk ujian ini.',
+                    switch ((exam.lockdown, exam.recordIntegrityEvents)) {
+                      (true, true) =>
+                        'Mode layar penuh aktif. Aktivitas keluar aplikasi akan dicatat untuk pengawas.',
+                      (true, false) =>
+                        'Mode layar penuh aktif. Aktivitas keluar aplikasi tidak dicatat.',
+                      (false, true) =>
+                        'Aktivitas keluar aplikasi akan dicatat untuk pengawas.',
+                      (false, false) =>
+                        'Mode aman tidak diwajibkan untuk ujian ini.',
+                    },
                     style: const TextStyle(
                       fontSize: 12,
                       height: 1.45,

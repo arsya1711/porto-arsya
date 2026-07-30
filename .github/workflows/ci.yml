@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, flutter]
   pull_request:
 
 jobs:
@@ -21,10 +21,28 @@ jobs:
 
       # Menjaga format tetap konsisten tanpa menulis ulang file di CI.
       - name: Check formatting
-        run: dart format --output=none --set-exit-if-changed .
+        run: dart format --output=none --set-exit-if-changed lib test
 
       - name: Analyze
         run: flutter analyze --fatal-infos
 
       - name: Test
-        run: flutter test
+        run: flutter test --coverage
+
+      - name: Enforce line coverage
+        run: |
+          awk -F: '
+            /^LF:/ { total += $2 }
+            /^LH:/ { hit += $2 }
+            END {
+              coverage = total ? (100 * hit / total) : 0
+              printf "Line coverage: %.1f%%\n", coverage
+              exit coverage < 75
+            }
+          ' coverage/lcov.info
+
+      - name: Build release bundle
+        run: >-
+          flutter build appbundle --release
+          --dart-define=SUPABASE_URL=https://example.supabase.co
+          --dart-define=SUPABASE_ANON_KEY=ci-publishable-key

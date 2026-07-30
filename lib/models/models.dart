@@ -30,6 +30,7 @@ class Exam {
     this.score,
     this.requiresCode = false,
     this.lockdown = true,
+    this.recordIntegrityEvents = true,
     this.allowBackwardNavigation = true,
   });
 
@@ -46,6 +47,7 @@ class Exam {
   final double? score;
   final bool requiresCode;
   final bool lockdown;
+  final bool recordIntegrityEvents;
   final bool allowBackwardNavigation;
 }
 
@@ -66,6 +68,7 @@ class ExamSession {
   const ExamSession({
     required this.attemptId,
     required this.startedAt,
+    required this.serverNow,
     required this.deadline,
     required this.questions,
     this.savedAnswers = const {},
@@ -73,6 +76,9 @@ class ExamSession {
 
   final String attemptId;
   final DateTime startedAt;
+  /// Waktu server ketika sesi dibuat/dibaca. Dipakai untuk mengoreksi jam
+  /// perangkat yang dapat diubah manual oleh siswa.
+  final DateTime serverNow;
   final DateTime deadline;
   final List<ExamQuestion> questions;
   final Map<String, String> savedAnswers;

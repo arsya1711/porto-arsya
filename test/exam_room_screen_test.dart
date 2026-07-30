@@ -21,6 +21,25 @@ const _twoQuestions = [
   ),
 ];
 
+const _sixOptionQuestion = [
+  ExamQuestion(
+    id: 'question-1',
+    type: QuestionType.multipleChoice,
+    body: 'Pilih huruf terakhir.',
+    options: ['Satu', 'Dua', 'Tiga', 'Empat', 'Lima', 'Enam'],
+  ),
+];
+
+final _manyQuestions = List<ExamQuestion>.generate(
+  100,
+  (index) => ExamQuestion(
+    id: 'question-${index + 1}',
+    type: QuestionType.multipleChoice,
+    body: 'Soal nomor ${index + 1}',
+    options: const ['A', 'B'],
+  ),
+);
+
 /// Menjalankan sebuah test di dalam ruang ujian dengan attempt yang sudah aktif.
 ///
 /// Countdown ujian memakai [Timer.periodic] yang hidup berjam-jam, sedangkan
@@ -61,6 +80,28 @@ void examRoomTest(
 }
 
 void main() {
+  examRoomTest('keeps the countdown visible on a narrow phone screen', (
+    tester,
+    controller,
+    repository,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(320, 568));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('exam-countdown')), findsOneWidget);
+    expect(find.text('Sisa waktu'), findsOneWidget);
+    expect(
+      find.text(
+        controller.formattedTime,
+        findRichText: true,
+        skipOffstage: false,
+      ),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   examRoomTest('records the chosen option and reports it as synced', (
     tester,
     controller,
@@ -78,6 +119,20 @@ void main() {
     expect(find.text('1/2 terjawab'), findsOneWidget);
     expect(find.text('Tersinkron'), findsOneWidget);
   });
+
+  examRoomTest(
+    'renders and accepts the sixth multiple-choice option',
+    repository: () => FakeExamRepository(questions: _sixOptionQuestion),
+    (tester, controller, repository) async {
+      expect(find.text('F'), findsOneWidget);
+      await tester.ensureVisible(find.text('Enam'));
+      await tester.tap(find.text('Enam'));
+      await tester.pumpAndSettle();
+
+      expect(controller.answers['question-1'], '5');
+      expect(repository.savedAnswers['question-1'], '5');
+    },
+  );
 
   examRoomTest(
     'shows pending answers while the server is unreachable',
@@ -191,6 +246,55 @@ void main() {
         find.text('Aktivitas keluar aplikasi telah dicatat.'),
         findsOneWidget,
       );
+    },
+  );
+
+  examRoomTest(
+    'does not claim an integrity event when recording is disabled',
+    repository: () => FakeExamRepository(
+      questions: _twoQuestions,
+      recordIntegrityEvents: false,
+    ),
+    (tester, controller, repository) async {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+
+      expect(controller.integrityEvents, 0);
+      expect(repository.integrityEventTypes, isEmpty);
+      expect(
+        find.text('Aktivitas keluar aplikasi telah dicatat.'),
+        findsNothing,
+      );
+    },
+  );
+
+  examRoomTest(
+    'keeps navigator and review sheets scrollable with many questions',
+    repository: () => FakeExamRepository(questions: _manyQuestions),
+    (tester, controller, repository) async {
+      await tester.tap(find.byTooltip('Lihat semua nomor soal'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Navigator soal'), findsOneWidget);
+      expect(find.text('100'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      Navigator.of(tester.element(find.text('Navigator soal'))).pop();
+      await tester.pumpAndSettle();
+
+      controller.goToQuestion(99);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Periksa jawaban'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Belum dijawab: soal 1, 2, 3, 4, 5'), findsNothing);
+      expect(
+        find.textContaining('Belum dijawab: soal 1, 2, 3'),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
     },
   );
 }

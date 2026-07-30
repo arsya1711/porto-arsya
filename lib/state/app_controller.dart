@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
@@ -23,6 +24,10 @@ class AppController extends ChangeNotifier {
   final DateTime Function() _now;
 
   static const _maxAutoSubmitAttempts = 5;
+  static const _answerRetryBaseDelay = Duration(seconds: 5);
+  static const _answerRetryMaxDelay = Duration(seconds: 60);
+  static const _answerRetryConcurrency = 4;
+  static const _draftPersistDelay = Duration(milliseconds: 200);
 
   final ExamRepository repository;
   final AttemptDraftStore draftStore;
@@ -36,6 +41,7 @@ class AppController extends ChangeNotifier {
   bool isStartingExam = false;
   bool isSubmitting = false;
   bool submissionCompleted = false;
+  String? submissionWarning;
   bool autoSubmitExhausted = false;
   bool isOnline = true;
   int homeTab = 0;
@@ -51,9 +57,15 @@ class AppController extends ChangeNotifier {
   final Map<String, Future<bool>> _pendingAnswerSaves = {};
   List<ExamQuestion> _questions = const [];
   Timer? _countdownTimer;
+  Timer? _draftPersistTimer;
+  Timer? _answerRetryTimer;
   Timer? _autoSubmitRetryTimer;
+  Future<void> _draftWriteQueue = Future<void>.value();
   DateTime? _deadline;
+  Duration _serverClockOffset = Duration.zero;
   int _autoSubmitAttempts = 0;
+  int _answerRetryRound = 0;
+  String? _retryingAttemptId;
 
   StudentProfile get profile => repository.profile;
   List<Exam> get exams => repository.exams;
@@ -69,6 +81,17 @@ class AppController extends ChangeNotifier {
       await _checkSupportedVersion();
       if (updateRequired) return;
       isLoggedIn = await repository.restoreSession();
+      if (isLoggedIn) {
+        try {
+          await repository.refreshExams();
+          isOnline = true;
+          operationError = null;
+        } catch (_) {
+          isOnline = false;
+          operationError =
+              'Sesi dipulihkan, tetapi jadwal ujian belum dapat dimuat. Coba muat ulang.';
+        }
+      }
     } finally {
       isInitializing = false;
       notifyListeners();
@@ -124,11 +147,15 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    await _clearDraft();
     _resetAttempt();
-    await repository.signOut();
-    isLoggedIn = false;
-    homeTab = 0;
-    notifyListeners();
+    try {
+      await repository.signOut();
+    } finally {
+      isLoggedIn = false;
+      homeTab = 0;
+      notifyListeners();
+    }
   }
 
   Future<void> refreshExams() async {
@@ -175,6 +202,7 @@ class AppController extends ChangeNotifier {
       answers.addAll(session.savedAnswers);
       _restoreDraft(draft);
       _deadline = session.deadline;
+      _serverClockOffset = session.serverNow.difference(_now());
       remainingSeconds = _computeRemainingSeconds();
       submissionCompleted = false;
       isOnline = true;
@@ -197,7 +225,12 @@ class AppController extends ChangeNotifier {
   int _computeRemainingSeconds() {
     final deadline = _deadline;
     if (deadline == null) return 0;
-    return deadline.difference(_now()).inSeconds.clamp(0, 1 << 31);
+    final milliseconds = deadline
+        .difference(_now().add(_serverClockOffset))
+        .inMilliseconds;
+    if (milliseconds <= 0) return 0;
+    // Pembulatan ke atas mencegah auto-submit sampai 999 ms terlalu dini.
+    return ((milliseconds + 999) ~/ 1000).clamp(0, 1 << 31);
   }
 
   /// Menghitung ulang sisa waktu dari deadline server.
@@ -259,7 +292,12 @@ class AppController extends ChangeNotifier {
 
   void answer(String questionId, String value, {bool debounce = false}) {
     final question = _questionById(questionId);
-    if (question == null || activeAttemptId == null || isSubmitting) return;
+    if (question == null ||
+        activeAttemptId == null ||
+        isSubmitting ||
+        remainingSeconds <= 0) {
+      return;
+    }
 
     answers[questionId] = value;
     _unsyncedQuestionIds.add(questionId);
@@ -273,7 +311,7 @@ class AppController extends ChangeNotifier {
     } else {
       unawaited(_enqueueAnswerSave(question, value));
     }
-    unawaited(_persistDraft());
+    _scheduleDraftPersist();
     notifyListeners();
   }
 
@@ -282,11 +320,13 @@ class AppController extends ChangeNotifier {
     String value, {
     bool notify = true,
   }) {
+    final attemptId = activeAttemptId;
+    if (attemptId == null) return Future<bool>.value(false);
     final previous =
         _pendingAnswerSaves[question.id] ?? Future<bool>.value(true);
     late final Future<bool> queued;
     queued = previous.then(
-      (_) => _persistAnswer(question, value, notify: notify),
+      (_) => _persistAnswer(attemptId, question, value, notify: notify),
     );
     _pendingAnswerSaves[question.id] = queued;
     unawaited(
@@ -300,12 +340,11 @@ class AppController extends ChangeNotifier {
   }
 
   Future<bool> _persistAnswer(
+    String attemptId,
     ExamQuestion question,
     String value, {
     bool notify = true,
   }) async {
-    final attemptId = activeAttemptId;
-    if (attemptId == null) return false;
     try {
       await repository.saveAnswer(
         attemptId: attemptId,
@@ -315,24 +354,112 @@ class AppController extends ChangeNotifier {
       if (activeAttemptId != attemptId) return false;
       if (answers[question.id] == value) {
         _unsyncedQuestionIds.remove(question.id);
-        unawaited(_persistDraft());
+        _scheduleDraftPersist();
       }
       isOnline = true;
+      if (_unsyncedQuestionIds.isEmpty) {
+        operationError = null;
+        _answerRetryRound = 0;
+        _answerRetryTimer?.cancel();
+        _answerRetryTimer = null;
+      } else {
+        _scheduleUnsyncedRetry();
+      }
       if (notify) notifyListeners();
       return true;
     } on ExamOperationException catch (error) {
       if (activeAttemptId != attemptId) return false;
       isOnline = false;
       operationError = error.message;
+      _scheduleUnsyncedRetry();
       if (notify) notifyListeners();
       return false;
     } catch (_) {
       if (activeAttemptId != attemptId) return false;
       isOnline = false;
       operationError = 'Jawaban belum tersimpan. Periksa koneksi internet.';
+      _scheduleUnsyncedRetry();
       if (notify) notifyListeners();
       return false;
     }
+  }
+
+  void _scheduleUnsyncedRetry() {
+    if (_answerRetryTimer != null ||
+        _retryingAttemptId != null ||
+        _unsyncedQuestionIds.isEmpty ||
+        activeAttemptId == null ||
+        remainingSeconds <= 0 ||
+        isSubmitting) {
+      return;
+    }
+    final exponentialSeconds = math.min(
+      _answerRetryMaxDelay.inSeconds,
+      _answerRetryBaseDelay.inSeconds * (1 << math.min(_answerRetryRound, 4)),
+    );
+    final attemptHash = activeAttemptId.hashCode;
+    final jitterMilliseconds =
+        ((attemptHash ^ (_answerRetryRound * 997)) & 0x7fffffff) % 1500;
+    final delay = Duration(
+      seconds: exponentialSeconds,
+      milliseconds: jitterMilliseconds,
+    );
+    _answerRetryTimer = Timer(delay, () {
+      _answerRetryTimer = null;
+      unawaited(retryUnsyncedAnswers());
+    });
+  }
+
+  /// Mencoba ulang seluruh jawaban lokal, dipanggil oleh timer dan ketika
+  /// aplikasi kembali ke foreground setelah jaringan mungkin telah pulih.
+  Future<void> retryUnsyncedAnswers() async {
+    if (_retryingAttemptId != null) return;
+    _answerRetryTimer?.cancel();
+    _answerRetryTimer = null;
+    final retryAttemptId = activeAttemptId;
+    if (_unsyncedQuestionIds.isEmpty ||
+        retryAttemptId == null ||
+        remainingSeconds <= 0 ||
+        isSubmitting) {
+      return;
+    }
+    _retryingAttemptId = retryAttemptId;
+
+    try {
+      final questionIds = _unsyncedQuestionIds.toList(growable: false);
+      for (
+        var offset = 0;
+        offset < questionIds.length;
+        offset += _answerRetryConcurrency
+      ) {
+        if (activeAttemptId != retryAttemptId || isSubmitting) return;
+        final end = math.min(
+          offset + _answerRetryConcurrency,
+          questionIds.length,
+        );
+        final retries = <Future<bool>>[];
+        for (final questionId in questionIds.sublist(offset, end)) {
+          final question = _questionById(questionId);
+          final value = answers[questionId];
+          if (question != null && value != null) {
+            retries.add(_enqueueAnswerSave(question, value, notify: false));
+          }
+        }
+        await Future.wait(retries);
+      }
+    } finally {
+      if (_retryingAttemptId == retryAttemptId) {
+        _retryingAttemptId = null;
+      }
+    }
+    if (activeAttemptId != retryAttemptId) return;
+    if (_unsyncedQuestionIds.isNotEmpty) {
+      _answerRetryRound++;
+      _scheduleUnsyncedRetry();
+    } else {
+      _answerRetryRound = 0;
+    }
+    notifyListeners();
   }
 
   Future<AttemptDraft?> _loadDraft(String attemptId) async {
@@ -364,30 +491,57 @@ class AppController extends ChangeNotifier {
     }
   }
 
-  /// Draft bersifat best-effort: kegagalan menulis tidak boleh menghentikan ujian.
-  Future<void> _persistDraft() async {
+  AttemptDraft? _draftSnapshot() {
     final attemptId = activeAttemptId;
-    if (attemptId == null) return;
-    try {
-      await draftStore.save(
-        AttemptDraft(
-          attemptId: attemptId,
-          answers: Map.of(answers),
-          unsyncedQuestionIds: Set.of(_unsyncedQuestionIds),
-          flagged: Set.of(flagged),
-        ),
-      );
-    } catch (_) {
-      // Diabaikan; jawaban tetap tersimpan di memori dan dikirim ke server.
-    }
+    if (attemptId == null) return null;
+    return AttemptDraft(
+      attemptId: attemptId,
+      answers: Map.of(answers),
+      unsyncedQuestionIds: Set.of(_unsyncedQuestionIds),
+      flagged: Set.of(flagged),
+    );
+  }
+
+  void _scheduleDraftPersist() {
+    if (activeAttemptId == null) return;
+    _draftPersistTimer?.cancel();
+    _draftPersistTimer = Timer(_draftPersistDelay, () {
+      _draftPersistTimer = null;
+      unawaited(flushDraft());
+    });
+  }
+
+  /// Menulis snapshot draft secara berurutan agar write lama tidak dapat
+  /// menimpa jawaban yang lebih baru. Dipanggil juga saat aplikasi masuk
+  /// background supaya debounce yang belum selesai tetap diamankan.
+  Future<void> flushDraft() {
+    _draftPersistTimer?.cancel();
+    _draftPersistTimer = null;
+    final draft = _draftSnapshot();
+    if (draft == null) return _draftWriteQueue;
+    final operation = _draftWriteQueue.then((_) async {
+      try {
+        await draftStore.save(draft);
+      } catch (_) {
+        // Draft bersifat best-effort; jawaban tetap ada di memori dan server.
+      }
+    });
+    _draftWriteQueue = operation;
+    return operation;
   }
 
   Future<void> _clearDraft() async {
-    try {
-      await draftStore.clear();
-    } catch (_) {
-      // Diabaikan; draft basi akan tersaring oleh pencocokan attemptId.
-    }
+    _draftPersistTimer?.cancel();
+    _draftPersistTimer = null;
+    final operation = _draftWriteQueue.then((_) async {
+      try {
+        await draftStore.clear();
+      } catch (_) {
+        // Diabaikan; draft basi akan tersaring oleh pencocokan attemptId.
+      }
+    });
+    _draftWriteQueue = operation;
+    await operation;
   }
 
   ExamQuestion? _questionById(String questionId) {
@@ -401,7 +555,7 @@ class AppController extends ChangeNotifier {
     flagged.contains(questionId)
         ? flagged.remove(questionId)
         : flagged.add(questionId);
-    unawaited(_persistDraft());
+    _scheduleDraftPersist();
     notifyListeners();
   }
 
@@ -411,25 +565,34 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void recordIntegrityEvent({String eventType = 'app_backgrounded'}) {
+  Future<bool> recordIntegrityEvent({
+    String eventType = 'app_backgrounded',
+  }) async {
     final attemptId = activeAttemptId;
     final exam = activeExam;
-    if (attemptId == null || exam == null || submissionCompleted) return;
-    integrityEvents++;
-    notifyListeners();
-    unawaited(
-      repository
-          .recordIntegrityEvent(
-            attemptId: attemptId,
-            examId: exam.id,
-            eventType: eventType,
-          )
-          .catchError((_) {
-            isOnline = false;
-            operationError = 'Aktivitas integritas belum dapat dicatat.';
-            notifyListeners();
-          }),
-    );
+    if (attemptId == null ||
+        exam == null ||
+        submissionCompleted ||
+        !exam.recordIntegrityEvents) {
+      return false;
+    }
+    try {
+      await repository.recordIntegrityEvent(
+        attemptId: attemptId,
+        examId: exam.id,
+        eventType: eventType,
+      );
+      if (activeAttemptId != attemptId || submissionCompleted) return false;
+      integrityEvents++;
+      notifyListeners();
+      return true;
+    } catch (_) {
+      if (activeAttemptId == attemptId && !submissionCompleted) {
+        operationError = 'Aktivitas integritas belum dapat dicatat.';
+        notifyListeners();
+      }
+      return false;
+    }
   }
 
   Future<bool> submitExam() async {
@@ -439,7 +602,10 @@ class AppController extends ChangeNotifier {
 
     isSubmitting = true;
     operationError = null;
+    submissionWarning = null;
     autoSubmitExhausted = false;
+    _answerRetryTimer?.cancel();
+    _answerRetryTimer = null;
     for (final timer in _answerSaveTimers.values) {
       timer.cancel();
     }
@@ -447,22 +613,25 @@ class AppController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      if (remainingSeconds == 0) {
-        await Future.wait(_pendingAnswerSaves.values.toList());
-      } else {
-        final saves = <Future<bool>>[];
-        for (final entry in answers.entries) {
-          final question = _questionById(entry.key);
-          if (question != null) {
-            saves.add(_enqueueAnswerSave(question, entry.value, notify: false));
-          }
+      await flushDraft();
+      final expired = remainingSeconds == 0;
+      final saves = <Future<bool>>[];
+      for (final entry in answers.entries) {
+        final question = _questionById(entry.key);
+        if (question != null) {
+          saves.add(_enqueueAnswerSave(question, entry.value, notify: false));
         }
-        final saved = await Future.wait(saves);
-        if (saved.any((success) => !success)) {
+      }
+      final saved = await Future.wait(saves);
+      final failedSaveCount = saved.where((success) => !success).length;
+      if (failedSaveCount > 0) {
+        if (!expired) {
           throw const ExamOperationException(
             'Masih ada jawaban yang belum tersimpan. Periksa koneksi lalu coba lagi.',
           );
         }
+        submissionWarning =
+            '$failedSaveCount jawaban lokal tidak sempat diterima server sebelum waktu berakhir dan mungkin tidak dinilai.';
       }
 
       await repository.submitExam(attemptId);
@@ -471,6 +640,7 @@ class AppController extends ChangeNotifier {
       _unsyncedQuestionIds.clear();
       await _clearDraft();
       isOnline = true;
+      operationError = null;
       submissionCompleted = true;
       return true;
     } on ExamOperationException catch (error) {
@@ -496,11 +666,18 @@ class AppController extends ChangeNotifier {
   void _resetAttempt() {
     _countdownTimer?.cancel();
     _countdownTimer = null;
+    _draftPersistTimer?.cancel();
+    _draftPersistTimer = null;
+    _answerRetryTimer?.cancel();
+    _answerRetryTimer = null;
+    _answerRetryRound = 0;
+    _retryingAttemptId = null;
     _autoSubmitRetryTimer?.cancel();
     _autoSubmitRetryTimer = null;
     _autoSubmitAttempts = 0;
     autoSubmitExhausted = false;
     _deadline = null;
+    _serverClockOffset = Duration.zero;
     for (final timer in _answerSaveTimers.values) {
       timer.cancel();
     }
@@ -512,6 +689,7 @@ class AppController extends ChangeNotifier {
     remainingSeconds = 0;
     integrityEvents = 0;
     submissionCompleted = false;
+    submissionWarning = null;
     isSubmitting = false;
     answers.clear();
     flagged.clear();

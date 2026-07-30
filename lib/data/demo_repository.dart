@@ -144,6 +144,7 @@ class DemoRepository implements ExamRepository {
     return ExamSession(
       attemptId: 'demo-$examId',
       startedAt: startedAt,
+      serverNow: startedAt,
       deadline: startedAt.add(Duration(minutes: exam.durationMinutes)),
       questions: questions,
     );

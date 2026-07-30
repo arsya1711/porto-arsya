@@ -10,10 +10,12 @@ abstract final class AppColors {
   static const background = Color(0xFFF8F8FC);
   static const border = Color(0xFFECECF3);
   static const text = Color(0xFF22233B);
-  static const muted = Color(0xFF8B8CA3);
-  static const green = Color(0xFF00AE91);
-  static const amber = Color(0xFFF0A73B);
-  static const red = Color(0xFFED5C5C);
+  // Warna yang dipakai sebagai teks harus tetap mencapai kontras 4.5:1
+  // terhadap permukaan putih dan latar aplikasi.
+  static const muted = Color(0xFF696A80);
+  static const green = Color(0xFF00806C);
+  static const amber = Color(0xFF9A5B00);
+  static const red = Color(0xFFC23737);
 }
 
 abstract final class AppTheme {

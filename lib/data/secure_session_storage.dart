@@ -1,5 +1,6 @@
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'secure_value_store.dart';
 
 /// Menyimpan sesi Supabase di Keychain (iOS) dan EncryptedSharedPreferences
 /// (Android) alih-alih SharedPreferences biasa.
@@ -8,19 +9,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// penyimpanan aplikasi, sehingga token siswa dapat terbaca pada perangkat yang
 /// di-root atau dari hasil backup.
 class SecureSessionStorage extends LocalStorage {
-  const SecureSessionStorage({FlutterSecureStorage? storage})
-    : _storage =
-          storage ??
-          const FlutterSecureStorage(
-            // Android v10 memakai cipher terenkripsi secara default.
-            iOptions: IOSOptions(
-              accessibility: KeychainAccessibility.first_unlock_this_device,
-            ),
-          );
+  const SecureSessionStorage({SecureValueStore? storage})
+    : _storage = storage ?? const FlutterSecureValueStore.session();
 
   static const _sessionKey = 'awexam.supabase.session';
 
-  final FlutterSecureStorage _storage;
+  final SecureValueStore _storage;
 
   @override
   Future<void> initialize() async {}
@@ -34,7 +28,7 @@ class SecureSessionStorage extends LocalStorage {
   @override
   Future<void> persistSession(String persistSessionString) async {
     try {
-      await _storage.write(key: _sessionKey, value: persistSessionString);
+      await _storage.write(_sessionKey, persistSessionString);
     } catch (_) {
       // Sesi tetap hidup di memori; siswa hanya perlu login ulang lain kali.
     }
@@ -43,7 +37,7 @@ class SecureSessionStorage extends LocalStorage {
   @override
   Future<void> removePersistedSession() async {
     try {
-      await _storage.delete(key: _sessionKey);
+      await _storage.delete(_sessionKey);
     } catch (_) {
       // Diabaikan; signOut tidak boleh gagal karena masalah penyimpanan.
     }
@@ -53,7 +47,7 @@ class SecureSessionStorage extends LocalStorage {
   /// sesi" supaya aplikasi jatuh ke layar login, bukan crash saat dibuka.
   Future<String?> _read() async {
     try {
-      return await _storage.read(key: _sessionKey);
+      return await _storage.read(_sessionKey);
     } catch (_) {
       await removePersistedSession();
       return null;

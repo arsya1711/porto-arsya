@@ -55,5 +55,16 @@ fi
 echo "Membangun AAB release dengan konfigurasi dari .env..."
 flutter build "${build_args[@]}"
 
+bundle_path="$project_dir/build/app/outputs/bundle/release/app-release.aab"
+if ! command -v jarsigner >/dev/null 2>&1; then
+  echo "Error: jarsigner tidak tersedia; instal JDK sebelum memverifikasi AAB." >&2
+  exit 1
+fi
+if ! verification_output="$(jarsigner -verify "$bundle_path" 2>&1)" ||
+  ! grep -q '^jar verified\.$' <<<"$verification_output"; then
+  echo "Error: AAB tidak memiliki tanda tangan release yang valid." >&2
+  exit 1
+fi
+
 echo
-echo "Selesai: $project_dir/build/app/outputs/bundle/release/app-release.aab"
+echo "Selesai dan tanda tangan terverifikasi: $bundle_path"
