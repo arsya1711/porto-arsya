@@ -17,7 +17,7 @@ import {
   useLocation,
   useNavigate,
   useParams,
-} from "react-router-dom";
+} from "react-router";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -80,12 +80,15 @@ import { BrandLogo } from "./components/BrandLogo";
 import { ReportCardsPage } from "./components/ReportCardsPage";
 import {
   isAnsweredValue,
+  mayFinalizeAttempt,
   normalizeStoredAnswers,
 } from "./lib/exam-answer-state";
 import {
   formatExamRemaining,
   parseExamDeadline,
   remainingSecondsFromDeadline,
+  serverAdjustedNow,
+  serverClockOffset,
 } from "./lib/exam-timer";
 import { StudentReportPage } from "./components/StudentReportPage";
 import { encodeCsv } from "./lib/csv";
@@ -2289,6 +2292,7 @@ function ExamRunner({
   const finishingRef = useRef(false);
   const finishRetryTimer = useRef<number | null>(null);
   const deadlineRef = useRef<number | null>(null);
+  const serverClockOffsetRef = useRef(0);
   const [pendingSaves, setPendingSaves] = useState(0);
   const unsyncedAnswersRef = useRef(new Set<string>());
   const [unsyncedCount, setUnsyncedCount] = useState(0);
@@ -2303,10 +2307,20 @@ function ExamRunner({
       setLoadingExam(true);
       deadlineRef.current = null;
       setRemaining(0);
-      const [{ data: authData }, catalogResult] = await Promise.all([
+      const clockRequestStartedAt = Date.now();
+      const [{ data: authData }, catalogResult, clockResult] = await Promise.all([
         client.auth.getUser(),
         client.rpc("get_student_exam_catalog"),
+        client.rpc("get_server_time"),
       ]);
+      if (!clockResult.error) {
+        const clientMidpoint =
+          clockRequestStartedAt + (Date.now() - clockRequestStartedAt) / 2;
+        serverClockOffsetRef.current = serverClockOffset(
+          clockResult.data,
+          clientMidpoint,
+        );
+      }
       const examRow = (catalogResult.data as StudentExamCatalogRow[] | null)?.find(
         (row) => row.exam_id === examId,
       );
@@ -2356,11 +2370,12 @@ function ExamRunner({
         return;
       }
       deadlineRef.current = deadlineTime;
-      if (deadlineTime <= Date.now()) {
+      const currentServerTime = serverAdjustedNow(serverClockOffsetRef.current);
+      if (deadlineTime <= currentServerTime) {
         const localAnswers = loadLocal<Record<string, number | string>>(`answers:${examId}`, {});
         const localAnswerEntries = Object.entries(localAnswers);
-        let expiredSaveFailed = localAnswerEntries.length > 0 && Date.now() - deadlineTime > 10_000;
-        if (Date.now() - deadlineTime <= 10_000) {
+        let expiredSaveFailed = localAnswerEntries.length > 0 && currentServerTime - deadlineTime > 10_000;
+        if (currentServerTime - deadlineTime <= 10_000) {
           const expiredSaves = await Promise.all(localAnswerEntries.map(([questionId, value]) =>
             client.rpc("save_exam_answer", {
               target_attempt_id: startedAttempt.attempt_id,
@@ -2426,7 +2441,12 @@ function ExamRunner({
         fullscreen: examRow.fullscreen_mode ?? true,
         recordTabSwitches: examRow.record_tab_switches ?? true,
       });
-      setRemaining(remainingSecondsFromDeadline(deadlineTime));
+      setRemaining(
+        remainingSecondsFromDeadline(
+          deadlineTime,
+          serverAdjustedNow(serverClockOffsetRef.current),
+        ),
+      );
       const localAnswers = normalizeStoredAnswers(
         loadLocal<unknown>(`answers:${examId}`, {}),
       );
@@ -2446,16 +2466,40 @@ function ExamRunner({
     const updateRemaining = () => {
       if (deadlineRef.current === null) return;
       setRemaining(
-        remainingSecondsFromDeadline(deadlineRef.current),
+        remainingSecondsFromDeadline(
+          deadlineRef.current,
+          serverAdjustedNow(serverClockOffsetRef.current),
+        ),
       );
     };
+    const refreshServerClock = async () => {
+      const client = supabase;
+      if (!client) {
+        updateRemaining();
+        return;
+      }
+      const requestStartedAt = Date.now();
+      const result = await client.rpc("get_server_time");
+      if (!result.error) {
+        const clientMidpoint =
+          requestStartedAt + (Date.now() - requestStartedAt) / 2;
+        serverClockOffsetRef.current = serverClockOffset(
+          result.data,
+          clientMidpoint,
+        );
+      }
+      updateRemaining();
+    };
+    const refreshVisibleClock = () => {
+      if (document.visibilityState === "visible") void refreshServerClock();
+    };
     const id = window.setInterval(updateRemaining, 1000);
-    document.addEventListener("visibilitychange", updateRemaining);
-    window.addEventListener("focus", updateRemaining);
+    document.addEventListener("visibilitychange", refreshVisibleClock);
+    window.addEventListener("focus", refreshServerClock);
     return () => {
       window.clearInterval(id);
-      document.removeEventListener("visibilitychange", updateRemaining);
-      window.removeEventListener("focus", updateRemaining);
+      document.removeEventListener("visibilitychange", refreshVisibleClock);
+      window.removeEventListener("focus", refreshServerClock);
     };
   }, []);
   useEffect(() => {
@@ -2641,7 +2685,13 @@ function ExamRunner({
           persistAnswer(questionId, value),
         ),
       );
-      if (finalSaves.some((saved) => !saved)) {
+      const failedSaveCount = finalSaves.filter((saved) => !saved).length;
+      const deadline = deadlineRef.current;
+      const expired = deadline !== null && remainingSecondsFromDeadline(
+        deadline,
+        serverAdjustedNow(serverClockOffsetRef.current),
+      ) === 0;
+      if (!mayFinalizeAttempt(failedSaveCount, expired)) {
         throw new Error(
           "Masih ada jawaban yang belum tersimpan. Periksa koneksi lalu coba kembali.",
         );
@@ -2650,10 +2700,17 @@ function ExamRunner({
         target_attempt_id: attemptId,
       });
       if (error) throw error;
-      localStorage.removeItem(`ruang-ujian:answers:${examId}`);
+      if (failedSaveCount === 0) {
+        localStorage.removeItem(`ruang-ujian:answers:${examId}`);
+      }
       localStorage.removeItem(`ruang-ujian:marked:${examId}`);
       if (document.fullscreenElement) await document.exitFullscreen();
-      notify("Jawaban berhasil dikumpulkan");
+      notify(
+        failedSaveCount > 0
+          ? `Ujian berhasil dikumpulkan, tetapi ${failedSaveCount} jawaban lokal terlambat diterima server dan mungkin tidak dinilai. Salinan tetap tersimpan di perangkat ini.`
+          : "Jawaban berhasil dikumpulkan",
+        failedSaveCount > 0,
+      );
       navigate("/siswa");
     } catch (error) {
       finishingRef.current = false;

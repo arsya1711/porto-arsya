@@ -9,6 +9,20 @@ export function parseExamDeadline(value: unknown): number | null {
   return Number.isFinite(timestamp) ? timestamp : null;
 }
 
+export function serverClockOffset(
+  serverTime: unknown,
+  clientTime = Date.now(),
+): number {
+  const parsed = parseExamDeadline(serverTime);
+  if (parsed === null || !Number.isFinite(clientTime)) return 0;
+  return parsed - clientTime;
+}
+
+export function serverAdjustedNow(offset: number, clientTime = Date.now()): number {
+  if (!Number.isFinite(offset) || !Number.isFinite(clientTime)) return clientTime;
+  return clientTime + offset;
+}
+
 export function remainingSecondsFromDeadline(
   deadline: number,
   now = Date.now(),

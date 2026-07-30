@@ -116,6 +116,25 @@ const restHealth = await checkedFetch(
 assert.equal(restHealth.status, 200, `Supabase REST menghasilkan HTTP ${restHealth.status}`);
 console.log("  ✓ Supabase Auth dan REST dapat dijangkau");
 
+const serverTime = await checkedFetch(
+  new URL("/rest/v1/rpc/get_server_time", supabaseUrl),
+  {
+    method: "POST",
+    headers: { ...apiHeaders, "Content-Type": "application/json" },
+    body: "{}",
+  },
+);
+assert.equal(
+  serverTime.status,
+  200,
+  "RPC get_server_time belum tersedia; terapkan migration Supabase terbaru sebelum deploy web/mobile",
+);
+assert.ok(
+  Number.isFinite(Date.parse(await serverTime.text())),
+  "RPC get_server_time mengembalikan waktu yang tidak valid",
+);
+console.log("  ✓ Waktu ujian memakai clock server");
+
 for (const functionName of ["admin-users", "student-login", "import-questions"]) {
   const response = await checkedFetch(
     new URL(`/functions/v1/${functionName}`, supabaseUrl),

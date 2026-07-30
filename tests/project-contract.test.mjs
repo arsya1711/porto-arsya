@@ -154,3 +154,16 @@ test('aksesibilitas modal, refresh siswa, dan validasi profil sekolah aktif', as
   assert.match(assessment, /fetchAllPages/)
   assert.match(assessment, /grading-pagination/)
 })
+
+test('migration melindungi waktu server, konfigurasi, dan admin terakhir', async () => {
+  const [serverClock, settings, adminGuard] = await Promise.all([
+    read('supabase/migrations/026_server_clock.sql'),
+    read('supabase/migrations/027_restore_operational_settings.sql'),
+    read('supabase/migrations/028_protect_last_admin.sql'),
+  ])
+  assert.match(serverClock, /get_server_time/i)
+  assert.match(serverClock, /security invoker/i)
+  assert.match(settings, /minimum_app_version/i)
+  assert.match(adminGuard, /pg_advisory_xact_lock/i)
+  assert.match(adminGuard, /profiles_protect_last_active_admin/i)
+})

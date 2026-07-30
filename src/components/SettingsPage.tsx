@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ChangeEvent, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import {
   Bell,
   CalendarDays,
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import type { Profile } from "../auth/auth-context";
 import { isSupabaseConfigured, supabase } from "../lib/supabase";
+import { normalizeMinimumAppVersion } from "../lib/app-version";
 
 type Notify = (text: string, error?: boolean) => void;
 type Settings = {
@@ -26,6 +27,7 @@ type Settings = {
   session_timeout_minutes: number;
   passing_score: number;
   school_timezone: string;
+  minimum_app_version: string;
 };
 type Preferences = {
   exam_updates: boolean;
@@ -45,6 +47,7 @@ const EMPTY_SETTINGS: Settings = {
   session_timeout_minutes: 120,
   passing_score: 75,
   school_timezone: "Asia/Jakarta",
+  minimum_app_version: "",
 };
 const DEFAULT_PREFERENCES: Preferences = {
   exam_updates: true,
@@ -66,7 +69,7 @@ export function RealSettingsPage({ profile, notify }: { profile: Profile; notify
     if (!supabase) { setLoading(false); return; }
     setLoading(true);
     const [settingsResult, preferenceResult, yearResult] = await Promise.all([
-      supabase.from("school_profile_settings").select("school_name,npsn,address,logo_url,require_fullscreen_default,record_tab_switches,session_timeout_minutes,passing_score,school_timezone").eq("id", 1).maybeSingle(),
+      supabase.from("school_profile_settings").select("school_name,npsn,address,logo_url,require_fullscreen_default,record_tab_switches,session_timeout_minutes,passing_score,school_timezone,minimum_app_version").eq("id", 1).maybeSingle(),
       supabase.from("user_notification_preferences").select("exam_updates,grading_reminders,security_alerts,email_notifications").eq("user_id", profile.id).maybeSingle(),
       supabase.from("academic_years").select("name").eq("active", true).maybeSingle(),
     ]);
@@ -80,6 +83,7 @@ export function RealSettingsPage({ profile, notify }: { profile: Profile; notify
       session_timeout_minutes: settingsResult.data.session_timeout_minutes ?? 120,
       passing_score: Number(settingsResult.data.passing_score ?? 75),
       school_timezone: settingsResult.data.school_timezone ?? "Asia/Jakarta",
+      minimum_app_version: settingsResult.data.minimum_app_version ?? "",
     });
     if (preferenceResult.data) setPreferences(preferenceResult.data as Preferences);
     if (yearResult.data) setActiveYear(yearResult.data.name);
@@ -96,6 +100,13 @@ export function RealSettingsPage({ profile, notify }: { profile: Profile; notify
       notify("NPSN harus terdiri dari tepat 8 angka.", true);
       return;
     }
+    const minimumAppVersion = normalizeMinimumAppVersion(
+      nextSettings.minimum_app_version,
+    );
+    if (minimumAppVersion === undefined) {
+      notify("Versi minimum harus berupa angka seperti 1.0.4.", true);
+      return;
+    }
     setSaving(true);
     const { error } = await supabase.from("school_profile_settings").upsert({
       id: 1,
@@ -108,6 +119,7 @@ export function RealSettingsPage({ profile, notify }: { profile: Profile; notify
       session_timeout_minutes: nextSettings.session_timeout_minutes,
       passing_score: nextSettings.passing_score,
       school_timezone: nextSettings.school_timezone,
+      minimum_app_version: minimumAppVersion,
       updated_by: profile.id,
     });
     setSaving(false);
@@ -196,6 +208,7 @@ export function RealSettingsPage({ profile, notify }: { profile: Profile; notify
                 <label><span><b>Catat perpindahan tab</b><small>Simpan event integritas ketika siswa keluar dari layar ujian.</small></span><input type="checkbox" checked={settings.record_tab_switches} onChange={(event) => setSettings({ ...settings, record_tab_switches: event.target.checked })} /></label>
               </div>
               <label className="form-field"><span>Batas sesi tidak aktif</span><select value={settings.session_timeout_minutes} onChange={(event) => setSettings({ ...settings, session_timeout_minutes: Number(event.target.value) })}><option value={30}>30 menit</option><option value={60}>1 jam</option><option value={120}>2 jam</option><option value={240}>4 jam</option><option value={480}>8 jam</option></select></label>
+              <label className="form-field"><span>Versi minimum aplikasi siswa</span><input value={settings.minimum_app_version} inputMode="decimal" placeholder="Contoh: 1.0.4" onChange={(event) => setSettings({ ...settings, minimum_app_version: event.target.value })} /><small>Biarkan kosong untuk tidak memblokir versi lama. Samakan dengan versi rilis yang wajib digunakan siswa.</small></label>
               <div className="security-note"><ShieldCheck /><p><b>Row Level Security aktif</b><span>Hak akses tetap dibatasi oleh role pada database Supabase.</span></p></div>
               <div className="settings-save"><button type="button" className="primary" disabled={saving} onClick={() => void saveSchoolSettings()}><Save />{saving ? "Menyimpan…" : "Simpan keamanan"}</button></div>
             </section>}

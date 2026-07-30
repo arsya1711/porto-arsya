@@ -58,21 +58,22 @@ npm run test:e2e
 supabase migration list
 ```
 
-Migrasi `021_go_live_readiness.sql`,
-`022_student_login_rate_limit.sql`, dan
-`023_security_advisor_hardening.sql`, serta
-`024_remove_duplicate_question_index.sql` harus diterapkan sebelum
-web/function terbaru:
+Seluruh migration sampai `028_protect_last_admin.sql` harus diterapkan sebelum
+web, Edge Function, atau AAB terbaru. Migration `026` menyediakan clock server
+untuk timer, `027` memulihkan konfigurasi singleton sekolah, dan `028`
+mencegah administrator aktif terakhir terhapus:
 
 ```bash
 supabase db push
 supabase migration list
 ```
 
-Karena fungsi login siswa juga diperbarui, deploy fungsi tersebut:
+Deploy seluruh fungsi yang berubah, termasuk pengelolaan akun:
 
 ```bash
 supabase functions deploy student-login
+supabase functions deploy admin-users
+supabase functions deploy import-questions
 supabase functions list
 ```
 
@@ -84,11 +85,9 @@ simpan di lokasi terenkripsi di luar repositori karena PITR tidak tersedia.
 
 ## Catatan audit dependency
 
-`react-router-dom` dipin sementara pada `7.18.1`. Audit npm tanggal
-29 Juli 2026 masih melaporkan `GHSA-qwww-vcr4-c8h2`, tetapi advisory tersebut
-hanya memengaruhi API RSC eksperimental yang tidak dipakai AWExam. Versi perbaikan
-`8.3.0` belum tersedia di registry saat audit dilakukan. Naikkan ke `8.3.0` atau
-lebih baru segera setelah dipublikasikan, lalu jalankan:
+Frontend memakai `react-router` 8.3 atau lebih baru karena versi 7 terkena
+advisory keamanan. Versi ini membutuhkan Node.js minimal 22.22; CI dan
+`.node-version` sudah dikunci pada versi tersebut. Sebelum setiap rilis jalankan:
 
 ```bash
 npm audit --omit=dev

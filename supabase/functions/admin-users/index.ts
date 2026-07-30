@@ -133,6 +133,23 @@ Deno.serve(async (request) => {
 
     if (body.action === 'delete') {
       if (body.user_id === callerData.user.id) return json(request, { error: 'Admin tidak dapat menghapus akunnya sendiri.' }, 400)
+      const targetProfile = await admin
+        .from('profiles')
+        .select('role,active')
+        .eq('id', body.user_id)
+        .single()
+      if (targetProfile.error) return json(request, { error: 'Profil pengguna tidak ditemukan.' }, 404)
+      if (targetProfile.data.role === 'admin' && targetProfile.data.active) {
+        const activeAdmins = await admin
+          .from('profiles')
+          .select('id', { count: 'exact', head: true })
+          .eq('role', 'admin')
+          .eq('active', true)
+        if (activeAdmins.error) return json(request, { error: 'Jumlah administrator aktif tidak dapat diperiksa.' }, 500)
+        if ((activeAdmins.count ?? 0) <= 1) {
+          return json(request, { error: 'Administrator aktif terakhir tidak dapat dihapus.' }, 400)
+        }
+      }
       const { error } = await admin.auth.admin.deleteUser(body.user_id)
       if (error) return json(request, { error: `Akun tidak dapat dihapus: ${error.message}. Nonaktifkan akun bila masih memiliki data terkait.` }, 400)
       const audit = await admin.from('audit_logs').insert({ actor_id: callerData.user.id, action: 'user.deleted', entity_type: 'profile', entity_id: body.user_id })

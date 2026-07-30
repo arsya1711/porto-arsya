@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import {
   AlertTriangle,
   ArrowRight,
@@ -24,6 +24,7 @@ import type { Profile } from "../auth/auth-context";
 import { supabase } from "../lib/supabase";
 import type { ExamStatus, StudentExamCatalogRow } from "../types";
 import { deriveExamStatus } from "../lib/exam-status";
+import { serverClockOffset } from "../lib/exam-timer";
 
 type StaffExam = {
   id: string;
@@ -144,12 +145,13 @@ function relativeTime(value: string) {
   return shortDate(value);
 }
 
-function currentExamStatus(exam: StaffExam): ExamStatus {
+function currentExamStatus(exam: StaffExam, now = Date.now()): ExamStatus {
   return deriveExamStatus(
     exam.status,
     exam.startsAt,
     exam.endsAt,
     exam.duration,
+    now,
   );
 }
 
@@ -567,6 +569,8 @@ export function StudentDashboard({
   logout: () => void;
 }) {
   const now = useDashboardClock();
+  const [clockOffsetMs, setClockOffsetMs] = useState(0);
+  const adjustedNow = now + clockOffsetMs;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [className, setClassName] = useState("Belum ada kelas");
@@ -598,7 +602,8 @@ export function StudentDashboard({
       }
       setLoading(true);
       setError("");
-      const [membershipResult, catalogResult, attemptResult] =
+      const clockRequestStartedAt = Date.now();
+      const [membershipResult, catalogResult, attemptResult, clockResult] =
         await Promise.all([
           supabase
             .from("class_students")
@@ -611,6 +616,7 @@ export function StudentDashboard({
             .from("attempts")
             .select("id,exam_id,status,final_score,started_at,submitted_at")
             .eq("student_id", profile.id),
+          supabase.rpc("get_server_time"),
         ]);
       const firstError = [
         membershipResult.error,
@@ -622,6 +628,14 @@ export function StudentDashboard({
         setError(firstError.message);
         setLoading(false);
         return;
+      }
+
+      let loadedClockOffset = 0;
+      if (!clockResult.error) {
+        const clientMidpoint =
+          clockRequestStartedAt + (Date.now() - clockRequestStartedAt) / 2;
+        loadedClockOffset = serverClockOffset(clockResult.data, clientMidpoint);
+        setClockOffsetMs(loadedClockOffset);
       }
 
       const attempts: StudentAttempt[] = (attemptResult.data ?? []).map(
@@ -650,6 +664,7 @@ export function StudentDashboard({
               rawExam.starts_at,
               rawExam.ends_at,
               duration,
+              Date.now() + loadedClockOffset,
             ),
             participants: 0,
             questionCount: Number(rawExam.question_count ?? 0),
@@ -722,7 +737,7 @@ export function StudentDashboard({
   const available = exams
     .filter(
       (exam) =>
-        currentExamStatus(exam) === "berlangsung" &&
+        currentExamStatus(exam, adjustedNow) === "berlangsung" &&
         !["submitted", "grading", "final"].includes(exam.attempt?.status ?? ""),
     )
     .sort(
@@ -730,7 +745,7 @@ export function StudentDashboard({
         new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime(),
     );
   const upcoming = exams
-    .filter((exam) => new Date(exam.startsAt).getTime() > now)
+    .filter((exam) => new Date(exam.startsAt).getTime() > adjustedNow)
     .sort(
       (left, right) =>
         new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime(),

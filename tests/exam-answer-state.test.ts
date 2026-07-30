@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   isAnsweredValue,
+  mayFinalizeAttempt,
   normalizeStoredAnswers,
 } from "../src/lib/exam-answer-state";
 
@@ -26,4 +27,10 @@ test("penghitung jawaban hanya menerima angka valid atau teks berisi", () => {
   assert.equal(isAnsweredValue("   "), false);
   assert.equal(isAnsweredValue(null), false);
   assert.equal(isAnsweredValue(Number.NaN), false);
+});
+
+test("attempt kedaluwarsa tetap difinalisasi walau sinkronisasi terlambat", () => {
+  assert.equal(mayFinalizeAttempt(1, false), false);
+  assert.equal(mayFinalizeAttempt(1, true), true);
+  assert.equal(mayFinalizeAttempt(0, false), true);
 });
