@@ -248,6 +248,20 @@ class AppController extends ChangeNotifier {
     _autoSubmitIfExpired();
   }
 
+  Future<void> refreshServerClock() async {
+    final attemptId = activeAttemptId;
+    if (attemptId == null || submissionCompleted) return;
+    try {
+      final serverNow = await repository.serverTime();
+      if (serverNow == null || activeAttemptId != attemptId) return;
+      _serverClockOffset = serverNow.difference(_now());
+      syncRemainingSeconds();
+    } catch (_) {
+      // Countdown tetap berjalan memakai offset terakhir. Backend selalu
+      // menegakkan deadline walau sinkronisasi clock sementara gagal.
+    }
+  }
+
   void _startCountdown() {
     _countdownTimer?.cancel();
     _countdownTimer = Timer.periodic(

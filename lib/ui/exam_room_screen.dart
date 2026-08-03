@@ -74,6 +74,7 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
       // Timer periodik berhenti selama suspensi, jadi sisa waktu dihitung ulang
       // dari deadline server sebelum layar dipakai lagi.
       widget.controller.syncRemainingSeconds();
+      unawaited(widget.controller.refreshServerClock());
       unawaited(widget.controller.retryUnsyncedAnswers());
       if (widget.controller.activeExam?.recordIntegrityEvents ?? false) {
         unawaited(_recordIntegrityEvent());

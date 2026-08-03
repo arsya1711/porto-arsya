@@ -21,6 +21,7 @@ class FakeExamRepository implements ExamRepository {
     this.failIntegrityEvents = false,
     this.restoreSessionResult = false,
     this.saveDelay = Duration.zero,
+    this.submitDelay = Duration.zero,
   });
 
   static const defaultQuestions = [
@@ -39,6 +40,7 @@ class FakeExamRepository implements ExamRepository {
   String attemptId;
   final DateTime? startedAt;
   final DateTime? serverNow;
+  DateTime? currentServerTime;
   final Map<String, String> savedServerAnswers;
   final List<ExamQuestion> questions;
   final String? minimumVersion;
@@ -48,6 +50,7 @@ class FakeExamRepository implements ExamRepository {
   final bool failIntegrityEvents;
   final bool restoreSessionResult;
   Duration saveDelay;
+  final Duration submitDelay;
 
   final Map<String, String> savedAnswers = {};
   final List<({String attemptId, String questionId, String value})>
@@ -57,6 +60,7 @@ class FakeExamRepository implements ExamRepository {
   int saveCalls = 0;
   int activeSaves = 0;
   int maxConcurrentSaves = 0;
+  int submitCalls = 0;
 
   @override
   StudentProfile get profile => const StudentProfile(
@@ -99,6 +103,9 @@ class FakeExamRepository implements ExamRepository {
     if (failVersionCheck) throw Exception('server tidak terjangkau');
     return minimumVersion;
   }
+
+  @override
+  Future<DateTime?> serverTime() async => currentServerTime ?? serverNow;
 
   @override
   Future<ExamSession> startExam(String examId, {String? accessCode}) async {
@@ -149,6 +156,10 @@ class FakeExamRepository implements ExamRepository {
 
   @override
   Future<void> submitExam(String attemptId) async {
+    submitCalls++;
+    if (submitDelay > Duration.zero) {
+      await Future<void>.delayed(submitDelay);
+    }
     if (failSubmits) {
       throw const ExamOperationException('Server tidak dapat dihubungi.');
     }

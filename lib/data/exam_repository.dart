@@ -10,6 +10,9 @@ abstract interface class ExamRepository {
 
   /// Versi minimum yang masih dilayani server, atau null bila tidak diatur.
   Future<String?> minimumSupportedVersion();
+
+  /// Clock server untuk mengoreksi perubahan jam perangkat saat ujian aktif.
+  Future<DateTime?> serverTime();
   Future<ExamSession> startExam(String examId, {String? accessCode});
   Future<void> saveAnswer({
     required String attemptId,
@@ -75,6 +78,9 @@ class UnavailableExamRepository implements ExamRepository {
 
   @override
   Future<String?> minimumSupportedVersion() async => null;
+
+  @override
+  Future<DateTime?> serverTime() async => null;
 
   @override
   Future<ExamSession> startExam(String examId, {String? accessCode}) {

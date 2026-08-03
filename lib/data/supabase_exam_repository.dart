@@ -392,6 +392,9 @@ class SupabaseExamRepository implements ExamRepository {
   }
 
   @override
+  Future<DateTime?> serverTime() => _loadServerTime();
+
+  @override
   Future<void> saveAnswer({
     required String attemptId,
     required ExamQuestion question,

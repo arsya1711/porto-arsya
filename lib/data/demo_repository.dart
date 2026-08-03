@@ -123,6 +123,9 @@ class DemoRepository implements ExamRepository {
   Future<String?> minimumSupportedVersion() async => null;
 
   @override
+  Future<DateTime?> serverTime() async => DateTime.now();
+
+  @override
   Future<void> refreshExams() async {}
 
   @override

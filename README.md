@@ -58,7 +58,7 @@ flutter run \
   --dart-define=SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
 ```
 
-Jika kedua `dart-define` tidak tersedia, mode demo hanya aktif otomatis pada build debug. Build release akan menolak login agar data demo tidak dipakai tanpa sengaja. Untuk build demo yang disengaja, tambahkan `--dart-define=ALLOW_DEMO=true`.
+Jika kedua `dart-define` tidak tersedia, mode demo hanya aktif otomatis pada build debug. Build release selalu menolak login agar data demo tidak dapat dipakai tanpa sengaja.
 
 Akun Supabase harus memiliki `role = siswa`, `active = true`, NIS unik pada `profiles.student_number`, serta email/password pada Supabase Auth. Database juga harus memiliki RPC `start_exam_attempt`, `get_exam_questions`, dan `submit_exam_attempt` dari migrasi backend AWExam.
 

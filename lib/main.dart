@@ -17,7 +17,6 @@ Future<void> main() async {
   // pernah menaruh service_role atau secret server lain di aplikasi klien.
   const compiledSupabaseUrl = String.fromEnvironment('SUPABASE_URL');
   const compiledSupabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
-  const allowDemo = bool.fromEnvironment('ALLOW_DEMO');
   late final ExamRepository repository;
 
   if (compiledSupabaseUrl.isNotEmpty && compiledSupabaseAnonKey.isNotEmpty) {
@@ -29,7 +28,7 @@ Future<void> main() async {
       ),
     );
     repository = SupabaseExamRepository(Supabase.instance.client);
-  } else if (!kReleaseMode || allowDemo) {
+  } else if (!kReleaseMode) {
     repository = DemoRepository();
   } else {
     repository = const UnavailableExamRepository();

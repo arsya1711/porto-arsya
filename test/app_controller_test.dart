@@ -123,6 +123,23 @@ void main() {
       expect(controller.operationError, contains('belum tersimpan'));
     });
 
+    test('prevents duplicate submissions while the first is in flight', () async {
+      final repository = FakeExamRepository(
+        submitDelay: const Duration(milliseconds: 20),
+      );
+      final controller = AppController(repository);
+      addTearDown(controller.dispose);
+
+      await controller.startExam(repository.exams.single);
+      final first = controller.submitExam();
+      await Future<void>.delayed(Duration.zero);
+      final duplicate = await controller.submitExam();
+
+      expect(duplicate, isFalse);
+      expect(await first, isTrue);
+      expect(repository.submitCalls, 1);
+    });
+
     test('serializes rapid changes so the latest answer wins', () async {
       final repository = FakeExamRepository(delayedValue: '0');
       final controller = AppController(repository);
@@ -262,6 +279,24 @@ void main() {
       deviceNow = deviceNow.add(const Duration(minutes: 25));
       controller.syncRemainingSeconds();
       expect(controller.remainingSeconds, 2100);
+    });
+
+    test('corrects a device clock changed during an active exam', () async {
+      final serverNow = DateTime(2026, 1, 1, 8);
+      var deviceNow = serverNow;
+      final repository = FakeExamRepository(
+        startedAt: serverNow,
+        serverNow: serverNow,
+      );
+      final controller = AppController(repository, clock: () => deviceNow);
+      addTearDown(controller.dispose);
+
+      await controller.startExam(repository.exams.single);
+      deviceNow = serverNow.add(const Duration(hours: 5, minutes: 10));
+      repository.currentServerTime = serverNow.add(const Duration(minutes: 10));
+      await controller.refreshServerClock();
+
+      expect(controller.remainingSeconds, 3000);
     });
 
     test('does not submit during the final partial second', () async {
