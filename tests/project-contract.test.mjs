@@ -228,3 +228,25 @@ test('ekspor akun siswa memakai workbook bergaya tanpa mengubah ekspor peran lai
   assert.match(adminFunction, /homeroom_teacher_id/)
   assert.match(adminFunction, /Guru hanya dapat mengatur password siswa pada kelas yang diampu/)
 })
+
+test('Audit & Keamanan memprioritaskan log error dengan retensi tujuh hari', async () => {
+  const [page, migration] = await Promise.all([
+    read('src/components/AdminPages.tsx'),
+    read('supabase/migrations/031_frontend_error_log_retention.sql'),
+  ])
+  assert.match(page, /Log Error Website/)
+  assert.match(page, /useState<"integrity" \| "errors">\("errors"\)/)
+  assert.doesNotMatch(page, /Aktivitas sistem/)
+  assert.match(page, /Log yang berusia lebih dari 7 hari dihapus otomatis/)
+  assert.match(migration, /create extension if not exists pg_cron/)
+  assert.match(migration, /created_at < now\(\) - interval '7 days'/)
+  assert.match(migration, /purge-frontend-error-logs-daily/)
+  assert.match(migration, /20 17 \* \* \*/)
+})
+
+test('form ujian mengizinkan durasi kosong saat diedit lalu memvalidasinya', async () => {
+  const assessment = await read('src/components/AssessmentPages.tsx')
+  assert.match(assessment, /parseExamDurationInput\(event\.target\.value\)/)
+  assert.match(assessment, /isValidExamDuration\(draft\.duration\)/)
+  assert.doesNotMatch(assessment, /duration: Math\.max\(1, Number\(event\.target\.value\)\)/)
+})

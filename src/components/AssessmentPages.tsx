@@ -24,6 +24,11 @@ import {
 } from "../lib/school-timezone";
 import { fetchAllPages } from "../lib/supabase-pagination";
 import { useAccessibleDialog } from "../lib/use-accessible-dialog";
+import {
+  type ExamDurationValue,
+  isValidExamDuration,
+  parseExamDurationInput,
+} from "../lib/exam-duration";
 
 type Notify = (text: string, error?: boolean) => void;
 
@@ -64,7 +69,7 @@ type ExamDraft = {
   subjectId: string;
   classId: string;
   startsAt: string;
-  duration: number;
+  duration: ExamDurationValue;
   accessCode: string;
   hadAccessCode: boolean;
   removeAccessCode: boolean;
@@ -400,6 +405,10 @@ export function RealExamManagement({
       notify("Lengkapi judul, mata pelajaran, kelas, dan pilih minimal satu soal.", true);
       return;
     }
+    if (!isValidExamDuration(draft.duration)) {
+      notify("Durasi ujian harus berupa angka bulat antara 1 dan 480 menit.", true);
+      return;
+    }
     if (draft.accessCode.trim() && draft.accessCode.trim().length < 4) {
       notify("Kode akses minimal terdiri dari 4 karakter.", true);
       return;
@@ -473,7 +482,7 @@ export function RealExamManagement({
         notify("Lengkapi judul, mata pelajaran, dan kelas peserta.", true);
         return;
       }
-      if (!draft.startsAt || !schoolDateTimeToIso(draft.startsAt, schoolTimezone) || draft.duration < 1) {
+      if (!draft.startsAt || !schoolDateTimeToIso(draft.startsAt, schoolTimezone) || !isValidExamDuration(draft.duration)) {
         notify("Periksa kembali jadwal mulai dan durasi ujian.", true);
         return;
       }
@@ -592,7 +601,7 @@ export function RealExamManagement({
                       <label className="form-field"><span>Kelas peserta</span><select value={draft.classId} onChange={(event) => { const classId = event.target.value; setDraft({ ...draft, classId, subjectId: subjectsForClass(classId)[0]?.id ?? "", questionIds: [] }); }}>{assignedClasses.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
                       <label className="form-field"><span>Mata pelajaran</span><select value={draft.subjectId} onChange={(event) => setDraft({ ...draft, subjectId: event.target.value, questionIds: [] })}>{availableDraftSubjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
                       <label className="form-field"><span>Mulai <small>(zona waktu sekolah: {schoolTimezone})</small></span><input type="datetime-local" value={draft.startsAt} onChange={(event) => setDraft({ ...draft, startsAt: event.target.value })} /></label>
-                      <label className="form-field"><span>Durasi (menit)</span><input type="number" min={1} value={draft.duration} onChange={(event) => setDraft({ ...draft, duration: Math.max(1, Number(event.target.value)) })} /></label>
+                      <label className="form-field"><span>Durasi (menit)</span><input type="number" min={1} max={480} step={1} value={draft.duration} onChange={(event) => setDraft({ ...draft, duration: parseExamDurationInput(event.target.value) })} /></label>
                       <label className="form-field"><span>Status awal</span><select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as ExamDraft["status"] })}><option value="draft">Simpan sebagai draft</option><option value="terjadwal">Jadwalkan untuk peserta</option></select></label>
                     </div>
                   </div>

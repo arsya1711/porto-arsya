@@ -11,7 +11,6 @@ import {
   BookOpen,
   CalendarDays,
   CheckCircle2,
-  History,
   Pencil,
   Plus,
   RefreshCw,
@@ -39,16 +38,6 @@ type Subject = {
 type SubjectClass = {
   id: string;
   name: string;
-};
-
-type AuditRow = {
-  id: number;
-  actor_id: string | null;
-  action: string;
-  entity_type: string | null;
-  entity_id: string | null;
-  metadata: Record<string, unknown> | null;
-  created_at: string;
 };
 
 type IntegrityRow = {
@@ -470,52 +459,20 @@ export function SubjectsPage({ notify }: { notify: Notify }) {
   );
 }
 
-function auditLabel(action: string) {
-  const labels: Record<string, string> = {
-    "user.created": "Membuat akun pengguna",
-    "user.updated": "Memperbarui akun pengguna",
-    "user.deleted": "Menghapus akun pengguna",
-    "user.activated": "Mengaktifkan akun pengguna",
-    "user.deactivated": "Menonaktifkan akun pengguna",
-    "user.password_reset": "Mereset kata sandi pengguna",
-    "academic_years.insert": "Menambahkan tahun ajaran",
-    "academic_years.update": "Memperbarui tahun ajaran",
-    "academic_years.delete": "Menghapus tahun ajaran",
-    "subjects.insert": "Menambahkan mata pelajaran",
-    "subjects.update": "Memperbarui mata pelajaran",
-    "subjects.delete": "Menghapus mata pelajaran",
-    "class_subjects.insert": "Menambahkan mata pelajaran ke kelas",
-    "class_subjects.delete": "Menghapus mata pelajaran dari kelas",
-    "classes.insert": "Menambahkan kelas",
-    "classes.update": "Memperbarui kelas",
-    "classes.delete": "Menghapus kelas",
-    "class_students.insert": "Menempatkan siswa ke kelas",
-    "class_students.update": "Memperbarui keanggotaan kelas",
-    "class_students.delete": "Mengeluarkan siswa dari kelas",
-  };
-  return labels[action] ?? action.split(".").join(" ");
-}
-
 export function AuditSecurityPage({ notify }: { notify: Notify }) {
-  const [audits, setAudits] = useState<AuditRow[]>([]);
-  const [actorNames, setActorNames] = useState<Record<string, string>>({});
   const [integrityEvents, setIntegrityEvents] = useState<IntegrityRow[]>([]);
   const [frontendErrors, setFrontendErrors] = useState<FrontendErrorRow[]>([]);
+  const [frontendErrorCount, setFrontendErrorCount] = useState(0);
   const [integrityCount, setIntegrityCount] = useState(0);
   const [activeUsers, setActiveUsers] = useState(0);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
-  const [view, setView] = useState<"activity" | "integrity" | "errors">("activity");
+  const [view, setView] = useState<"integrity" | "errors">("errors");
 
   const load = useCallback(async () => {
     if (!supabase) return;
     setLoading(true);
-    const [auditResult, integrityResult, usersResult, errorResult] = await Promise.all([
-      supabase
-        .from("audit_logs")
-        .select("id,actor_id,action,entity_type,entity_id,metadata,created_at")
-        .order("created_at", { ascending: false })
-        .limit(100),
+    const [integrityResult, usersResult, errorResult] = await Promise.all([
       supabase
         .from("integrity_events")
         .select("id,event_type,metadata,occurred_at,student_id,profiles(full_name),attempts(exams(title))", { count: "exact" })
@@ -527,32 +484,22 @@ export function AuditSecurityPage({ notify }: { notify: Notify }) {
         .eq("active", true),
       supabase
         .from("frontend_error_logs")
-        .select("id,reference_id,error_message,path,user_agent,created_at,profiles(full_name,email)")
+        .select("id,reference_id,error_message,path,user_agent,created_at,profiles(full_name,email)", { count: "exact" })
         .order("created_at", { ascending: false })
         .limit(100),
     ]);
     const requestError =
-      auditResult.error ??
       integrityResult.error ??
       usersResult.error ??
       errorResult.error;
     if (requestError) notify(requestError.message, true);
-    if (auditResult.error) setAudits([]);
-    else {
-      const rows = (auditResult.data ?? []) as AuditRow[];
-      setAudits(rows);
-      const actorIds = [...new Set(rows.map((row) => row.actor_id).filter(Boolean))] as string[];
-      if (actorIds.length) {
-        const { data } = await supabase.from("profiles").select("id,full_name").in("id", actorIds);
-        setActorNames(Object.fromEntries((data ?? []).map((actor) => [actor.id, actor.full_name])));
-      } else setActorNames({});
-    }
     setIntegrityEvents(integrityResult.error ? [] : (integrityResult.data ?? []) as unknown as IntegrityRow[]);
     setFrontendErrors(
       errorResult.error
         ? []
         : (errorResult.data ?? []) as unknown as FrontendErrorRow[],
     );
+    setFrontendErrorCount(errorResult.count ?? 0);
     setIntegrityCount(integrityResult.count ?? 0);
     setActiveUsers(usersResult.count ?? 0);
     setLoading(false);
@@ -562,14 +509,6 @@ export function AuditSecurityPage({ notify }: { notify: Notify }) {
     void load();
   }, [load]);
 
-  const filteredAudits = useMemo(() => {
-    const value = query.trim().toLowerCase();
-    if (!value) return audits;
-    return audits.filter((audit) =>
-      [audit.action, audit.entity_type ?? "", actorNames[audit.actor_id ?? ""] ?? ""]
-        .some((item) => item.toLowerCase().includes(value)),
-    );
-  }, [actorNames, audits, query]);
   const filteredIntegrityEvents = useMemo(() => {
     const value = query.trim().toLowerCase();
     if (!value) return integrityEvents;
@@ -599,23 +538,23 @@ export function AuditSecurityPage({ notify }: { notify: Notify }) {
       <AdminPageTitle
         eyebrow="KONTROL SISTEM"
         title="Audit & Keamanan"
-        description="Tinjau tindakan sensitif dan indikator keamanan tingkat sekolah."
+        description="Pantau log error website dan event integritas ujian. Log error disimpan maksimal 7 hari."
         action={<button className="outline" onClick={load}><RefreshCw /> Segarkan</button>}
       />
       <div className="audit-summary">
         <div className="card"><span className="admin-card-icon green"><CheckCircle2 /></span><p><small>AKUN AKTIF</small><b>{activeUsers}</b><span>pengguna dapat masuk</span></p></div>
         <div className="card"><span className="admin-card-icon amber"><ShieldCheck /></span><p><small>EVENT INTEGRITAS</small><b>{integrityCount}</b><span>tercatat di seluruh ujian</span></p></div>
-        <div className="card"><span className="admin-card-icon blue"><History /></span><p><small>LOG TERBARU</small><b>{audits.length}</b><span>maksimal 100 aktivitas</span></p></div>
-        <div className="card"><span className="admin-card-icon purple"><AlertTriangle /></span><p><small>ERROR FRONTEND</small><b>{frontendErrors.length}</b><span>maksimal 100 laporan terbaru</span></p></div>
+        <div className="card"><span className="admin-card-icon purple"><AlertTriangle /></span><p><small>LOG ERROR WEBSITE</small><b>{frontendErrorCount}</b><span>error dalam masa retensi</span></p></div>
+        <div className="card"><span className="admin-card-icon blue"><CalendarDays /></span><p><small>RETENSI LOG</small><b>7 hari</b><span>dihapus otomatis setiap hari</span></p></div>
       </div>
       <div className="section-switcher" aria-label="Jenis catatan keamanan">
         <button
           type="button"
-          className={view === "activity" ? "active" : ""}
-          aria-pressed={view === "activity"}
-          onClick={() => { setView("activity"); setQuery(""); }}
+          className={view === "errors" ? "active" : ""}
+          aria-pressed={view === "errors"}
+          onClick={() => { setView("errors"); setQuery(""); }}
         >
-          <History /> Aktivitas sistem <span>{audits.length}</span>
+          <AlertTriangle /> Log Error Website <span>{frontendErrorCount}</span>
         </button>
         <button
           type="button"
@@ -625,45 +564,18 @@ export function AuditSecurityPage({ notify }: { notify: Notify }) {
         >
           <ShieldCheck /> Integritas ujian <span>{integrityCount}</span>
         </button>
-        <button
-          type="button"
-          className={view === "errors" ? "active" : ""}
-          aria-pressed={view === "errors"}
-          onClick={() => { setView("errors"); setQuery(""); }}
-        >
-          <AlertTriangle /> Error aplikasi <span>{frontendErrors.length}</span>
-        </button>
       </div>
       <div className="toolbar">
         <div>
-          {view === "activity" ? <History /> : view === "integrity" ? <ShieldCheck /> : <AlertTriangle />}
+          {view === "integrity" ? <ShieldCheck /> : <AlertTriangle />}
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder={view === "activity" ? "Cari tindakan, aktor, atau entitas…" : view === "integrity" ? "Cari siswa, ujian, atau event…" : "Cari referensi, pengguna, halaman, atau pesan error…"}
+            placeholder={view === "integrity" ? "Cari siswa, ujian, atau event…" : "Cari referensi, pengguna, halaman, atau pesan error…"}
           />
         </div>
       </div>
-      {view === "activity" ? <div className="table-card audit-table">
-        <table>
-          <thead><tr><th>WAKTU</th><th>AKTOR</th><th>TINDAKAN</th><th>ENTITAS</th></tr></thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={4}>Memuat audit log…</td></tr>
-            ) : filteredAudits.length === 0 ? (
-              <tr><td colSpan={4}>Belum ada aktivitas yang cocok.</td></tr>
-            ) : filteredAudits.map((audit) => (
-              <tr key={audit.id}>
-                <td data-label="Waktu">{new Date(audit.created_at).toLocaleString("id-ID")}</td>
-                <td data-label="Aktor"><b className="table-main">{actorNames[audit.actor_id ?? ""] ?? "Sistem"}</b></td>
-                <td data-label="Tindakan">{auditLabel(audit.action)}</td>
-                <td data-label="Entitas"><span className="subject-code">{audit.entity_type ?? "—"}</span>{audit.entity_id ? <small>{audit.entity_id.slice(0, 8)}</small> : null}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="table-footer"><span>Menampilkan maksimal 100 aktivitas terbaru</span></div>
-      </div> : view === "integrity" ? <div className="table-card audit-table integrity-table">
+      {view === "integrity" ? <div className="table-card audit-table integrity-table">
         <table>
           <thead><tr><th>WAKTU</th><th>SISWA</th><th>UJIAN</th><th>EVENT</th><th>DETAIL</th></tr></thead>
           <tbody>
@@ -688,9 +600,9 @@ export function AuditSecurityPage({ notify }: { notify: Notify }) {
           <thead><tr><th>WAKTU</th><th>REFERENSI</th><th>PENGGUNA</th><th>HALAMAN</th><th>PESAN</th></tr></thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5}>Memuat error aplikasi…</td></tr>
+              <tr><td colSpan={5}>Memuat log error website…</td></tr>
             ) : filteredFrontendErrors.length === 0 ? (
-              <tr><td colSpan={5}>Belum ada error frontend yang tercatat.</td></tr>
+              <tr><td colSpan={5}>Belum ada log error website yang tercatat.</td></tr>
             ) : filteredFrontendErrors.map((item) => (
               <tr key={item.id}>
                 <td data-label="Waktu">{new Date(item.created_at).toLocaleString("id-ID")}</td>
@@ -702,7 +614,7 @@ export function AuditSecurityPage({ notify }: { notify: Notify }) {
             ))}
           </tbody>
         </table>
-        <div className="table-footer"><span>Gunakan ID referensi dari layar error untuk menemukan laporan terkait</span></div>
+        <div className="table-footer"><span>Gunakan ID referensi untuk penelusuran. Log yang berusia lebih dari 7 hari dihapus otomatis.</span></div>
       </div>}
     </div>
   );
