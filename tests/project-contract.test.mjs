@@ -167,3 +167,23 @@ test('migration melindungi waktu server, konfigurasi, dan admin terakhir', async
   assert.match(adminGuard, /pg_advisory_xact_lock/i)
   assert.match(adminGuard, /profiles_protect_last_active_admin/i)
 })
+
+test('percobaan ulang kode akses membersihkan error lama sebelum memuat ujian', async () => {
+  const app = await read('src/App.tsx')
+  assert.match(
+    app,
+    /const load = async \(\) => \{\s*setLoadingExam\(true\);\s*(?:\/\/[^\n]*\n\s*)*setExamError\(""\);/,
+  )
+})
+
+test('policy integritas siswa tidak bergantung pada SELECT langsung ke exams', async () => {
+  const migration = await read('supabase/migrations/029_fix_student_integrity_policy.sql')
+  assert.match(migration, /can_record_student_integrity_event/)
+  assert.match(migration, /security definer/i)
+  assert.match(migration, /attempt\.student_id = auth\.uid\(\)/)
+  assert.match(migration, /exam\.record_tab_switches/)
+  assert.match(migration, /attempt\.status = 'in_progress'/)
+  assert.match(migration, /octet_length/)
+  assert.match(migration, /to authenticated/)
+  assert.match(migration, /from public, anon/)
+})

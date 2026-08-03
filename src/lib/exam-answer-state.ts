@@ -30,3 +30,13 @@ export function normalizeStoredAnswers(
     ),
   );
 }
+
+export function normalizeStoredMarks(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(
+    value.filter(
+      (questionId): questionId is string =>
+        typeof questionId === "string" && questionId.trim().length > 0,
+    ),
+  )];
+}

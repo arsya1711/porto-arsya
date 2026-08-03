@@ -82,6 +82,7 @@ import {
   isAnsweredValue,
   mayFinalizeAttempt,
   normalizeStoredAnswers,
+  normalizeStoredMarks,
 } from "./lib/exam-answer-state";
 import {
   formatExamRemaining,
@@ -2267,7 +2268,7 @@ function ExamRunner({
     normalizeStoredAnswers(loadLocal<unknown>(`answers:${examId}`, {})),
   );
   const [marked, setMarked] = useState<string[]>(() =>
-    loadLocal(`marked:${examId}`, []),
+    normalizeStoredMarks(loadLocal<unknown>(`marked:${examId}`, [])),
   );
   const [remaining, setRemaining] = useState(0);
   const [submit, setSubmit] = useState(false);
@@ -2305,6 +2306,9 @@ function ExamRunner({
     let active = true;
     const load = async () => {
       setLoadingExam(true);
+      // Percobaan kode akses sebelumnya boleh gagal. Jangan biarkan pesan
+      // tersebut menutupi soal setelah percobaan berikutnya berhasil.
+      setExamError("");
       deadlineRef.current = null;
       setRemaining(0);
       const clockRequestStartedAt = Date.now();
@@ -2372,7 +2376,9 @@ function ExamRunner({
       deadlineRef.current = deadlineTime;
       const currentServerTime = serverAdjustedNow(serverClockOffsetRef.current);
       if (deadlineTime <= currentServerTime) {
-        const localAnswers = loadLocal<Record<string, number | string>>(`answers:${examId}`, {});
+        const localAnswers = normalizeStoredAnswers(
+          loadLocal<unknown>(`answers:${examId}`, {}),
+        );
         const localAnswerEntries = Object.entries(localAnswers);
         let expiredSaveFailed = localAnswerEntries.length > 0 && currentServerTime - deadlineTime > 10_000;
         if (currentServerTime - deadlineTime <= 10_000) {
@@ -2450,6 +2456,9 @@ function ExamRunner({
       const localAnswers = normalizeStoredAnswers(
         loadLocal<unknown>(`answers:${examId}`, {}),
       );
+      const localMarks = normalizeStoredMarks(
+        loadLocal<unknown>(`marked:${examId}`, []),
+      );
       unsyncedAnswersRef.current = new Set(
         Object.entries(localAnswers)
           .filter(([questionId, value]) => remoteAnswers[questionId] !== value)
@@ -2457,6 +2466,8 @@ function ExamRunner({
       );
       setUnsyncedCount(unsyncedAnswersRef.current.size);
       setAnswers({ ...remoteAnswers, ...localAnswers });
+      setMarked(localMarks);
+      setCurrent(0);
       setLoadingExam(false);
     };
     void load();

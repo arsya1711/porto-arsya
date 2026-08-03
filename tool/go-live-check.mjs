@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 const appUrl = new URL(process.env.APP_URL ?? "https://porto-arsya.pages.dev");
 const envFile = process.env.ENV_FILE ?? ".env";
 const timeoutMs = Number(process.env.CHECK_TIMEOUT_MS ?? 15_000);
+const checkEdgeFunctions = process.env.CHECK_EDGE_FUNCTIONS !== "false";
 
 function parseEnv(source) {
   const result = {};
@@ -129,27 +130,33 @@ assert.equal(
   200,
   "RPC get_server_time belum tersedia; terapkan migration Supabase terbaru sebelum deploy web/mobile",
 );
+const serverTimeValue = await serverTime.json();
 assert.ok(
-  Number.isFinite(Date.parse(await serverTime.text())),
+  typeof serverTimeValue === "string"
+    && Number.isFinite(Date.parse(serverTimeValue)),
   "RPC get_server_time mengembalikan waktu yang tidak valid",
 );
 console.log("  ✓ Waktu ujian memakai clock server");
 
-for (const functionName of ["admin-users", "student-login", "import-questions"]) {
-  const response = await checkedFetch(
-    new URL(`/functions/v1/${functionName}`, supabaseUrl),
-    {
-      method: "OPTIONS",
-      headers: { ...apiHeaders, Origin: appUrl.origin },
-    },
-  );
-  assert.ok(response.ok, `${functionName} preflight menghasilkan HTTP ${response.status}`);
-  assert.equal(
-    response.headers.get("access-control-allow-origin"),
-    appUrl.origin,
-    `${functionName} belum mengizinkan origin ${appUrl.origin}`,
-  );
-  console.log(`  ✓ Edge Function ${functionName} menerima origin production`);
+if (checkEdgeFunctions) {
+  for (const functionName of ["admin-users", "student-login", "import-questions"]) {
+    const response = await checkedFetch(
+      new URL(`/functions/v1/${functionName}`, supabaseUrl),
+      {
+        method: "OPTIONS",
+        headers: { ...apiHeaders, Origin: appUrl.origin },
+      },
+    );
+    assert.ok(response.ok, `${functionName} preflight menghasilkan HTTP ${response.status}`);
+    assert.equal(
+      response.headers.get("access-control-allow-origin"),
+      appUrl.origin,
+      `${functionName} belum mengizinkan origin ${appUrl.origin}`,
+    );
+    console.log(`  ✓ Edge Function ${functionName} menerima origin production`);
+  }
+} else {
+  console.log("  - Pemeriksaan Edge Functions dilewati");
 }
 
 console.log("✓ Pemeriksaan go-live infrastruktur lulus");
