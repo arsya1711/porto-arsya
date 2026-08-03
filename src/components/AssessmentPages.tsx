@@ -49,6 +49,7 @@ type ExamRow = {
 };
 
 type Option = { id: string; name: string };
+type AssignmentPair = { class_id: string; subject_id: string };
 type QuestionOption = Option & {
   body: string;
   type: "multiple_choice" | "essay";
@@ -217,6 +218,7 @@ export function RealExamManagement({
   const [exams, setExams] = useState<ExamRow[]>([]);
   const [subjects, setSubjects] = useState<Option[]>([]);
   const [classes, setClasses] = useState<Option[]>([]);
+  const [assignmentPairs, setAssignmentPairs] = useState<AssignmentPair[]>([]);
   const [questions, setQuestions] = useState<QuestionOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -237,7 +239,7 @@ export function RealExamManagement({
     }
     setLoading(true);
     setError("");
-    const [examResult, subjectResult, classResult, questionResult, settingsResult] = await Promise.all([
+    const [examResult, subjectResult, classResult, assignmentResult, questionResult, settingsResult] = await Promise.all([
       fetchAllPages((from, to) =>
         client
           .from("exams")
@@ -247,6 +249,7 @@ export function RealExamManagement({
       ),
       client.from("subjects").select("id,name").order("name"),
       client.from("classes").select("id,name").order("name"),
+      client.from("teacher_subjects").select("class_id,subject_id"),
       fetchAllPages((from, to) =>
         client
           .from("questions")
@@ -257,13 +260,14 @@ export function RealExamManagement({
       ),
       client.from("school_profile_settings").select("require_fullscreen_default,record_tab_switches,school_timezone").eq("id", 1).maybeSingle(),
     ]);
-    const requestError = examResult.error ?? subjectResult.error ?? classResult.error ?? questionResult.error;
+    const requestError = examResult.error ?? subjectResult.error ?? classResult.error ?? assignmentResult.error ?? questionResult.error;
     if (requestError) {
       setError(requestError.message);
     } else {
       setExams((examResult.data ?? []) as unknown as ExamRow[]);
       setSubjects((subjectResult.data ?? []) as Option[]);
       setClasses((classResult.data ?? []) as Option[]);
+      setAssignmentPairs((assignmentResult.data ?? []) as AssignmentPair[]);
       setQuestions(
         (questionResult.data ?? []).map((row) => {
           const bank = nestedRecord(row.question_banks);
@@ -314,13 +318,36 @@ export function RealExamManagement({
 
   useEffect(() => setPage(1), [search]);
 
+  const assignedClasses = useMemo(
+    () => classes.filter((item) =>
+      assignmentPairs.some((assignment) => assignment.class_id === item.id),
+    ),
+    [assignmentPairs, classes],
+  );
+
+  const subjectsForClass = useCallback(
+    (classId: string) => subjects.filter((subject) =>
+      assignmentPairs.some(
+        (assignment) =>
+          assignment.class_id === classId && assignment.subject_id === subject.id,
+      ),
+    ),
+    [assignmentPairs, subjects],
+  );
+
   const openCreate = () => {
+    const initialClassId = assignedClasses[0]?.id ?? "";
+    const initialSubjectId = subjectsForClass(initialClassId)[0]?.id ?? "";
+    if (!initialClassId || !initialSubjectId) {
+      notify("Belum ada penugasan mata pelajaran untuk kelas. Hubungi Admin terlebih dahulu.", true);
+      return;
+    }
     setExamStep(0);
     setDraft({
       title: "",
       description: "",
-      subjectId: subjects[0]?.id ?? "",
-      classId: classes[0]?.id ?? "",
+      subjectId: initialSubjectId,
+      classId: initialClassId,
       startsAt: isoToSchoolDateTimeInput(null, schoolTimezone),
       duration: 90,
       accessCode: "",
@@ -467,6 +494,7 @@ export function RealExamManagement({
 
   const selectedSubjectName = subjects.find((item) => item.id === draft?.subjectId)?.name ?? "Belum dipilih";
   const selectedClassName = classes.find((item) => item.id === draft?.classId)?.name ?? "Belum dipilih";
+  const availableDraftSubjects = subjectsForClass(draft?.classId ?? "");
   const examStepTitles = ["Informasi dasar", "Pilih soal", "Keamanan & publikasi"];
 
   return (
@@ -561,8 +589,8 @@ export function RealExamManagement({
                     <label className="form-field"><span>Judul ujian</span><input autoFocus value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="Contoh: Penilaian Tengah Semester" /></label>
                     <label className="form-field"><span>Deskripsi (opsional)</span><textarea rows={2} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} placeholder="Tambahkan petunjuk singkat untuk peserta." /></label>
                     <div className="form-grid">
-                      <label className="form-field"><span>Mata pelajaran</span><select value={draft.subjectId} onChange={(event) => setDraft({ ...draft, subjectId: event.target.value, questionIds: [] })}>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
-                      <label className="form-field"><span>Kelas peserta</span><select value={draft.classId} onChange={(event) => setDraft({ ...draft, classId: event.target.value })}>{classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+                      <label className="form-field"><span>Kelas peserta</span><select value={draft.classId} onChange={(event) => { const classId = event.target.value; setDraft({ ...draft, classId, subjectId: subjectsForClass(classId)[0]?.id ?? "", questionIds: [] }); }}>{assignedClasses.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+                      <label className="form-field"><span>Mata pelajaran</span><select value={draft.subjectId} onChange={(event) => setDraft({ ...draft, subjectId: event.target.value, questionIds: [] })}>{availableDraftSubjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
                       <label className="form-field"><span>Mulai <small>(zona waktu sekolah: {schoolTimezone})</small></span><input type="datetime-local" value={draft.startsAt} onChange={(event) => setDraft({ ...draft, startsAt: event.target.value })} /></label>
                       <label className="form-field"><span>Durasi (menit)</span><input type="number" min={1} value={draft.duration} onChange={(event) => setDraft({ ...draft, duration: Math.max(1, Number(event.target.value)) })} /></label>
                       <label className="form-field"><span>Status awal</span><select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as ExamDraft["status"] })}><option value="draft">Simpan sebagai draft</option><option value="terjadwal">Jadwalkan untuk peserta</option></select></label>

@@ -96,6 +96,7 @@ import { encodeCsv } from "./lib/csv";
 import { fetchAllPages } from "./lib/supabase-pagination";
 import { useAccessibleDialog } from "./lib/use-accessible-dialog";
 import { edgeFunctionErrorMessage } from "./lib/edge-function-error";
+import { buildStudentAccountWorkbook } from "./lib/student-account-workbook";
 
 type Toast = { text: string; error?: boolean } | null;
 
@@ -861,6 +862,7 @@ function Toolbar({
   filterValue,
   onFilterChange,
   onExport,
+  exportLabel = "Ekspor CSV",
 }: {
   placeholder: string;
   value?: string;
@@ -868,6 +870,7 @@ function Toolbar({
   filterValue?: string;
   onFilterChange?: (value: string) => void;
   onExport?: () => void;
+  exportLabel?: string;
 }) {
   return (
     <div className="toolbar">
@@ -900,7 +903,7 @@ function Toolbar({
       {onExport && (
         <button type="button" onClick={onExport}>
           <Download />
-          Ekspor CSV
+          {exportLabel}
         </button>
       )}
     </div>
@@ -1004,6 +1007,10 @@ function UserManagement({
   const [editing, setEditing] = useState<ManagedUser | null>(null);
   const [resetting, setResetting] = useState<ManagedUser | null>(null);
   const [assigning, setAssigning] = useState<ManagedUser | null>(null);
+  const [temporaryPasswords, setTemporaryPasswords] = useState<Record<string, string>>({});
+  const [revealedPasswordIds, setRevealedPasswordIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [query, setQuery] = useState("");
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [subjects, setSubjects] = useState<SubjectOption[]>([]);
@@ -1150,15 +1157,28 @@ function UserManagement({
     class_id: string;
   }) => {
     try {
-      await invoke({
+      const result = await invoke({
         action: "create",
         ...form,
         role: roleFilter,
         student_number: form.student_number || null,
         class_id: form.class_id || null,
       });
+      if (roleFilter === "siswa" && typeof result?.user_id === "string") {
+        setTemporaryPasswords((current) => ({
+          ...current,
+          [result.user_id]: form.password,
+        }));
+        setRevealedPasswordIds((current) =>
+          new Set(current).add(result.user_id),
+        );
+      }
       setCreate(false);
-      notify("Akun pengguna berhasil dibuat.");
+      notify(
+        roleFilter === "siswa"
+          ? "Akun berhasil dibuat. Password sementara ditampilkan sampai halaman dimuat ulang."
+          : "Akun pengguna berhasil dibuat.",
+      );
       await loadUsers();
     } catch (error) {
       notify(
@@ -1186,8 +1206,19 @@ function UserManagement({
   const resetUser = async (user: ManagedUser, password: string) => {
     try {
       await invoke({ action: "reset_password", user_id: user.id, password });
+      if (roleFilter === "siswa") {
+        setTemporaryPasswords((current) => ({
+          ...current,
+          [user.id]: password,
+        }));
+        setRevealedPasswordIds((current) => new Set(current).add(user.id));
+      }
       setResetting(null);
-      notify("Kata sandi sementara berhasil diperbarui.");
+      notify(
+        roleFilter === "siswa"
+          ? "Password sementara diperbarui dan siap disalin atau diekspor."
+          : "Kata sandi sementara berhasil diperbarui.",
+      );
     } catch (error) {
       notify(
         error instanceof Error ? error.message : "Gagal mereset kata sandi.",
@@ -1232,6 +1263,16 @@ function UserManagement({
       return;
     try {
       await invoke({ action: "delete", user_id: user.id });
+      setTemporaryPasswords((current) => {
+        const next = { ...current };
+        delete next[user.id];
+        return next;
+      });
+      setRevealedPasswordIds((current) => {
+        const next = new Set(current);
+        next.delete(user.id);
+        return next;
+      });
       notify("Akun pengguna berhasil dihapus.");
       await loadUsers();
     } catch (error) {
@@ -1312,20 +1353,73 @@ function UserManagement({
   const selectedClassOption = classes.find(
     (item) => item.id === classFilter,
   );
-  const exportUsers = () => {
-    const headers = roleFilter === "siswa"
-      ? ["Nama", "Email", "Kelas", "NIS", "Status", "Dibuat"]
-      : ["Nama", "Email", "Peran", "Status", "Dibuat"];
-    const rows = filteredUsers.map((user) => roleFilter === "siswa"
-      ? [user.full_name, user.email, user.class_name ?? "Belum ditempatkan", user.student_number ?? "", user.active ? "Aktif" : "Nonaktif", new Date(user.created_at).toLocaleDateString("id-ID")]
-      : [user.full_name, user.email, capitalize(user.role), user.active ? "Aktif" : "Nonaktif", new Date(user.created_at).toLocaleDateString("id-ID")]);
-    const csv = encodeCsv([headers, ...rows]);
-    const url = URL.createObjectURL(new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" }));
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `${roleFilter}-${new Date().toISOString().slice(0, 10)}.csv`;
-    anchor.click();
-    URL.revokeObjectURL(url);
+  const exportUsers = async () => {
+    if (roleFilter !== "siswa") {
+      const headers = ["Nama", "Email", "Peran", "Status", "Dibuat"];
+      const rows = filteredUsers.map((user) => [
+        user.full_name,
+        user.email,
+        capitalize(user.role),
+        user.active ? "Aktif" : "Nonaktif",
+        new Date(user.created_at).toLocaleDateString("id-ID"),
+      ]);
+      const csv = encodeCsv([headers, ...rows]);
+      const url = URL.createObjectURL(
+        new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" }),
+      );
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${roleFilter}-${new Date().toISOString().slice(0, 10)}.csv`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    const exportedUsers = [...filteredUsers].sort((left, right) =>
+      `${left.class_name ?? ""}\u0000${left.full_name}`.localeCompare(
+        `${right.class_name ?? ""}\u0000${right.full_name}`,
+        "id",
+      ),
+    );
+    const includedPasswordCount = exportedUsers.filter(
+      (user) => temporaryPasswords[user.id],
+    ).length;
+    if (
+      includedPasswordCount > 0 &&
+      !window.confirm(
+        `File Excel akan memuat ${includedPasswordCount} password sementara dalam teks terbuka. Simpan file secara aman dan hapus setelah dibagikan. Lanjutkan ekspor?`,
+      )
+    ) return;
+    try {
+      const workbook = await buildStudentAccountWorkbook({
+        schoolName: DEFAULT_SCHOOL_NAME,
+        className: selectedClassOption?.name ?? "Semua kelas",
+        exportedAt: new Date(),
+        rows: exportedUsers.map((user, index) => ({
+          number: index + 1,
+          name: user.full_name,
+          email: user.email,
+          temporaryPassword: temporaryPasswords[user.id] ?? "Reset diperlukan",
+          className: user.class_name ?? "Belum ditempatkan",
+          studentNumber: user.student_number ?? "",
+          status: user.active ? "Aktif" : "Nonaktif",
+        })),
+      });
+      const url = URL.createObjectURL(workbook);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      const classSuffix = selectedClassOption
+        ? `-${selectedClassOption.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`
+        : "";
+      anchor.download = `data-akun-siswa${classSuffix}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      notify(
+        error instanceof Error ? error.message : "File Excel belum dapat dibuat.",
+        true,
+      );
+    }
   };
   return (
     <div className="portal-page user-management-page">
@@ -1428,6 +1522,15 @@ function UserManagement({
           )}
         </>
       )}
+      {roleFilter === "siswa" && (
+        <div className="credential-export-note">
+          <LockKeyhole />
+          <span>
+            <b>Password siswa</b>
+            Admin dan Guru dapat melihat password sementara yang dibuat atau direset pada sesi masing-masing. Password lama perlu direset terlebih dahulu.
+          </span>
+        </div>
+      )}
       <Toolbar
         placeholder={roleFilter === "siswa" ? "Cari nama, email, atau NIS…" : "Cari nama atau email…"}
         value={query}
@@ -1435,6 +1538,7 @@ function UserManagement({
         filterValue={activeFilter}
         onFilterChange={setActiveFilter}
         onExport={exportUsers}
+        exportLabel={roleFilter === "siswa" ? "Ekspor Excel" : "Ekspor CSV"}
       />
       <div className="table-card users-table responsive-card-table">
         <table>
@@ -1444,7 +1548,9 @@ function UserManagement({
               <th>{roleFilter === "siswa" ? "KELAS" : "PERAN"}</th>
               {roleFilter === "siswa" && <th>NIS</th>}
               <th>STATUS</th>
-              <th>DIBUAT</th>
+              {roleFilter === "siswa"
+                ? <th>PASSWORD SEMENTARA</th>
+                : <th>DIBUAT</th>}
               <th />
             </tr>
           </thead>
@@ -1487,9 +1593,54 @@ function UserManagement({
                       {user.active ? "Aktif" : "Nonaktif"}
                     </span>
                   </td>
-                  <td data-label="Dibuat">
-                    {new Date(user.created_at).toLocaleDateString("id-ID")}
-                  </td>
+                  {roleFilter === "siswa" ? (
+                    <td data-label="Password sementara">
+                    <div className="temporary-password-cell">
+                      {temporaryPasswords[user.id] ? (
+                        <>
+                          <code>
+                            {revealedPasswordIds.has(user.id)
+                              ? temporaryPasswords[user.id]
+                              : "••••••••"}
+                          </code>
+                          <button
+                            type="button"
+                            onClick={() => setRevealedPasswordIds((current) => {
+                              const next = new Set(current);
+                              if (next.has(user.id)) next.delete(user.id);
+                              else next.add(user.id);
+                              return next;
+                            })}
+                            aria-label={revealedPasswordIds.has(user.id)
+                              ? `Sembunyikan password ${user.full_name}`
+                              : `Tampilkan password ${user.full_name}`}
+                            title={revealedPasswordIds.has(user.id)
+                              ? "Sembunyikan password"
+                              : "Tampilkan password"}
+                          >
+                            {revealedPasswordIds.has(user.id) ? <EyeOff /> : <Eye />}
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <span>Reset diperlukan</span>
+                          <button
+                            type="button"
+                            onClick={() => setResetting(user)}
+                            aria-label={`Atur password sementara ${user.full_name}`}
+                            title="Atur password sementara"
+                          >
+                            <LockKeyhole />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                    </td>
+                  ) : (
+                    <td data-label="Dibuat">
+                      {new Date(user.created_at).toLocaleDateString("id-ID")}
+                    </td>
+                  )}
                   <td data-label="Aksi">
                     {canManage && (
                       <div className="user-actions">
@@ -1756,6 +1907,11 @@ type TeacherAssignmentRow = {
   classes: unknown;
 };
 
+type ClassSubjectRow = {
+  class_id: string;
+  subject_id: string;
+};
+
 function TeacherAssignmentsModal({
   teacher,
   classes,
@@ -1770,7 +1926,8 @@ function TeacherAssignmentsModal({
   notify: (text: string, error?: boolean) => void;
 }) {
   const [assignments, setAssignments] = useState<TeacherAssignmentRow[]>([]);
-  const [subjectId, setSubjectId] = useState(subjects[0]?.id ?? "");
+  const [classSubjects, setClassSubjects] = useState<ClassSubjectRow[]>([]);
+  const [subjectId, setSubjectId] = useState("");
   const [classId, setClassId] = useState(classes[0]?.id ?? "");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1778,19 +1935,43 @@ function TeacherAssignmentsModal({
   const loadAssignments = useCallback(async () => {
     if (!supabase) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from("teacher_subjects")
-      .select("teacher_id,subject_id,class_id,subjects(name),classes(name)")
-      .eq("teacher_id", teacher.id)
-      .order("subject_id");
+    const [assignmentResult, classSubjectResult] = await Promise.all([
+      supabase
+        .from("teacher_subjects")
+        .select("teacher_id,subject_id,class_id,subjects(name),classes(name)")
+        .eq("teacher_id", teacher.id)
+        .order("subject_id"),
+      supabase.from("class_subjects").select("class_id,subject_id"),
+    ]);
+    const error = assignmentResult.error ?? classSubjectResult.error;
     if (error) notify(error.message, true);
-    else setAssignments((data ?? []) as unknown as TeacherAssignmentRow[]);
+    else {
+      setAssignments(
+        (assignmentResult.data ?? []) as unknown as TeacherAssignmentRow[],
+      );
+      setClassSubjects((classSubjectResult.data ?? []) as ClassSubjectRow[]);
+    }
     setLoading(false);
   }, [notify, teacher.id]);
 
   useEffect(() => {
     void loadAssignments();
   }, [loadAssignments]);
+
+  const availableSubjects = useMemo(
+    () => subjects.filter((subject) =>
+      classSubjects.some(
+        (mapping) => mapping.class_id === classId && mapping.subject_id === subject.id,
+      ),
+    ),
+    [classId, classSubjects, subjects],
+  );
+
+  useEffect(() => {
+    if (!availableSubjects.some((subject) => subject.id === subjectId)) {
+      setSubjectId(availableSubjects[0]?.id ?? "");
+    }
+  }, [availableSubjects, subjectId]);
 
   const addAssignment = async (event: FormEvent) => {
     event.preventDefault();
@@ -1872,19 +2053,6 @@ function TeacherAssignmentsModal({
           ) : (
             <form className="teacher-assignment-form" onSubmit={addAssignment}>
               <label className="form-field">
-                <span>Mata pelajaran</span>
-                <select
-                  value={subjectId}
-                  onChange={(event) => setSubjectId(event.target.value)}
-                >
-                  {subjects.map((subject) => (
-                    <option key={subject.id} value={subject.id}>
-                      {subject.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="form-field">
                 <span>Kelas</span>
                 <select
                   value={classId}
@@ -1897,7 +2065,22 @@ function TeacherAssignmentsModal({
                   ))}
                 </select>
               </label>
-              <button className="primary" disabled={saving}>
+              <label className="form-field">
+                <span>Mata pelajaran</span>
+                <select
+                  value={subjectId}
+                  onChange={(event) => setSubjectId(event.target.value)}
+                  disabled={!availableSubjects.length}
+                >
+                  {!availableSubjects.length && <option value="">Belum diatur untuk kelas ini</option>}
+                  {availableSubjects.map((subject) => (
+                    <option key={subject.id} value={subject.id}>
+                      {subject.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button className="primary" disabled={saving || !subjectId || !classId}>
                 <Plus /> {saving ? "Menyimpan…" : "Tambahkan penugasan"}
               </button>
             </form>

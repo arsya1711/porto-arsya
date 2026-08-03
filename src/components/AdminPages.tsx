@@ -32,6 +32,13 @@ type Subject = {
   id: string;
   name: string;
   code: string | null;
+  classIds: string[];
+  classNames: string[];
+};
+
+type SubjectClass = {
+  id: string;
+  name: string;
 };
 
 type AuditRow = {
@@ -261,6 +268,8 @@ export function AcademicYearsPage({ notify }: { notify: Notify }) {
 
 export function SubjectsPage({ notify }: { notify: Notify }) {
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [classes, setClasses] = useState<SubjectClass[]>([]);
+  const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -271,12 +280,38 @@ export function SubjectsPage({ notify }: { notify: Notify }) {
   const load = useCallback(async () => {
     if (!supabase) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from("subjects")
-      .select("id,name,code")
-      .order("name");
+    const [subjectResult, classResult, mappingResult] = await Promise.all([
+      supabase.from("subjects").select("id,name,code").order("name"),
+      supabase.from("classes").select("id,name").order("name"),
+      supabase.from("class_subjects").select("class_id,subject_id"),
+    ]);
+    const error = subjectResult.error ?? classResult.error ?? mappingResult.error;
     if (error) notify(error.message, true);
-    else setSubjects((data ?? []) as Subject[]);
+    else {
+      const loadedClasses = (classResult.data ?? []) as SubjectClass[];
+      const mappings = (mappingResult.data ?? []) as {
+        class_id: string;
+        subject_id: string;
+      }[];
+      const classNameById = new Map(
+        loadedClasses.map((item) => [item.id, item.name]),
+      );
+      setClasses(loadedClasses);
+      setSubjects(
+        (subjectResult.data ?? []).map((subject) => {
+          const classIds = mappings
+            .filter((mapping) => mapping.subject_id === subject.id)
+            .map((mapping) => mapping.class_id);
+          return {
+            ...subject,
+            classIds,
+            classNames: classIds
+              .map((classId) => classNameById.get(classId))
+              .filter((className): className is string => Boolean(className)),
+          };
+        }),
+      );
+    }
     setLoading(false);
   }, [notify]);
 
@@ -286,17 +321,20 @@ export function SubjectsPage({ notify }: { notify: Notify }) {
 
   const saveSubject = async (event: FormEvent) => {
     event.preventDefault();
-    if (!supabase || !name.trim()) return;
+    if (!supabase || !name.trim() || !selectedClassIds.length) return;
     setSaving(true);
-    const values = { name: name.trim(), code: code.trim().toUpperCase() || null };
-    const { error } = editingSubject
-      ? await supabase.from("subjects").update(values).eq("id", editingSubject.id)
-      : await supabase.from("subjects").insert(values);
+    const { error } = await supabase.rpc("save_subject_with_classes", {
+      target_subject_id: editingSubject?.id ?? null,
+      subject_name: name.trim(),
+      subject_code: code.trim(),
+      class_ids: selectedClassIds,
+    });
     setSaving(false);
     if (error) notify(error.message, true);
     else {
       setName("");
       setCode("");
+      setSelectedClassIds([]);
       setShowCreate(false);
       setEditingSubject(null);
       notify(editingSubject ? "Mata pelajaran berhasil diperbarui." : "Mata pelajaran berhasil ditambahkan.");
@@ -340,9 +378,9 @@ export function SubjectsPage({ notify }: { notify: Notify }) {
       <AdminPageTitle
         eyebrow="DATA MASTER"
         title="Mata Pelajaran"
-        description="Daftar ini dipakai saat membuat bank soal, penugasan guru, dan ujian."
+        description="Atur mata pelajaran secara manual untuk setiap tingkat atau kelas."
         action={!showCreate ? (
-          <button className="primary" type="button" onClick={() => { setEditingSubject(null); setName(""); setCode(""); setShowCreate(true); }}>
+          <button className="primary" type="button" onClick={() => { setEditingSubject(null); setName(""); setCode(""); setSelectedClassIds([]); setShowCreate(true); }}>
             <Plus /> Tambah mata pelajaran
           </button>
         ) : undefined}
@@ -360,33 +398,64 @@ export function SubjectsPage({ notify }: { notify: Notify }) {
             Kode
             <input value={code} onChange={(event) => setCode(event.target.value)} placeholder="MTK" maxLength={12} />
           </label>
+          <fieldset className="subject-class-picker">
+            <legend>Tersedia untuk kelas</legend>
+            {!classes.length ? (
+              <p>Buat kelas terlebih dahulu melalui menu Kelas &amp; Siswa.</p>
+            ) : (
+              <div>
+                {classes.map((item) => (
+                  <label key={item.id}>
+                    <input
+                      type="checkbox"
+                      checked={selectedClassIds.includes(item.id)}
+                      onChange={(event) => setSelectedClassIds((current) =>
+                        event.target.checked
+                          ? [...current, item.id]
+                          : current.filter((classId) => classId !== item.id),
+                      )}
+                    />
+                    <span>{item.name}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+            <small>Pilih minimal satu kelas. Pilihan dapat diubah selama belum dipakai oleh penugasan atau ujian.</small>
+          </fieldset>
           <div className="admin-form-actions">
-            <button type="button" onClick={() => { setShowCreate(false); setEditingSubject(null); setName(""); setCode(""); }}>
+            <button type="button" onClick={() => { setShowCreate(false); setEditingSubject(null); setName(""); setCode(""); setSelectedClassIds([]); }}>
               Batal
             </button>
-            <button className="primary" disabled={saving}>
+            <button className="primary" disabled={saving || !name.trim() || !selectedClassIds.length}>
               {editingSubject ? <Pencil /> : <Plus />} {saving ? "Menyimpan…" : editingSubject ? "Simpan perubahan" : "Tambahkan"}
             </button>
           </div>
         </form>}
         <div className="table-card admin-master-table">
           <table>
-            <thead><tr><th>MATA PELAJARAN</th><th>KODE</th><th>AKSI</th></tr></thead>
+            <thead><tr><th>MATA PELAJARAN</th><th>KODE</th><th>TINGKAT / KELAS</th><th>AKSI</th></tr></thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={3}>Memuat mata pelajaran…</td></tr>
+                <tr><td colSpan={4}>Memuat mata pelajaran…</td></tr>
               ) : subjects.length === 0 ? (
-                <tr><td colSpan={3}>Belum ada mata pelajaran.</td></tr>
+                <tr><td colSpan={4}>Belum ada mata pelajaran.</td></tr>
               ) : subjects.map((subject) => (
                 <tr key={subject.id}>
                   <td data-label="Mata pelajaran"><b className="table-main">{subject.name}</b></td>
                   <td data-label="Kode"><span className="subject-code">{subject.code || "—"}</span></td>
+                  <td data-label="Tingkat / kelas">
+                    <div className="subject-class-list">
+                      {subject.classNames.length
+                        ? subject.classNames.map((className) => <span key={className}>{className}</span>)
+                        : <em>Belum diatur</em>}
+                    </div>
+                  </td>
                   <td data-label="Aksi">
                     <div className="master-actions">
                       <button
                         title="Edit"
                         aria-label={`Edit ${subject.name}`}
-                        onClick={() => { setEditingSubject(subject); setName(subject.name); setCode(subject.code ?? ""); setShowCreate(true); }}
+                        onClick={() => { setEditingSubject(subject); setName(subject.name); setCode(subject.code ?? ""); setSelectedClassIds(subject.classIds); setShowCreate(true); }}
                       ><Pencil /></button>
                       <button className="danger" title="Hapus" onClick={() => deleteSubject(subject)}><Trash2 /></button>
                     </div>
@@ -415,6 +484,8 @@ function auditLabel(action: string) {
     "subjects.insert": "Menambahkan mata pelajaran",
     "subjects.update": "Memperbarui mata pelajaran",
     "subjects.delete": "Menghapus mata pelajaran",
+    "class_subjects.insert": "Menambahkan mata pelajaran ke kelas",
+    "class_subjects.delete": "Menghapus mata pelajaran dari kelas",
     "classes.insert": "Menambahkan kelas",
     "classes.update": "Memperbarui kelas",
     "classes.delete": "Menghapus kelas",

@@ -51,6 +51,8 @@ function auditTitle(action: string) {
     "subjects.insert": "Mata pelajaran ditambahkan",
     "subjects.update": "Mata pelajaran diperbarui",
     "subjects.delete": "Mata pelajaran dihapus",
+    "class_subjects.insert": "Mata pelajaran ditambahkan ke kelas",
+    "class_subjects.delete": "Mata pelajaran dihapus dari kelas",
     "classes.insert": "Kelas ditambahkan",
     "classes.delete": "Kelas dihapus",
   };

@@ -59,10 +59,62 @@ Deno.serve(async (request) => {
     const { data: callerData, error: callerError } = await admin.auth.getUser(token)
     if (callerError || !callerData.user) return json(request, { error: 'Sesi tidak valid.' }, 401)
 
-    const { data: caller } = await admin.from('profiles').select('role,active').eq('id', callerData.user.id).single()
-    if (!caller?.active || caller.role !== 'admin') return json(request, { error: 'Hanya admin yang dapat mengelola akun.' }, 403)
-
     const body = await request.json() as RequestBody
+    const { data: caller } = await admin.from('profiles').select('role,active').eq('id', callerData.user.id).single()
+    if (!caller?.active || !['admin', 'guru'].includes(caller.role)) return json(request, { error: 'Akun tidak memiliki akses pengelolaan.' }, 403)
+
+    if (caller.role === 'guru') {
+      if (body.action !== 'reset_password') return json(request, { error: 'Guru hanya dapat mengatur password sementara siswa.' }, 403)
+      if (!body.user_id || !body.password || body.password.length < 8) return json(request, { error: 'Password sementara minimal 8 karakter.' }, 400)
+
+      const { data: targetProfile } = await admin
+        .from('profiles')
+        .select('role,active')
+        .eq('id', body.user_id)
+        .maybeSingle()
+      if (!targetProfile || targetProfile.role !== 'siswa' || !targetProfile.active) {
+        return json(request, { error: 'Akun siswa aktif tidak ditemukan.' }, 404)
+      }
+
+      const { data: memberships, error: membershipError } = await admin
+        .from('class_students')
+        .select('class_id')
+        .eq('student_id', body.user_id)
+      if (membershipError) return json(request, { error: membershipError.message }, 400)
+      const classIds = [...new Set((memberships ?? []).map((item) => item.class_id).filter(Boolean))]
+      if (!classIds.length) return json(request, { error: 'Siswa belum ditempatkan di kelas.' }, 403)
+
+      const [homeroomResult, assignmentResult] = await Promise.all([
+        admin
+          .from('classes')
+          .select('id', { count: 'exact', head: true })
+          .in('id', classIds)
+          .eq('homeroom_teacher_id', callerData.user.id),
+        admin
+          .from('teacher_subjects')
+          .select('class_id', { count: 'exact', head: true })
+          .in('class_id', classIds)
+          .eq('teacher_id', callerData.user.id),
+      ])
+      if (homeroomResult.error || assignmentResult.error) {
+        return json(request, { error: homeroomResult.error?.message ?? assignmentResult.error?.message }, 400)
+      }
+      if (!homeroomResult.count && !assignmentResult.count) {
+        return json(request, { error: 'Guru hanya dapat mengatur password siswa pada kelas yang diampu.' }, 403)
+      }
+
+      const { error: passwordError } = await admin.auth.admin.updateUserById(body.user_id, { password: body.password })
+      if (passwordError) return json(request, { error: passwordError.message }, 400)
+      const audit = await admin.from('audit_logs').insert({
+        actor_id: callerData.user.id,
+        action: 'user.password_reset',
+        entity_type: 'profile',
+        entity_id: body.user_id,
+        metadata: { reset_by_role: 'guru' },
+      })
+      return json(request, { updated: true, audit_warning: audit.error?.message })
+    }
+
     if (body.action === 'create') {
       if (!body.full_name?.trim() || !body.email?.trim() || !body.password || !body.role) return json(request, { error: 'Data akun belum lengkap.' }, 400)
       if (body.password.length < 8) return json(request, { error: 'Kata sandi minimal 8 karakter.' }, 400)

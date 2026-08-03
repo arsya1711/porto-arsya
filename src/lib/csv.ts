@@ -8,8 +8,12 @@ export function escapeCsvCell(value: unknown): string {
   return `"${normalized.replace(/"/g, '""')}"`;
 }
 
-export function encodeCsv(rows: readonly (readonly unknown[])[]): string {
+export function encodeCsv(
+  rows: readonly (readonly unknown[])[],
+  delimiter = ",",
+  lineEnding = "\n",
+): string {
   return rows
-    .map((columns) => columns.map(escapeCsvCell).join(","))
-    .join("\n");
+    .map((columns) => columns.map(escapeCsvCell).join(delimiter))
+    .join(lineEnding);
 }

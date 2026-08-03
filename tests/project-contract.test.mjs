@@ -187,3 +187,44 @@ test('policy integritas siswa tidak bergantung pada SELECT langsung ke exams', a
   assert.match(migration, /to authenticated/)
   assert.match(migration, /from public, anon/)
 })
+
+test('mata pelajaran dikonfigurasi manual per kelas dan dipakai secara konsisten', async () => {
+  const [migration, adminPage, app, assessment] = await Promise.all([
+    read('supabase/migrations/030_class_subjects.sql'),
+    read('src/components/AdminPages.tsx'),
+    read('src/App.tsx'),
+    read('src/components/AssessmentPages.tsx'),
+  ])
+  assert.match(migration, /create table public\.class_subjects/)
+  assert.match(migration, /save_subject_with_classes/)
+  assert.match(migration, /teacher_subjects_class_subject_fk/)
+  assert.match(migration, /exams_class_subject_fk/)
+  assert.match(adminPage, /Tersedia untuk kelas/)
+  assert.match(adminPage, /selectedClassIds/)
+  assert.match(app, /class_subjects/)
+  assert.match(assessment, /subjectsForClass/)
+})
+
+test('ekspor akun siswa memakai workbook bergaya tanpa mengubah ekspor peran lain', async () => {
+  const [app, workbook, adminFunction] = await Promise.all([
+    read('src/App.tsx'),
+    read('src/lib/student-account-workbook.ts'),
+    read('supabase/functions/admin-users/index.ts'),
+  ])
+  assert.match(app, /PASSWORD SEMENTARA/)
+  assert.match(app, /temporaryPasswords/)
+  assert.match(app, /Reset diperlukan/)
+  assert.match(app, /File Excel akan memuat.*password sementara/)
+  assert.match(app, /if \(roleFilter !== "siswa"\)/)
+  assert.match(app, /\["Nama", "Email", "Peran", "Status", "Dibuat"\]/)
+  assert.match(app, /roleFilter === "siswa" && typeof result\?\.user_id/)
+  assert.match(app, /buildStudentAccountWorkbook/)
+  assert.match(app, /Ekspor Excel/)
+  assert.match(workbook, /state=\"frozen\"/)
+  assert.match(workbook, /autoFilter/)
+  assert.match(workbook, /PASSWORD SEMENTARA/)
+  assert.match(adminFunction, /caller\.role === 'guru'/)
+  assert.match(adminFunction, /teacher_subjects/)
+  assert.match(adminFunction, /homeroom_teacher_id/)
+  assert.match(adminFunction, /Guru hanya dapat mengatur password siswa pada kelas yang diampu/)
+})

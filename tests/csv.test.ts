@@ -20,3 +20,17 @@ test("CSV tetap meng-escape kutip dan mempertahankan nilai biasa", () => {
     '"Nama","Nilai"\n"Ayu","90"',
   );
 });
+
+test("CSV mendukung pemisah dan baris baru yang dikenali Excel", () => {
+  assert.equal(
+    encodeCsv(
+      [
+        ["Nama", "Kelas"],
+        ["Ayu", "VIII A"],
+      ],
+      ";",
+      "\r\n",
+    ),
+    '"Nama";"Kelas"\r\n"Ayu";"VIII A"',
+  );
+});

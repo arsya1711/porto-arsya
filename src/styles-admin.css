@@ -50,6 +50,63 @@
   box-shadow: 0 0 0 3px #315ce812;
 }
 
+.subject-class-picker {
+  margin: 2px 0 15px;
+  border: 1px solid #dfe3ea;
+  border-radius: 9px;
+  padding: 11px;
+}
+
+.subject-class-picker legend {
+  padding: 0 5px;
+  color: #5c6678;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.subject-class-picker > div {
+  max-height: 190px;
+  display: grid;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.admin-quick-form .subject-class-picker label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  border-radius: 7px;
+  background: #f8f9fb;
+  padding: 8px 9px;
+  color: #475267;
+  font-size: 13px;
+}
+
+.admin-quick-form .subject-class-picker input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: #315ce8;
+  box-shadow: none;
+}
+
+.admin-quick-form .subject-class-picker p {
+  margin: 0 0 8px;
+  color: #b16e15;
+  font-size: 12px;
+}
+
+.subject-class-picker small {
+  display: block;
+  margin-top: 9px;
+  color: #8b95a7;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
 .admin-form-actions {
   display: grid;
   grid-template-columns: 0.75fr 1.25fr;
@@ -156,6 +213,27 @@
   font-size: 14px;
   font-weight: 750;
   text-transform: uppercase;
+}
+
+.subject-class-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.subject-class-list span {
+  border-radius: 999px;
+  background: #edf1ff;
+  color: #315ce8;
+  padding: 4px 7px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.subject-class-list em {
+  color: #a36b18;
+  font-size: 12px;
+  font-style: normal;
 }
 
 .audit-summary {
