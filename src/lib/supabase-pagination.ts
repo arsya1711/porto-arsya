@@ -7,7 +7,7 @@ type PageResult<T> = {
 
 export async function fetchAllPages<T>(
   requestPage: (from: number, to: number) => PromiseLike<PageResult<T>>,
-  pageSize = 500,
+  pageSize = 1000,
 ): Promise<PageResult<T>> {
   const rows: T[] = [];
 

@@ -66,7 +66,6 @@ type StudentAttempt = {
   id: string;
   examId: string;
   status: "not_started" | "in_progress" | "submitted" | "grading" | "final";
-  finalScore: number | null;
   startedAt: string | null;
   submittedAt: string | null;
 };
@@ -242,7 +241,7 @@ function Status({ value }: { value: ExamStatus }) {
   };
   return (
     <span className={`status ${value}`}>
-      <i /> {labels[value]}
+      {labels[value]}
     </span>
   );
 }
@@ -259,7 +258,7 @@ export function StaffDashboard({ profile }: { profile: Profile }) {
     let active = true;
     const load = async () => {
       if (!supabase) {
-        setError("Supabase belum dikonfigurasi.");
+        setError("Server belum dikonfigurasi.");
         setLoading(false);
         return;
       }
@@ -432,7 +431,7 @@ export function StaffDashboard({ profile }: { profile: Profile }) {
         title={profile.full_name}
         description={
           profile.role === "admin"
-            ? "Ringkasan operasional sekolah berdasarkan data Supabase."
+            ? "Ringkasan operasional sekolah berdasarkan data terbaru."
             : "Ringkasan ujian dan konten yang Anda kelola."
         }
         action={
@@ -542,7 +541,7 @@ export function StaffDashboard({ profile }: { profile: Profile }) {
         <div>
           <p>STATUS UJIAN {profile.role === "guru" ? "ANDA" : "SEKOLAH"}</p>
           <strong>{exams.length}</strong>
-          <span>Total ujian yang tersimpan di Supabase</span>
+          <span>Total ujian yang tersimpan</span>
         </div>
         <div className="dashboard-status-grid">
           {Object.entries(examStatusCounts).map(([status, count]) => (
@@ -596,7 +595,7 @@ export function StudentDashboard({
     let active = true;
     const load = async () => {
       if (!supabase) {
-        setError("Supabase belum dikonfigurasi.");
+        setError("Server belum dikonfigurasi.");
         setLoading(false);
         return;
       }
@@ -614,7 +613,7 @@ export function StudentDashboard({
           supabase.rpc("get_student_exam_catalog"),
           supabase
             .from("attempts")
-            .select("id,exam_id,status,final_score,started_at,submitted_at")
+            .select("id,exam_id,status,started_at,submitted_at")
             .eq("student_id", profile.id),
           supabase.rpc("get_server_time"),
         ]);
@@ -643,7 +642,6 @@ export function StudentDashboard({
           id: row.id,
           examId: row.exam_id,
           status: row.status,
-          finalScore: row.final_score === null ? null : Number(row.final_score),
           startedAt: row.started_at,
           submittedAt: row.submitted_at,
         }),
@@ -787,7 +785,7 @@ export function StudentDashboard({
             <b>
               {profile.full_name}
               <small>
-                Nilai & rapor · {className}
+                Rapor terpublikasi · {className}
               </small>
             </b>
           </Link>
@@ -904,7 +902,7 @@ export function StudentDashboard({
           </section>
 
           <section>
-            <h3>HASIL TERBARU</h3>
+            <h3>RIWAYAT UJIAN</h3>
             {results.length ? (
               results.slice(0, 5).map((exam) => (
                 <div className="result-card" key={exam.id}>
@@ -921,21 +919,11 @@ export function StudentDashboard({
                       </small>
                     </p>
                   </div>
-                  {exam.attempt?.finalScore === null ? (
-                    <span className="grading-badge">Menunggu nilai</span>
-                  ) : (
-                    <>
-                      <strong>
-                        {exam.attempt?.finalScore}
-                        <small> nilai</small>
-                      </strong>
-                      <span className="passed">Final</span>
-                    </>
-                  )}
+                  <span className="submitted-badge"><CheckCircle2 /> Sudah dikumpulkan</span>
                 </div>
               ))
             ) : (
-              <div className="student-list-empty">Belum ada hasil ujian.</div>
+              <div className="student-list-empty">Belum ada ujian yang dikumpulkan.</div>
             )}
           </section>
         </div>

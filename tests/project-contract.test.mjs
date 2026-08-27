@@ -250,3 +250,24 @@ test('form ujian mengizinkan durasi kosong saat diedit lalu memvalidasinya', asy
   assert.match(assessment, /isValidExamDuration\(draft\.duration\)/)
   assert.doesNotMatch(assessment, /duration: Math\.max\(1, Number\(event\.target\.value\)\)/)
 })
+
+test('kumpulan ujian mempertahankan urutan asli dan memuat hasil per ujian', async () => {
+  const [assessment, migration] = await Promise.all([
+    read('src/components/AssessmentPages.tsx'),
+    read('supabase/migrations/015_exam_security_and_branding.sql'),
+  ])
+  assert.match(assessment, /title="Kumpulan Ujian"/)
+  assert.match(assessment, /Hasil siswa/)
+  assert.match(assessment, /\.order\("position", \{ ascending: true \}\)/)
+  assert.match(assessment, /urutan asli yang tetap/)
+  assert.match(migration, /when exam\.shuffle_questions then[\s\S]*hashtextextended\(question\.id::text, hashtextextended\(attempt\.id::text, 0\)\)/)
+  assert.match(migration, /else exam_question\.position::bigint/)
+})
+
+test('dashboard siswa tidak mengambil atau menampilkan nilai ujian secara langsung', async () => {
+  const dashboard = await read('src/components/Dashboards.tsx')
+  assert.doesNotMatch(dashboard, /finalScore/)
+  assert.doesNotMatch(dashboard, /select\("id,exam_id,status,final_score/)
+  assert.match(dashboard, /Sudah dikumpulkan/)
+  assert.match(dashboard, /Rapor terpublikasi/)
+})

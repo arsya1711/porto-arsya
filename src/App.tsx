@@ -71,8 +71,8 @@ import {
 } from "./components/AdminPages";
 import {
   RealExamManagement,
-  RealGrading,
   RealReports,
+  StudentAnswerReviewPage,
 } from "./components/AssessmentPages";
 import { RealSettingsPage } from "./components/SettingsPage";
 import { PortalTopbar } from "./components/PortalTopbar";
@@ -142,7 +142,7 @@ function Application() {
       <main className="auth-loading">
         <span><AlertTriangle /></span>
         <h1>Konfigurasi server belum tersedia</h1>
-        <p>Administrator harus mengatur VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY sebelum aplikasi digunakan.</p>
+        <p>Administrator harus menyelesaikan konfigurasi server sebelum aplikasi digunakan.</p>
       </main>
     );
   }
@@ -523,7 +523,6 @@ function Portal({
     {
       label: "Penilaian",
       items: [
-        ["/app/koreksi", <ClipboardCheck />, "Koreksi Essay"],
         ["/app/laporan", <BarChart3 />, "Hasil Ujian"],
         ["/app/rapor", <BookOpenCheck />, "Rapor Semester"],
       ],
@@ -766,11 +765,11 @@ function Portal({
               )
             }
           />
-          <Route
-            path="koreksi"
-            element={role === "guru" ? <RealGrading notify={notify} /> : <Navigate to="/app" />}
-          />
           <Route path="laporan" element={<RealReports />} />
+          <Route
+            path="ujian/:examId/hasil/:attemptId"
+            element={role === "guru" ? <StudentAnswerReviewPage notify={notify} /> : <Navigate to="/app" />}
+          />
           <Route
             path="rapor"
             element={<ReportCardsPage profile={profile} notify={notify} />}
@@ -1133,7 +1132,7 @@ function UserManagement({
     loadUsers();
   }, [loadUsers]);
   const invoke = async (body: Record<string, unknown>) => {
-    if (!supabase) throw new Error("Supabase belum dikonfigurasi.");
+    if (!supabase) throw new Error("Server belum dikonfigurasi.");
     const { data, error } = await supabase.functions.invoke("admin-users", {
       body,
     });

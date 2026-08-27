@@ -39,7 +39,6 @@ function formatExportTime(value: Date) {
   return new Intl.DateTimeFormat("id-ID", {
     dateStyle: "long",
     timeStyle: "short",
-    timeZone: "Asia/Jakarta",
   }).format(value);
 }
 

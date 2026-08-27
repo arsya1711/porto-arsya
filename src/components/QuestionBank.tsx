@@ -411,6 +411,36 @@ export function QuestionBank({ notify }: { notify: Notify }) {
     }
   };
 
+  const removeSelectedQuestions = async () => {
+    const removable = selectedQuestions.filter((question) => question.used === 0);
+    const locked = selectedQuestions.length - removable.length;
+    if (!removable.length) {
+      notify("Soal yang dipilih sudah dipakai dalam ujian dan tidak dapat dihapus.", true);
+      return;
+    }
+    const message = locked
+      ? `Hapus ${removable.length} soal? ${locked} soal yang sudah dipakai akan dilewati.`
+      : `Hapus ${removable.length} soal yang dipilih?`;
+    if (!window.confirm(message)) return;
+    try {
+      if (supabase) {
+        const { error } = await supabase
+          .from("questions")
+          .update({ archived: true })
+          .in("id", removable.map((question) => question.id));
+        if (error) throw error;
+        await loadData();
+      } else {
+        const removableIds = new Set(removable.map((question) => question.id));
+        setQuestions((current) => current.filter((question) => !removableIds.has(question.id)));
+        setSelectedQuestionIds(new Set());
+      }
+      notify(`${removable.length} soal berhasil dihapus dari daftar aktif`);
+    } catch (error) {
+      notify(errorMessage(error, "Soal gagal dihapus"), true);
+    }
+  };
+
   const saveBank = async (draft: BankDraft) => {
     try {
       if (
@@ -670,7 +700,7 @@ export function QuestionBank({ notify }: { notify: Notify }) {
         </div>
       </div>
 
-      <label className="mobile-bank-filter">
+      <label className="question-bank-filter">
         <span>Bank soal</span>
         <select
           value={selectedBank}
@@ -694,6 +724,9 @@ export function QuestionBank({ notify }: { notify: Notify }) {
           <div>
             <button onClick={() => setSelectedQuestionIds(new Set())}>
               Batalkan
+            </button>
+            <button className="danger" onClick={() => void removeSelectedQuestions()}>
+              <Trash2 /> Hapus terpilih
             </button>
             <button className="primary" onClick={() => setBulkTools(true)}>
               <ListChecks /> Kelola pilihan

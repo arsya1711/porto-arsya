@@ -154,7 +154,7 @@ export function ReportCardsPage({
 
   const loadOptions = useCallback(async () => {
     if (!supabase) {
-      setError("Supabase belum dikonfigurasi.");
+      setError("Server belum dikonfigurasi.");
       setLoading(false);
       return;
     }

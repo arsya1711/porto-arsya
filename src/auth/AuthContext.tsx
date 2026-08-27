@@ -11,7 +11,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [passwordRecovery, setPasswordRecovery] = useState(false)
 
   const fetchProfile = useCallback(async (userId: string): Promise<Profile> => {
-    if (!supabase) throw new Error('Supabase belum dikonfigurasi.')
+    if (!supabase) throw new Error('Server belum dikonfigurasi.')
     const { data, error } = await supabase.from('profiles').select('id,full_name,email,role,student_number,active').eq('id', userId).single()
     if (error) throw error
     if (!data.active) throw new Error('Akun ini sudah dinonaktifkan.')
@@ -85,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     passwordRecovery,
     login: async (email, password) => {
-      if (!supabase) throw new Error('Supabase belum dikonfigurasi.')
+      if (!supabase) throw new Error('Server belum dikonfigurasi.')
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
       let nextProfile: Profile
@@ -104,12 +104,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     },
     resetPassword: async (email) => {
-      if (!supabase) throw new Error('Supabase belum dikonfigurasi.')
+      if (!supabase) throw new Error('Server belum dikonfigurasi.')
       const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/` })
       if (error) throw error
     },
     updatePassword: async (password) => {
-      if (!supabase) throw new Error('Supabase belum dikonfigurasi.')
+      if (!supabase) throw new Error('Server belum dikonfigurasi.')
       const { error } = await supabase.auth.updateUser({ password })
       if (error) throw error
       setPasswordRecovery(false)

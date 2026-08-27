@@ -21,7 +21,6 @@ test("waktu UTC ditampilkan kembali sebagai waktu sekolah", () => {
   assert.equal(
     isoToSchoolDateTimeInput(
       "2026-07-24T02:30:00.000Z",
-      "Asia/Jakarta",
     ),
     "2026-07-24T09:30",
   );

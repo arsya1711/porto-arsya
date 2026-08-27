@@ -160,7 +160,7 @@ export function PortalTopbar({
       ]);
       const gradingNotices = (gradingResult.data ?? []).map((item) => {
         const exam = Array.isArray(item.exams) ? item.exams[0] : item.exams;
-        return { id: `grading-${item.id}`, title: "Jawaban menunggu koreksi", detail: exam?.title ?? "Ujian", time: item.submitted_at ? new Date(item.submitted_at).toLocaleString("id-ID") : "Baru saja", href: "/app/koreksi" };
+        return { id: `grading-${item.id}`, title: "Jawaban menunggu koreksi", detail: exam?.title ?? "Ujian", time: item.submitted_at ? new Date(item.submitted_at).toLocaleString("id-ID") : "Baru saja", href: "/app/ujian" };
       });
       const examNotices = (examResult.data ?? [])
         .map((item) => ({

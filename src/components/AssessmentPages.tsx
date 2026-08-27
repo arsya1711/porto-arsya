@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useNavigate, useParams } from "react-router";
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
   CheckCircle2,
   ClipboardCheck,
+  ClipboardList,
   Download,
+  Eye,
   FileQuestion,
   LoaderCircle,
   Pencil,
@@ -119,6 +124,44 @@ type AnalysisItem = {
   value: number;
 };
 
+type ExamAttemptSummary = {
+  completed: number;
+  inProgress: number;
+};
+
+type ExamQuestionPreview = {
+  id: string;
+  position: number;
+  body: string;
+  type: "multiple_choice" | "essay";
+  options: string[];
+};
+
+type ExamStudentResult = {
+  id: string;
+  studentName: string;
+  status: string;
+  score: number | null;
+  submittedAt: string | null;
+  answers: StudentAnswerReview[];
+};
+
+type StudentAnswerReview = {
+  id: string;
+  questionId: string;
+  position: number;
+  body: string;
+  type: "multiple_choice" | "essay";
+  options: string[];
+  selectedOption: number | null;
+  essayText: string;
+  score: number | null;
+  comment: string;
+  answerKey: string;
+  correctOption: number | null;
+  weight: number;
+};
+
 function relationName(value: unknown, fallback = "—") {
   if (Array.isArray(value)) return String(value[0]?.name ?? fallback);
   if (value && typeof value === "object" && "name" in value) {
@@ -204,7 +247,7 @@ function PageState({
     <div className="real-empty-state">
       {loading ? <LoaderCircle className="spin" /> : error ? <AlertTriangle /> : <FileQuestion />}
       <h3>{loading ? "Memuat data…" : error ? "Data belum dapat dimuat" : "Belum ada data"}</h3>
-      <p>{loading ? "Mengambil data terbaru dari Supabase." : error || empty}</p>
+      <p>{loading ? "Mengambil data terbaru dari server." : error || empty}</p>
       {error && onRetry && (
         <button type="button" onClick={onRetry}>
           <RefreshCw /> Coba lagi
@@ -220,6 +263,7 @@ export function RealExamManagement({
 }: {
   notify: Notify;
 }) {
+  const navigate = useNavigate();
   const [exams, setExams] = useState<ExamRow[]>([]);
   const [subjects, setSubjects] = useState<Option[]>([]);
   const [classes, setClasses] = useState<Option[]>([]);
@@ -234,17 +278,24 @@ export function RealExamManagement({
   const [securityDefaults, setSecurityDefaults] = useState({ fullscreen: true, recordTabs: true });
   const [schoolTimezone, setSchoolTimezone] = useState("Asia/Jakarta");
   const [page, setPage] = useState(1);
+  const [attemptSummaries, setAttemptSummaries] = useState<Record<string, ExamAttemptSummary>>({});
+  const [detailExam, setDetailExam] = useState<ExamRow | null>(null);
+  const [detailKind, setDetailKind] = useState<"questions" | "results">("questions");
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
+  const [questionPreview, setQuestionPreview] = useState<ExamQuestionPreview[]>([]);
+  const [studentResults, setStudentResults] = useState<ExamStudentResult[]>([]);
 
   const load = useCallback(async () => {
     const client = supabase;
     if (!client) {
-      setError("Supabase belum dikonfigurasi. Isi VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY.");
+      setError("Server belum dikonfigurasi. Hubungi administrator.");
       setLoading(false);
       return;
     }
     setLoading(true);
     setError("");
-    const [examResult, subjectResult, classResult, assignmentResult, questionResult, settingsResult] = await Promise.all([
+    const [examResult, subjectResult, classResult, assignmentResult, questionResult, settingsResult, attemptResult] = await Promise.all([
       fetchAllPages((from, to) =>
         client
           .from("exams")
@@ -264,8 +315,14 @@ export function RealExamManagement({
           .range(from, to),
       ),
       client.from("school_profile_settings").select("require_fullscreen_default,record_tab_switches,school_timezone").eq("id", 1).maybeSingle(),
+      fetchAllPages((from, to) =>
+        client
+          .from("attempts")
+          .select("exam_id,status")
+          .range(from, to),
+      ),
     ]);
-    const requestError = examResult.error ?? subjectResult.error ?? classResult.error ?? assignmentResult.error ?? questionResult.error;
+    const requestError = examResult.error ?? subjectResult.error ?? classResult.error ?? assignmentResult.error ?? questionResult.error ?? attemptResult.error;
     if (requestError) {
       setError(requestError.message);
     } else {
@@ -286,6 +343,15 @@ export function RealExamManagement({
           };
         }),
       );
+      const nextAttemptSummaries: Record<string, ExamAttemptSummary> = {};
+      for (const attempt of attemptResult.data ?? []) {
+        const examId = String(attempt.exam_id);
+        const summary = nextAttemptSummaries[examId] ?? { completed: 0, inProgress: 0 };
+        if (["submitted", "grading", "final"].includes(String(attempt.status))) summary.completed += 1;
+        if (attempt.status === "in_progress") summary.inProgress += 1;
+        nextAttemptSummaries[examId] = summary;
+      }
+      setAttemptSummaries(nextAttemptSummaries);
       if (settingsResult.data) {
         setSecurityDefaults({ fullscreen: settingsResult.data.require_fullscreen_default ?? true, recordTabs: settingsResult.data.record_tab_switches ?? true });
         setSchoolTimezone(settingsResult.data.school_timezone ?? "Asia/Jakarta");
@@ -475,6 +541,92 @@ export function RealExamManagement({
     });
   };
 
+  const moveQuestion = (questionId: string, direction: -1 | 1) => {
+    setDraft((currentDraft) => {
+      if (!currentDraft) return currentDraft;
+      const currentIndex = currentDraft.questionIds.indexOf(questionId);
+      const nextIndex = currentIndex + direction;
+      if (currentIndex < 0 || nextIndex < 0 || nextIndex >= currentDraft.questionIds.length) return currentDraft;
+      const questionIds = [...currentDraft.questionIds];
+      [questionIds[currentIndex], questionIds[nextIndex]] = [questionIds[nextIndex], questionIds[currentIndex]];
+      return { ...currentDraft, questionIds };
+    });
+  };
+
+  const openQuestionPreview = async (exam: ExamRow) => {
+    if (!supabase) return;
+    setDetailExam(exam);
+    setDetailKind("questions");
+    setDetailLoading(true);
+    setDetailError("");
+    setQuestionPreview([]);
+    const { data, error: previewError } = await supabase
+      .from("exam_questions")
+      .select("position,questions(id,body,type,options)")
+      .eq("exam_id", exam.id)
+      .order("position", { ascending: true });
+    if (previewError) setDetailError(previewError.message);
+    else {
+      setQuestionPreview((data ?? []).map((row) => {
+        const question = nestedRecord(row.questions);
+        return {
+          id: String(question.id ?? `${exam.id}-${row.position}`),
+          position: Number(row.position),
+          body: String(question.body ?? "Soal"),
+          type: String(question.type) === "essay" ? "essay" : "multiple_choice",
+          options: Array.isArray(question.options) ? question.options.map(String) : [],
+        };
+      }));
+    }
+    setDetailLoading(false);
+  };
+
+  const openStudentResults = async (exam: ExamRow) => {
+    if (!supabase) return;
+    setDetailExam(exam);
+    setDetailKind("results");
+    setDetailLoading(true);
+    setDetailError("");
+    setStudentResults([]);
+    const { data, error: resultError } = await supabase
+      .from("attempts")
+      .select("id,status,student_id,final_score,submitted_at")
+      .eq("exam_id", exam.id)
+      .in("status", ["submitted", "grading", "final"])
+      .order("submitted_at", { ascending: false });
+    if (resultError) setDetailError(resultError.message);
+    else {
+      const attempts = data ?? [];
+      const studentIds = [...new Set(attempts.map((attempt) => attempt.student_id))];
+      const profileResult = studentIds.length
+        ? await supabase.from("profiles").select("id,full_name").in("id", studentIds)
+        : { data: [], error: null };
+      if (profileResult.error) {
+        setDetailError(profileResult.error.message);
+        setDetailLoading(false);
+        return;
+      }
+      const studentNames = new Map((profileResult.data ?? []).map((profile) => [profile.id, profile.full_name]));
+      const normalized = attempts.map((attempt) => ({
+        id: attempt.id,
+        studentName: studentNames.get(attempt.student_id) || "Siswa",
+        status: attempt.status,
+        score: attempt.final_score === null ? null : Number(attempt.final_score),
+        submittedAt: attempt.submitted_at,
+        answers: [],
+      }));
+      setStudentResults(normalized);
+    }
+    setDetailLoading(false);
+  };
+
+  const closeDetail = () => {
+    setDetailExam(null);
+    setDetailError("");
+    setQuestionPreview([]);
+    setStudentResults([]);
+  };
+
   const nextExamStep = () => {
     if (!draft) return;
     if (examStep === 0) {
@@ -500,6 +652,7 @@ export function RealExamManagement({
     setExamStep(0);
   };
   const examDialogRef = useAccessibleDialog(closeExamModal, saving, Boolean(draft));
+  const detailDialogRef = useAccessibleDialog(closeDetail, detailLoading, Boolean(detailExam));
 
   const selectedSubjectName = subjects.find((item) => item.id === draft?.subjectId)?.name ?? "Belum dipilih";
   const selectedClassName = classes.find((item) => item.id === draft?.classId)?.name ?? "Belum dipilih";
@@ -510,8 +663,8 @@ export function RealExamManagement({
     <div className="portal-page">
       <PageHeader
         eyebrow="MANAJEMEN UJIAN"
-        title="Daftar Ujian"
-        description="Susun soal, jadwalkan ujian, dan tetapkan peserta berdasarkan kelas."
+        title="Kumpulan Ujian"
+        description="Kelola susunan soal dan lihat hasil siswa dari setiap ujian."
         action={
           <button className="primary" type="button" onClick={openCreate} disabled={!subjects.length || !classes.length}>
             <Plus /> Buat ujian
@@ -534,32 +687,41 @@ export function RealExamManagement({
           action={!search && subjects.length && classes.length ? <button type="button" className="primary" onClick={openCreate}><Plus /> Buat ujian pertama</button> : undefined}
         />
       ) : (
-        <div className="table-card exam-management-table responsive-card-table">
-          <table>
-            <thead><tr><th>UJIAN</th><th>KELAS</th><th>JADWAL</th><th>PESERTA</th><th>STATUS</th><th>AKSI</th></tr></thead>
-            <tbody>
-              {pagedExams.map((exam) => (
-                <tr key={exam.id}>
-                  <td data-label="Ujian"><div className="exam-cell"><span>{relationName(exam.subjects, "UJ").slice(0, 2).toUpperCase()}</span><p><b>{exam.title}</b><small>{relationName(exam.subjects)} · {relationCount(exam.exam_questions)} soal</small></p></div></td>
-                  <td data-label="Kelas">{relationName(exam.classes)}</td>
-                  <td data-label="Jadwal"><b className="table-main">{formatDate(exam.starts_at, schoolTimezone)}</b><small>{exam.duration_minutes} menit · {schoolTimezone}</small></td>
-                  <td data-label="Peserta"><div className="participant"><Users /> <span>{relationCount(exam.exam_assignments)} siswa</span></div></td>
-                  <td data-label="Status">
-                    {(() => {
-                      const status = currentExamStatus(exam);
-                      return (
-                        <span className={`status ${status}`}>
-                          <i />
-                          {status[0].toUpperCase() + status.slice(1)}
-                        </span>
-                      );
-                    })()}
-                  </td>
-                  <td data-label="Aksi"><div className="row-actions"><button type="button" title="Edit ujian" onClick={() => void openEdit(exam)}><Pencil /></button><button type="button" className="danger" title="Hapus ujian" onClick={() => void removeExam(exam)}><Trash2 /></button></div></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div>
+          <div className="exam-collection-grid">
+            {pagedExams.map((exam) => {
+              const status = currentExamStatus(exam);
+              const summary = attemptSummaries[exam.id] ?? { completed: 0, inProgress: 0 };
+              return (
+                <article className="exam-collection-card" key={exam.id}>
+                  <div className="exam-card-topline">
+                    <span className="exam-card-subject"><FileQuestion /> {relationName(exam.subjects)}</span>
+                    <div>
+                      <span className={`status ${status}`}><i />{status[0].toUpperCase() + status.slice(1)}</span>
+                      <button type="button" className="exam-delete" aria-label={`Hapus ${exam.title}`} title="Hapus ujian" onClick={() => void removeExam(exam)}><Trash2 /></button>
+                    </div>
+                  </div>
+                  <h2>{exam.title}</h2>
+                  <div className="exam-card-meta">
+                    <span><b>{relationName(exam.classes)}</b>Kelas</span>
+                    <span><b>{relationCount(exam.exam_questions)} soal</b>Susunan tetap</span>
+                    <span><b>{exam.duration_minutes} menit</b>Durasi</span>
+                  </div>
+                  <p className="exam-card-schedule">{formatDate(exam.starts_at, schoolTimezone)} · {schoolTimezone}</p>
+                  <div className="exam-card-participants">
+                    <span><Users /><b>{relationCount(exam.exam_assignments)}</b> peserta</span>
+                    <span><CheckCircle2 /><b>{summary.completed}</b> sudah mengerjakan</span>
+                    {summary.inProgress > 0 && <span><LoaderCircle /><b>{summary.inProgress}</b> mengerjakan</span>}
+                  </div>
+                  <div className="exam-card-actions">
+                    <button type="button" onClick={() => void openQuestionPreview(exam)}><Eye /> Lihat soal</button>
+                    <button type="button" className="primary" onClick={() => void openStudentResults(exam)}><ClipboardCheck /> Hasil siswa</button>
+                    <button type="button" className="icon" title="Edit ujian" aria-label={`Edit ${exam.title}`} onClick={() => void openEdit(exam)}><Pencil /></button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
           <div className="table-footer"><span>Menampilkan {pagedExams.length} dari {visibleExams.length} ujian</span></div>
           {visibleExams.length > pageSize && (
             <nav className="pagination-controls" aria-label="Halaman daftar ujian">
@@ -608,15 +770,30 @@ export function RealExamManagement({
                 )}
                 {examStep === 1 && (
                   <div className="exam-step">
-                    <p className="exam-step-intro">Menampilkan soal <b>{selectedSubjectName}</b>. Pilih minimal satu soal untuk ujian ini.</p>
+                    <p className="exam-step-intro">Susunan di bawah menjadi <b>urutan asli yang tetap</b> untuk guru. Saat siswa mengerjakan, server mengacaknya secara konsisten khusus untuk sesi siswa tersebut.</p>
+                    {!!draft.questionIds.length && <div className="question-order-list">
+                      <div><b>Susunan soal ujian</b><span>{draft.questionIds.length} soal</span></div>
+                      {draft.questionIds.map((questionId, index) => {
+                        const question = questions.find((item) => item.id === questionId);
+                        if (!question) return null;
+                        return <div className="question-order-row" key={questionId}>
+                          <i>{index + 1}</i>
+                          <p><b>{question.body}</b><small>{question.type === "essay" ? "Essay" : "Pilihan Ganda"}</small></p>
+                          <button type="button" title="Naikkan" aria-label={`Naikkan soal ${index + 1}`} disabled={index === 0} onClick={() => moveQuestion(questionId, -1)}><ArrowUp /></button>
+                          <button type="button" title="Turunkan" aria-label={`Turunkan soal ${index + 1}`} disabled={index === draft.questionIds.length - 1} onClick={() => moveQuestion(questionId, 1)}><ArrowDown /></button>
+                          <button type="button" className="danger" title="Keluarkan" aria-label={`Keluarkan soal ${index + 1}`} onClick={() => toggleQuestion(questionId, false)}><X /></button>
+                        </div>;
+                      })}
+                    </div>}
                     <div className="real-question-picker">
-                      <div><b>Daftar soal</b><span>{draft.questionIds.length} dipilih</span></div>
-                      {!filteredQuestions.length ? <p>Belum ada soal pada bank soal mata pelajaran ini. Tutup formulir, lalu tambahkan soal terlebih dahulu.</p> : filteredQuestions.map((question) => (
+                      <div><b>Tambahkan dari {selectedSubjectName}</b><span>{filteredQuestions.length - draft.questionIds.length} tersedia</span></div>
+                      {!filteredQuestions.length ? <p>Belum ada soal pada bank soal mata pelajaran ini. Tutup formulir, lalu tambahkan soal terlebih dahulu.</p> : filteredQuestions.filter((question) => !draft.questionIds.includes(question.id)).map((question) => (
                         <label key={question.id}>
-                          <input type="checkbox" checked={draft.questionIds.includes(question.id)} onChange={(event) => toggleQuestion(question.id, event.target.checked)} />
+                          <input type="checkbox" checked={false} onChange={(event) => toggleQuestion(question.id, event.target.checked)} />
                           <span><b>{question.body}</b><small>{question.bank} · {question.type === "essay" ? "Essay" : "Pilihan Ganda"}</small></span>
                         </label>
                       ))}
+                      {!!filteredQuestions.length && filteredQuestions.every((question) => draft.questionIds.includes(question.id)) && <p>Semua soal pada mata pelajaran ini sudah dimasukkan.</p>}
                     </div>
                   </div>
                 )}
@@ -630,8 +807,8 @@ export function RealExamManagement({
                     <label className="form-field"><span>{draft.hadAccessCode ? "Kode akses baru (kosong = pertahankan)" : "Kode akses (opsional)"}</span><input value={draft.accessCode} disabled={draft.removeAccessCode} minLength={4} maxLength={64} autoComplete="off" placeholder="Minimal 4 karakter" onChange={(event) => setDraft({ ...draft, accessCode: event.target.value.toUpperCase(), removeAccessCode: false })} /></label>
                     {draft.hadAccessCode && <label className="real-remove-access-code"><input type="checkbox" checked={draft.removeAccessCode} onChange={(event) => setDraft({ ...draft, removeAccessCode: event.target.checked, accessCode: "" })} /> Hapus kode akses yang tersimpan</label>}
                     <div className="switch-list real-switches">
-                      <label><span><b>Acak urutan soal</b><small>Urutan soal dapat berbeda untuk setiap siswa.</small></span><input type="checkbox" checked={draft.shuffleQuestions} onChange={(event) => setDraft({ ...draft, shuffleQuestions: event.target.checked })} /></label>
-                      <label><span><b>Acak pilihan jawaban</b><small>Acak opsi pada soal pilihan ganda.</small></span><input type="checkbox" checked={draft.shuffleOptions} onChange={(event) => setDraft({ ...draft, shuffleOptions: event.target.checked })} /></label>
+                      <label><span><b>Acak khusus saat siswa mengerjakan</b><small>Susunan asli guru tetap; setiap sesi siswa menerima urutan soal yang konsisten.</small></span><input type="checkbox" checked={draft.shuffleQuestions} onChange={(event) => setDraft({ ...draft, shuffleQuestions: event.target.checked })} /></label>
+                      <label><span><b>Acak pilihan jawaban siswa</b><small>Opsi pilihan ganda hanya diacak pada sesi pengerjaan siswa.</small></span><input type="checkbox" checked={draft.shuffleOptions} onChange={(event) => setDraft({ ...draft, shuffleOptions: event.target.checked })} /></label>
                       <label><span><b>Wajibkan layar penuh</b><small>Minta siswa menjalankan ujian dalam mode layar penuh.</small></span><input type="checkbox" checked={draft.fullscreenMode} onChange={(event) => setDraft({ ...draft, fullscreenMode: event.target.checked })} /></label>
                       <label><span><b>Catat perpindahan tab</b><small>Simpan kejadian ketika siswa meninggalkan halaman ujian.</small></span><input type="checkbox" checked={draft.recordTabSwitches} onChange={(event) => setDraft({ ...draft, recordTabSwitches: event.target.checked })} /></label>
                     </div>
@@ -650,8 +827,149 @@ export function RealExamManagement({
           </div>
         </div>
       )}
+      {detailExam && (
+        <div className="modal-overlay">
+          <div ref={detailDialogRef} className="modal wide" role="dialog" aria-modal="true" tabIndex={-1}>
+            <div className="simple-modal exam-detail-modal">
+              <header>
+                <div>
+                  <p>{detailKind === "questions" ? "SUSUNAN SOAL" : "HASIL SISWA"}</p>
+                  <h2>{detailExam.title}</h2>
+                </div>
+                <button type="button" aria-label="Tutup detail ujian" onClick={closeDetail}><X /></button>
+              </header>
+              <div className="modal-content">
+                {detailLoading ? <div className="detail-loading"><LoaderCircle className="spin" /> Memuat data…</div> : detailError ? <div className="detail-error"><AlertTriangle />{detailError}</div> : detailKind === "questions" ? (
+                  <>
+                    <div className="stable-order-note"><ClipboardList /><p><b>Urutan asli ujian</b><span>Daftar ini selalu tersusun sama. Pengacakan hanya diterapkan ketika masing-masing siswa mulai mengerjakan.</span></p></div>
+                    <div className="exam-question-preview">
+                      {questionPreview.map((question, index) => <article key={question.id}>
+                        <span>{index + 1}</span>
+                        <div><small>{question.type === "essay" ? "ESSAY" : "PILIHAN GANDA"}</small><b>{question.body}</b>{question.options.length > 0 && <ol type="A">{question.options.map((option, optionIndex) => <li key={`${question.id}-${optionIndex}`}>{option}</li>)}</ol>}</div>
+                      </article>)}
+                      {!questionPreview.length && <p className="inline-empty">Belum ada soal pada ujian ini.</p>}
+                    </div>
+                  </>
+                ) : (
+                  <div className="exam-result-list">
+                    <div className="exam-result-summary"><CheckCircle2 /><p><b>{studentResults.length} siswa sudah mengerjakan</b><span>Nilai hanya terlihat oleh guru pada halaman ini.</span></p></div>
+                    <div className="exam-result-students">
+                      {studentResults.map((result) => <button type="button" key={result.id} className="exam-result-student-link" onClick={() => navigate(`/app/ujian/${detailExam.id}/hasil/${result.id}`)}>
+                        <span>{initials(result.studentName)}</span>
+                        <p><b>{result.studentName}</b><small>Dikumpulkan {formatDate(result.submittedAt, schoolTimezone)}</small></p>
+                        <em className={result.score === null ? "pending" : ""}>{result.score === null ? "Menunggu koreksi" : `Nilai ${result.score}`}</em>
+                      </button>)}
+                    </div>
+                    {!studentResults.length && <p className="inline-empty">Belum ada siswa yang mengumpulkan ujian ini.</p>}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+export function StudentAnswerReviewPage({ notify }: { notify: Notify }) {
+  const { examId = "", attemptId = "" } = useParams();
+  const navigate = useNavigate();
+  const [result, setResult] = useState<ExamStudentResult | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [savingAnswerId, setSavingAnswerId] = useState("");
+
+  const load = useCallback(async () => {
+    if (!supabase || !examId || !attemptId) {
+      setError("Jawaban ujian tidak ditemukan.");
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError("");
+    const [attemptResult, questionResult, answerResult] = await Promise.all([
+      supabase.from("attempts").select("id,status,student_id,final_score,submitted_at").eq("id", attemptId).eq("exam_id", examId).single(),
+      supabase.from("exam_questions").select("question_id,position").eq("exam_id", examId).order("position"),
+      supabase.from("answers").select("id,attempt_id,question_id,selected_option,essay_text,score,teacher_comment,questions(body,type,options,answer_key,weight,correct_option)").eq("attempt_id", attemptId),
+    ]);
+    const loadError = attemptResult.error ?? questionResult.error ?? answerResult.error;
+    if (loadError || !attemptResult.data) {
+      setError(loadError?.message ?? "Jawaban ujian tidak ditemukan.");
+      setLoading(false);
+      return;
+    }
+    const profileResult = await supabase.from("profiles").select("id,full_name").eq("id", attemptResult.data.student_id).maybeSingle();
+    if (profileResult.error) {
+      setError(profileResult.error.message);
+      setLoading(false);
+      return;
+    }
+    const positions = new Map((questionResult.data ?? []).map((question) => [question.question_id, question.position]));
+    const answers: StudentAnswerReview[] = (answerResult.data ?? []).map((row) => {
+      const question = nestedRecord(row.questions);
+      return {
+        id: String(row.id),
+        questionId: String(row.question_id),
+        position: Number(positions.get(row.question_id) ?? 0),
+        body: String(question.body ?? "Soal"),
+        type: (String(question.type) === "essay" ? "essay" : "multiple_choice") as StudentAnswerReview["type"],
+        options: Array.isArray(question.options) ? question.options.map(String) : [],
+        selectedOption: row.selected_option === null ? null : Number(row.selected_option),
+        essayText: String(row.essay_text ?? ""),
+        score: row.score === null ? null : Number(row.score),
+        comment: String(row.teacher_comment ?? ""),
+        answerKey: String(question.answer_key ?? ""),
+        correctOption: question.correct_option === null ? null : Number(question.correct_option),
+        weight: Number(question.weight ?? 1),
+      };
+    }).sort((left, right) => left.position - right.position);
+    setResult({
+      id: attemptResult.data.id,
+      studentName: profileResult.data?.full_name || "Siswa",
+      status: attemptResult.data.status,
+      score: attemptResult.data.final_score === null ? null : Number(attemptResult.data.final_score),
+      submittedAt: attemptResult.data.submitted_at,
+      answers,
+    });
+    setLoading(false);
+  }, [attemptId, examId]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const updateAnswer = (answerId: string, patch: Partial<StudentAnswerReview>) => {
+    setResult((current) => current ? { ...current, answers: current.answers.map((answer) => answer.id === answerId ? { ...answer, ...patch } : answer) } : current);
+  };
+
+  const saveEssay = async (answer: StudentAnswerReview) => {
+    if (!supabase || answer.score === null || answer.score < 0 || answer.score > answer.weight) {
+      notify(`Skor harus berada di antara 0 dan ${answer.weight}.`, true);
+      return;
+    }
+    setSavingAnswerId(answer.id);
+    const { error: saveError } = await supabase.rpc("grade_essay_answer", { target_answer_id: answer.id, awarded_score: answer.score, feedback: answer.comment.trim() || null });
+    setSavingAnswerId("");
+    if (saveError) {
+      notify(saveError.message, true);
+      return;
+    }
+    notify("Nilai essay berhasil disimpan.");
+    await load();
+  };
+
+  return <div className="portal-page student-answer-page">
+    <div className="page-title">
+      <div><p>HASIL SISWA</p><h1>{result?.studentName ?? "Jawaban siswa"}</h1><span>{result ? `${result.answers.length} jawaban · Dikumpulkan ${formatDate(result.submittedAt)}` : "Memuat jawaban ujian"}</span></div>
+      <button type="button" onClick={() => navigate(`/app/ujian`)}>Kembali ke ujian</button>
+    </div>
+    {loading || error || !result ? <PageState loading={loading} error={error} empty="Jawaban siswa belum tersedia." onRetry={() => void load()} /> : <>
+      <div className="student-answer-page-summary"><span>{result.studentName}</span><strong>{result.score === null ? "Menunggu koreksi" : `Nilai ${result.score}`}</strong><small>{result.answers.length} jawaban</small></div>
+      <div className="student-answer-page-list">{result.answers.map((answer) => <article className="student-answer-page-item" key={answer.id}>
+        <div className="student-answer-question"><span>{answer.position || "-"}</span><div><small>{answer.type === "essay" ? "ESSAY" : "PILIHAN GANDA"}</small><b>{answer.body}</b></div></div>
+        {answer.type === "essay" ? <><div className="student-answer-text">{answer.essayText || "Siswa tidak memberikan jawaban."}</div><div className="student-essay-grading"><label className="form-field"><span>Skor (maks. {answer.weight})</span><input type="number" min={0} max={answer.weight} step="0.5" value={answer.score ?? ""} onChange={(event) => updateAnswer(answer.id, { score: event.target.value === "" ? null : Number(event.target.value) })} /></label><label className="form-field"><span>Komentar untuk siswa</span><input value={answer.comment} onChange={(event) => updateAnswer(answer.id, { comment: event.target.value })} placeholder="Berikan umpan balik singkat…" /></label><button type="button" className="primary" disabled={savingAnswerId === answer.id || answer.score === null} onClick={() => void saveEssay(answer)}>{savingAnswerId === answer.id ? "Menyimpan…" : "Simpan koreksi"}</button></div><details><summary>Lihat pedoman jawaban</summary><p>{answer.answerKey || "Belum ada pedoman jawaban."}</p></details></> : <div className={`student-choice-answer ${answer.selectedOption === answer.correctOption ? "correct" : "wrong"}`}><span>{answer.selectedOption === null ? "Tidak dijawab" : `Jawaban siswa: ${String.fromCharCode(65 + answer.selectedOption)}. ${answer.options[answer.selectedOption] ?? ""}`}</span><small>{answer.correctOption === null ? "Kunci belum ditentukan" : `Kunci: ${String.fromCharCode(65 + answer.correctOption)}. ${answer.options[answer.correctOption] ?? ""}`}</small></div>}
+      </article>)}</div>
+    </>}
+  </div>;
 }
 
 export function RealGrading({ notify }: { notify: Notify }) {
@@ -667,7 +985,7 @@ export function RealGrading({ notify }: { notify: Notify }) {
   const load = useCallback(async () => {
     const client = supabase;
     if (!client) {
-      setError("Supabase belum dikonfigurasi.");
+      setError("Server belum dikonfigurasi.");
       setLoading(false);
       return;
     }
@@ -811,6 +1129,7 @@ export function RealGrading({ notify }: { notify: Notify }) {
 }
 
 export function RealReports() {
+  const navigate = useNavigate();
   const [attempts, setAttempts] = useState<ReportAttempt[]>([]);
   const [analysis, setAnalysis] = useState<AnalysisItem[]>([]);
   const [selectedExam, setSelectedExam] = useState("");
@@ -821,7 +1140,7 @@ export function RealReports() {
   const loadAttempts = useCallback(async () => {
     const client = supabase;
     if (!client) {
-      setError("Supabase belum dikonfigurasi.");
+      setError("Server belum dikonfigurasi.");
       setLoading(false);
       return;
     }
@@ -941,6 +1260,22 @@ export function RealReports() {
           <section className="card chart-card"><div className="card-head"><h3>Distribusi nilai</h3></div><div className="grade-chart">{distribution.map((count, index) => <div key={index}><i style={{ height: `${Math.max(3, (count / maxDistribution) * 100)}%` }} title={`${count} siswa`} /><span>{index * 10}</span></div>)}</div></section>
           <section className="card"><div className="card-head"><h3>Ringkasan peserta</h3></div><div className="real-report-summary"><span><ClipboardCheck /></span><strong>{rows.length}</strong><p>jawaban dikumpulkan</p><ul><li><i className="green" />Lulus KKM <b>{passed}</b></li><li><i className="amber" />Di bawah KKM <b>{scores.length - passed}</b></li><li><i className="gray" />Belum final <b>{pending}</b></li></ul></div></section>
         </div>
+        <section className="card report-student-results">
+          <div className="card-head"><div><h3>Hasil per siswa</h3><span>Pilih siswa untuk membaca jawaban dan menyelesaikan koreksi essay.</span></div></div>
+          <div className="report-student-table-wrap">
+            <table className="report-student-table">
+              <thead><tr><th>SISWA</th><th>DIKUMPULKAN</th><th>STATUS</th><th>NILAI</th><th /></tr></thead>
+              <tbody>{rows.map((row) => <tr key={row.id}>
+                <td><b>{row.studentName}</b><small>{row.className}</small></td>
+                <td>{formatDate(row.submittedAt)}</td>
+                <td><span className={`report-status ${row.status}`}>{row.status === "final" ? "Final" : row.status === "grading" ? "Menunggu koreksi" : "Terkumpul"}</span></td>
+                <td><strong>{row.score === null ? "—" : row.score}</strong></td>
+                <td><button type="button" className="report-answer-link" onClick={() => navigate(`/app/ujian/${row.examId}/hasil/${row.id}`)}>Lihat jawaban</button></td>
+              </tr>)}</tbody>
+            </table>
+            {!rows.length && <div className="inline-empty">Belum ada peserta untuk ujian ini.</div>}
+          </div>
+        </section>
         <section className="card item-analysis"><div className="card-head"><h3>Analisis butir soal</h3></div>{!analysis.length ? <div className="inline-empty">Belum ada jawaban yang dapat dianalisis.</div> : analysis.map((item, index) => <div className="analysis-row" key={item.questionId}><span>{String(index + 1).padStart(2, "0")}</span><p><b>{item.body}</b><small>{item.type === "essay" ? "Essay · rata-rata skor" : "Pilihan Ganda · dijawab benar"}</small></p><div><small>{item.answered} JAWABAN</small><b>{item.value}%</b></div><span className={`difficulty ${item.difficulty}`}>{item.difficulty}</span></div>)}</section>
       </>}
     </div>
