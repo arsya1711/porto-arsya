@@ -55,6 +55,12 @@ test("mengganti error jaringan dan non-2xx generik", async () => {
   );
   assert.equal(
     await edgeFunctionErrorMessage(
+      new Error("Service Unavailable"),
+    ),
+    "Layanan server sedang tidak tersedia. Tunggu sebentar lalu coba lagi.",
+  );
+  assert.equal(
+    await edgeFunctionErrorMessage(
       new Error("Edge Function returned a non-2xx status code"),
       "Akun belum dapat diproses.",
     ),

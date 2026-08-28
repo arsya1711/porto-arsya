@@ -18,6 +18,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import type { Role } from "../types";
 
 type Notify = (text: string, error?: boolean) => void;
 
@@ -73,6 +74,18 @@ function integrityExamName(value: unknown) {
   const attempt = Array.isArray(value) ? value[0] : value;
   if (!attempt || typeof attempt !== "object") return "—";
   return relatedName((attempt as Record<string, unknown>).exams);
+}
+
+function integrityEventLabel(eventType: string, studentName: string) {
+  const actions: Record<string, string> = {
+    tab_hidden: "halaman ujiannya tidak aktif",
+    app_backgrounded: "aplikasinya masuk ke latar belakang",
+    fullscreen_exit: "mode layar penuhnya tidak aktif",
+    reconnect: "kembali terhubung ke server",
+    copy: "menyalin teks saat ujian",
+    paste: "menempelkan teks saat ujian",
+  };
+  return `${studentName} ${actions[eventType] ?? "melakukan aktivitas saat ujian"}`;
 }
 
 function AdminPageTitle({
@@ -459,7 +472,7 @@ export function SubjectsPage({ notify }: { notify: Notify }) {
   );
 }
 
-export function AuditSecurityPage({ notify }: { notify: Notify }) {
+export function AuditSecurityPage({ notify, role = "admin" }: { notify: Notify; role?: Role }) {
   const [integrityEvents, setIntegrityEvents] = useState<IntegrityRow[]>([]);
   const [frontendErrors, setFrontendErrors] = useState<FrontendErrorRow[]>([]);
   const [frontendErrorCount, setFrontendErrorCount] = useState(0);
@@ -482,11 +495,13 @@ export function AuditSecurityPage({ notify }: { notify: Notify }) {
         .from("profiles")
         .select("id", { count: "exact", head: true })
         .eq("active", true),
-      supabase
-        .from("frontend_error_logs")
-        .select("id,reference_id,error_message,path,user_agent,created_at,profiles(full_name,email)", { count: "exact" })
-        .order("created_at", { ascending: false })
-        .limit(100),
+      role === "admin"
+        ? supabase
+          .from("frontend_error_logs")
+          .select("id,reference_id,error_message,path,user_agent,created_at,profiles(full_name,email)", { count: "exact" })
+          .order("created_at", { ascending: false })
+          .limit(100)
+        : Promise.resolve({ data: [], error: null, count: 0 }),
     ]);
     const requestError =
       integrityResult.error ??
@@ -503,7 +518,13 @@ export function AuditSecurityPage({ notify }: { notify: Notify }) {
     setIntegrityCount(integrityResult.count ?? 0);
     setActiveUsers(usersResult.count ?? 0);
     setLoading(false);
-  }, [notify]);
+  }, [notify, role]);
+
+  useEffect(() => {
+    if (role === "guru") {
+      setView("integrity");
+    }
+  }, [role]);
 
   useEffect(() => {
     void load();
@@ -517,6 +538,7 @@ export function AuditSecurityPage({ notify }: { notify: Notify }) {
         event.event_type,
         relatedName(event.profiles),
         integrityExamName(event.attempts),
+        integrityEventLabel(event.event_type, relatedName(event.profiles)),
       ].some((item) => item.toLowerCase().includes(value)),
     );
   }, [integrityEvents, query]);
@@ -538,9 +560,10 @@ export function AuditSecurityPage({ notify }: { notify: Notify }) {
       <AdminPageTitle
         eyebrow="KONTROL SISTEM"
         title="Audit & Keamanan"
-        description="Pantau log error website dan event integritas ujian. Log error disimpan maksimal 7 hari."
+        description={role === "guru" ? "Pantau aktivitas integritas pada ujian yang Anda kelola." : "Pantau log error website dan event integritas ujian. Log error disimpan maksimal 7 hari."}
         action={<button className="outline" onClick={load}><RefreshCw /> Segarkan</button>}
       />
+      {view === "integrity" && <p className="audit-meaning-note">Catatan ini menunjukkan saat halaman atau aplikasi tidak aktif. Catatan ini bukan bukti bahwa siswa mengambil screenshot.</p>}
       <div className="audit-summary">
         <div className="card"><span className="admin-card-icon green"><CheckCircle2 /></span><p><small>AKUN AKTIF</small><b>{activeUsers}</b><span>pengguna dapat masuk</span></p></div>
         <div className="card"><span className="admin-card-icon amber"><ShieldCheck /></span><p><small>EVENT INTEGRITAS</small><b>{integrityCount}</b><span>tercatat di seluruh ujian</span></p></div>
@@ -548,14 +571,14 @@ export function AuditSecurityPage({ notify }: { notify: Notify }) {
         <div className="card"><span className="admin-card-icon blue"><CalendarDays /></span><p><small>RETENSI LOG</small><b>7 hari</b><span>dihapus otomatis setiap hari</span></p></div>
       </div>
       <div className="section-switcher" aria-label="Jenis catatan keamanan">
-        <button
+        {role === "admin" && <button
           type="button"
           className={view === "errors" ? "active" : ""}
           aria-pressed={view === "errors"}
           onClick={() => { setView("errors"); setQuery(""); }}
         >
           <AlertTriangle /> Log Error Website <span>{frontendErrorCount}</span>
-        </button>
+        </button>}
         <button
           type="button"
           className={view === "integrity" ? "active" : ""}
@@ -577,19 +600,18 @@ export function AuditSecurityPage({ notify }: { notify: Notify }) {
       </div>
       {view === "integrity" ? <div className="table-card audit-table integrity-table">
         <table>
-          <thead><tr><th>WAKTU</th><th>SISWA</th><th>UJIAN</th><th>EVENT</th><th>DETAIL</th></tr></thead>
+          <thead><tr><th>WAKTU</th><th>SISWA</th><th>UJIAN</th><th>AKTIVITAS</th></tr></thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5}>Memuat event integritas…</td></tr>
+              <tr><td colSpan={4}>Memuat aktivitas ujian…</td></tr>
             ) : filteredIntegrityEvents.length === 0 ? (
-              <tr><td colSpan={5}>Belum ada event integritas.</td></tr>
+              <tr><td colSpan={4}>Belum ada aktivitas siswa yang tercatat.</td></tr>
             ) : filteredIntegrityEvents.map((event) => (
               <tr key={event.id}>
                 <td data-label="Waktu">{new Date(event.occurred_at).toLocaleString("id-ID")}</td>
                 <td data-label="Siswa"><b className="table-main">{relatedName(event.profiles)}</b></td>
                 <td data-label="Ujian">{integrityExamName(event.attempts)}</td>
-                <td data-label="Event"><span className="subject-code">{event.event_type.replace(/_/g, " ")}</span></td>
-                <td data-label="Detail"><small>{event.metadata ? JSON.stringify(event.metadata) : "—"}</small></td>
+                <td data-label="Aktivitas"><span className="audit-friendly-event">{integrityEventLabel(event.event_type, relatedName(event.profiles))}</span></td>
               </tr>
             ))}
           </tbody>

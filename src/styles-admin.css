@@ -5,6 +5,21 @@
   align-items: start;
 }
 
+.audit-friendly-event {
+  display: inline-block;
+  color: #354157;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.audit-meaning-note {
+  margin: -8px 0 14px;
+  color: #69758a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .admin-master-layout.list-only {
   grid-template-columns: minmax(0, 1fr);
 }

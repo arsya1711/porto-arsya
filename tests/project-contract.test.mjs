@@ -36,6 +36,8 @@ test('submit ujian menyinkronkan seluruh jawaban sebelum finalisasi', async () =
   assert.match(app, /if \(!expiredSaveFailed\) \{\s*localStorage\.removeItem/)
   assert.match(app, /unsyncedAnswersRef/)
   assert.match(app, /window\.addEventListener\("online", retryUnsyncedAnswers\)/)
+  assert.match(app, /submitRetryRef/)
+  assert.match(app, /window\.addEventListener\("online", retryPendingSubmit\)/)
   assert.match(app, /jawaban belum tersinkron/)
 })
 
@@ -102,6 +104,13 @@ test('deployment SPA dan hardening operasional tersedia', async () => {
   assert.match(indexMigration, /drop index if exists public\.questions_bank_archived_created_idx/)
   assert.match(importer, /reserve_ai_import_attempt/)
   assert.match(boundary, /frontend_error_logs/)
+})
+
+test('query data besar dibatasi agar tetap aman pada dataset yang tumbuh', async () => {
+  const pagination = await read('src/lib/supabase-pagination.ts')
+  assert.match(pagination, /maxRows/)
+  assert.match(pagination, /pageSize = 250/)
+  assert.match(pagination, /rows\.length >= maxRows/)
 })
 
 test('go-live memiliki Realtime, fallback refresh, dan pemeriksaan production', async () => {

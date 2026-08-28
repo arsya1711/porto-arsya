@@ -62,6 +62,14 @@ function friendlyMessage(message: string, fallback: string): string {
     return "Alamat aplikasi tidak diizinkan mengakses layanan admin.";
   }
   if (
+    lower.includes("service unavailable") ||
+    lower.includes("temporarily unavailable") ||
+    lower.includes("server is unavailable") ||
+    lower.includes("internal server error")
+  ) {
+    return "Layanan server sedang tidak tersedia. Tunggu sebentar lalu coba lagi.";
+  }
+  if (
     lower.includes("failed to fetch") ||
     lower.includes("failed to send a request") ||
     lower.includes("network") ||

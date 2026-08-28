@@ -525,6 +525,7 @@ function Portal({
       items: [
         ["/app/laporan", <BarChart3 />, "Hasil Ujian"],
         ["/app/rapor", <BookOpenCheck />, "Rapor Semester"],
+        ["/app/audit", <LockKeyhole />, "Audit & Keamanan"],
       ],
     },
   ];
@@ -758,8 +759,8 @@ function Portal({
           <Route
             path="audit"
             element={
-              role === "admin" ? (
-                <AuditSecurityPage notify={notify} />
+              role === "admin" || role === "guru" ? (
+                <AuditSecurityPage notify={notify} role={role} />
               ) : (
                 <Navigate to="/app" />
               )
@@ -2473,6 +2474,7 @@ function ExamRunner({
   const pendingEssay = useRef<{ questionId: string; value: string } | null>(null);
   const answerSaveQueue = useRef<Record<string, Promise<boolean>>>({});
   const finishingRef = useRef(false);
+  const submitRetryRef = useRef(false);
   const finishRetryTimer = useRef<number | null>(null);
   const deadlineRef = useRef<number | null>(null);
   const serverClockOffsetRef = useRef(0);
@@ -2859,6 +2861,11 @@ function ExamRunner({
       return nextMarked;
     });
   };
+  const retryPendingSubmit = useCallback(() => {
+    if (!attemptId || !supabase || finishingRef.current || !submitRetryRef.current) return;
+    submitRetryRef.current = false;
+    void finishRef.current?.();
+  }, [attemptId, supabase]);
   const finish = useCallback(async () => {
     if (finishingRef.current) return;
     finishingRef.current = true;
@@ -2893,6 +2900,7 @@ function ExamRunner({
         target_attempt_id: attemptId,
       });
       if (error) throw error;
+      submitRetryRef.current = false;
       if (failedSaveCount === 0) {
         localStorage.removeItem(`ruang-ujian:answers:${examId}`);
       }
@@ -2906,6 +2914,7 @@ function ExamRunner({
       );
       navigate("/siswa");
     } catch (error) {
+      submitRetryRef.current = true;
       finishingRef.current = false;
       setSubmittingExam(false);
       notify(error instanceof Error ? error.message : "Jawaban gagal dikumpulkan. Coba lagi sebelum meninggalkan halaman.", true);
@@ -2916,11 +2925,15 @@ function ExamRunner({
         }, 8_000);
       }
     }
-  }, [answers, attemptId, examId, navigate, notify, persistAnswer, remaining]);
+  }, [answers, attemptId, examId, navigate, notify, persistAnswer, remaining, supabase]);
   const finishRef = useRef<(() => Promise<void>) | null>(null);
   useEffect(() => {
     finishRef.current = finish;
   }, [finish]);
+  useEffect(() => {
+    window.addEventListener("online", retryPendingSubmit);
+    return () => window.removeEventListener("online", retryPendingSubmit);
+  }, [retryPendingSubmit]);
   useEffect(() => () => {
     if (essaySaveTimer.current !== null) window.clearTimeout(essaySaveTimer.current);
     if (finishRetryTimer.current !== null) window.clearTimeout(finishRetryTimer.current);
