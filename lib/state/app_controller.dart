@@ -28,6 +28,7 @@ class AppController extends ChangeNotifier {
   static const _answerRetryMaxDelay = Duration(seconds: 60);
   static const _answerRetryConcurrency = 4;
   static const _draftPersistDelay = Duration(milliseconds: 200);
+  static const _refreshCooldown = Duration(seconds: 5);
 
   final ExamRepository repository;
   final AttemptDraftStore draftStore;
@@ -66,6 +67,8 @@ class AppController extends ChangeNotifier {
   int _autoSubmitAttempts = 0;
   int _answerRetryRound = 0;
   String? _retryingAttemptId;
+  Future<void>? _refreshExamsInFlight;
+  DateTime? _lastExamsRefresh;
 
   StudentProfile get profile => repository.profile;
   List<Exam> get exams => repository.exams;
@@ -83,9 +86,7 @@ class AppController extends ChangeNotifier {
       isLoggedIn = await repository.restoreSession();
       if (isLoggedIn) {
         try {
-          await repository.refreshExams();
-          isOnline = true;
-          operationError = null;
+          await refreshExams();
         } catch (_) {
           isOnline = false;
           operationError =
@@ -122,9 +123,7 @@ class AppController extends ChangeNotifier {
       await repository.authenticate(username, password);
       isLoggedIn = true;
       try {
-        await repository.refreshExams();
-        isOnline = true;
-        operationError = null;
+        await refreshExams();
       } catch (_) {
         // Session login tetap sah. Pengguna masuk dengan katalog kosong dan
         // dapat mencoba lagi melalui pull-to-refresh/tombol muat ulang.
@@ -159,6 +158,26 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> refreshExams() async {
+    final inFlight = _refreshExamsInFlight;
+    if (inFlight != null) return inFlight;
+    final lastRefresh = _lastExamsRefresh;
+    if (lastRefresh != null &&
+        _now().difference(lastRefresh) < _refreshCooldown) {
+      return;
+    }
+    final operation = _refreshExamsOnce();
+    _refreshExamsInFlight = operation;
+    try {
+      await operation;
+    } finally {
+      if (identical(_refreshExamsInFlight, operation)) {
+        _refreshExamsInFlight = null;
+      }
+    }
+  }
+
+  Future<void> _refreshExamsOnce() async {
+    _lastExamsRefresh = _now();
     try {
       await repository.refreshExams();
       isOnline = true;

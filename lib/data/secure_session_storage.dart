@@ -2,8 +2,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'secure_value_store.dart';
 
-/// Menyimpan sesi Supabase di Keychain (iOS) dan EncryptedSharedPreferences
-/// (Android) alih-alih SharedPreferences biasa.
+/// Menyimpan sesi Supabase di penyimpanan aman Android alih-alih
+/// SharedPreferences biasa.
 ///
 /// Default bawaan `supabase_flutter` menulis refresh token sebagai teks polos di
 /// penyimpanan aplikasi, sehingga token siswa dapat terbaca pada perangkat yang

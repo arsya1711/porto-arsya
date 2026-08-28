@@ -38,16 +38,18 @@ void main() {
       expect(exam.recordIntegrityEvents, isFalse);
     });
 
-    test('prefers attempt state and score over schedule state', () {
-      final exam = parseExamCatalogEntry(
-        row: catalogRow(startsAt: '2026-08-01T08:00:00Z'),
-        attempt: {'status': 'final', 'final_score': 87.5},
-        now: now,
-      );
+    test(
+      'prefers completed attempt state over schedule state without exposing score',
+      () {
+        final exam = parseExamCatalogEntry(
+          row: catalogRow(startsAt: '2026-08-01T08:00:00Z'),
+          attempt: {'status': 'final', 'final_score': 87.5},
+          now: now,
+        );
 
-      expect(exam.state, ExamState.completed);
-      expect(exam.score, 87.5);
-    });
+        expect(exam.state, ExamState.completed);
+      },
+    );
 
     test('uses duration when the server omits ends_at', () {
       final exam = parseExamCatalogEntry(

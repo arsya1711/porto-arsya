@@ -32,7 +32,6 @@ Exam parseExamCatalogEntry({
       now: now,
     ),
     instructions: examInstructions(row['description'] as String?),
-    score: (attempt?['final_score'] as num?)?.toDouble(),
     requiresCode: row['requires_access_code'] as bool? ?? false,
     lockdown: row['fullscreen_mode'] as bool? ?? true,
     recordIntegrityEvents: row['record_tab_switches'] as bool? ?? true,
@@ -268,13 +267,15 @@ class SupabaseExamRepository implements ExamRepository {
     }
 
     final results = await Future.wait([
-      client.rpc('get_student_exam_catalog'),
+      client.rpc('get_student_exam_catalog').then((value) => value),
       client
           .from('attempts')
-          .select('exam_id,status,final_score')
-          .eq('student_id', userId),
+          .select('exam_id,status')
+          .eq('student_id', userId)
+          .then((value) => value),
+      _loadServerTime(),
     ]);
-    final serverNow = await _loadServerTime() ?? DateTime.now();
+    final serverNow = results[2] as DateTime? ?? DateTime.now();
 
     final attempts = <String, Map<String, dynamic>>{
       for (final row in results[1] as List)

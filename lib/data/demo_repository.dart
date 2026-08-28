@@ -69,7 +69,6 @@ class DemoRepository implements ExamRepository {
       durationMinutes: 45,
       questionCount: 20,
       state: ExamState.completed,
-      score: 88,
       instructions: const [],
     ),
   ];

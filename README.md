@@ -1,6 +1,6 @@
 # AWExam
 
-Aplikasi Flutter untuk siswa berdasarkan PRD Aplikasi Ujian Sekolah dan Spesifikasi Mobile v1.1.
+Aplikasi Flutter Android untuk siswa berdasarkan PRD Aplikasi Ujian Sekolah dan Spesifikasi Mobile v1.1.
 
 ## Menjalankan aplikasi
 
@@ -104,7 +104,8 @@ disertakan di `assets/fonts/`.
 
 ## Distribusi Android
 
-Aplikasi ini menargetkan Android saja. Sebelum distribusi release, salin
+Aplikasi ini hanya menargetkan Android. Platform iOS tidak disertakan dalam
+project. Sebelum distribusi release, salin
 `android/key.properties.example` menjadi `android/key.properties`, lalu isi lokasi
 dan kredensial keystore produksi. Project tidak lagi menandatangani release dengan
 debug key.

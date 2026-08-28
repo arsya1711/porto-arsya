@@ -12,11 +12,7 @@ class FlutterSecureValueStore implements SecureValueStore {
     : _storage = const FlutterSecureStorage();
 
   const FlutterSecureValueStore.session()
-    : _storage = const FlutterSecureStorage(
-        iOptions: IOSOptions(
-          accessibility: KeychainAccessibility.first_unlock_this_device,
-        ),
-      );
+    : _storage = const FlutterSecureStorage();
 
   const FlutterSecureValueStore.withStorage(this._storage);
 

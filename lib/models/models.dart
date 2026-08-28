@@ -27,7 +27,6 @@ class Exam {
     required this.questionCount,
     required this.state,
     required this.instructions,
-    this.score,
     this.requiresCode = false,
     this.lockdown = true,
     this.recordIntegrityEvents = true,
@@ -44,7 +43,6 @@ class Exam {
   final int questionCount;
   final ExamState state;
   final List<String> instructions;
-  final double? score;
   final bool requiresCode;
   final bool lockdown;
   final bool recordIntegrityEvents;

@@ -10,7 +10,7 @@ class ScreenSecurity {
     try {
       await _channel.invokeMethod<void>('setSecure', enabled);
     } on MissingPluginException {
-      // Platform selain Android atau test runner tidak memasang channel ini.
+      // Test runner tidak memasang channel native ini.
     } on PlatformException {
       // Proteksi layar tidak boleh membuat ruang ujian gagal dibuka.
     }

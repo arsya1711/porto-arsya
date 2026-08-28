@@ -774,24 +774,7 @@ class HistoryPage extends StatelessWidget {
     final completedCount = history
         .where((exam) => exam.state == ExamState.completed)
         .length;
-    final scores = history
-        .map((exam) => exam.score)
-        .whereType<double>()
-        .toList();
-    final average = scores.isEmpty
-        ? null
-        : scores.reduce((first, second) => first + second) / scores.length;
-    final predicate = average == null
-        ? '-'
-        : average >= 90
-        ? 'A'
-        : average >= 80
-        ? 'B'
-        : average >= 70
-        ? 'C'
-        : average >= 60
-        ? 'D'
-        : 'E';
+    final expiredCount = history.length - completedCount;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Riwayat ujian'),
@@ -802,12 +785,12 @@ class HistoryPage extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         children: [
           Text(
-            'Hasil belajarmu',
+            'Riwayat pengerjaanmu',
             style: Theme.of(context).textTheme.headlineMedium,
           ),
           const SizedBox(height: 6),
           const Text(
-            'Nilai hanya tampil setelah difinalisasi guru.',
+            'Nilai ujian tidak ditampilkan langsung. Hasil akan diumumkan oleh guru atau sekolah.',
             style: TextStyle(color: AppColors.muted, fontSize: 12),
           ),
           const SizedBox(height: 20),
@@ -830,9 +813,9 @@ class HistoryPage extends StatelessWidget {
               children: [
                 Expanded(
                   child: _HistoryStat(
-                    value: average?.round().toString() ?? '-',
-                    label: 'Rata-rata',
-                    icon: Icons.trending_up_rounded,
+                    value: '${history.length}',
+                    label: 'Total riwayat',
+                    icon: Icons.history_rounded,
                   ),
                 ),
                 const SizedBox(
@@ -852,16 +835,16 @@ class HistoryPage extends StatelessWidget {
                 ),
                 Expanded(
                   child: _HistoryStat(
-                    value: predicate,
-                    label: 'Predikat',
-                    icon: Icons.workspace_premium_outlined,
+                    value: '$expiredCount',
+                    label: 'Tidak dikerjakan',
+                    icon: Icons.event_busy_outlined,
                   ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 24),
-          Text('Hasil terbaru', style: Theme.of(context).textTheme.titleMedium),
+          Text('Ujian terbaru', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 10),
           if (history.isEmpty)
             const _EmptyHistoryState()
@@ -909,41 +892,25 @@ class HistoryPage extends StatelessWidget {
                               StatusPill(
                                 label: exam.state == ExamState.expired
                                     ? 'Tidak dikerjakan'
-                                    : exam.score == null
-                                    ? 'Menunggu koreksi'
-                                    : 'Nilai final',
+                                    : 'Sudah dikumpulkan',
                                 color: exam.state == ExamState.expired
                                     ? AppColors.red
-                                    : exam.score == null
-                                    ? AppColors.amber
                                     : AppColors.green,
                                 icon: exam.state == ExamState.expired
                                     ? Icons.event_busy_outlined
-                                    : exam.score == null
-                                    ? Icons.schedule_rounded
-                                    : Icons.verified_outlined,
+                                    : Icons.task_alt_rounded,
                               ),
                             ],
                           ),
                         ),
-                        Column(
-                          children: [
-                            Text(
-                              exam.score?.round().toString() ?? '-',
-                              style: const TextStyle(
-                                fontSize: 27,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.navy,
-                              ),
-                            ),
-                            const Text(
-                              'Nilai',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: AppColors.muted,
-                              ),
-                            ),
-                          ],
+                        Icon(
+                          exam.state == ExamState.expired
+                              ? Icons.remove_circle_outline_rounded
+                              : Icons.check_circle_rounded,
+                          color: exam.state == ExamState.expired
+                              ? AppColors.muted
+                              : AppColors.green,
+                          size: 27,
                         ),
                       ],
                     ),
@@ -989,13 +956,9 @@ class ProfilePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = controller.profile;
-    final scores = controller.exams
-        .map((exam) => exam.score)
-        .whereType<double>()
-        .toList();
-    final average = scores.isEmpty
-        ? null
-        : scores.reduce((first, second) => first + second) / scores.length;
+    final completedCount = controller.exams
+        .where((exam) => exam.state == ExamState.completed)
+        .length;
     final synced = controller.isOnline && controller.unsyncedCount == 0;
     return Scaffold(
       appBar: AppBar(
@@ -1123,8 +1086,8 @@ class ProfilePage extends StatelessWidget {
                           ),
                           Expanded(
                             child: _ProfileStat(
-                              value: average?.round().toString() ?? '-',
-                              label: 'Rata-rata',
+                              value: '$completedCount',
+                              label: 'Ujian selesai',
                             ),
                           ),
                           const SizedBox(
