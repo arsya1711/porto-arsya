@@ -744,6 +744,10 @@ export function RealExamManagement({
   }, []);
 
   const openExamMonitor = async (exam: ExamRow) => {
+    if (currentExamStatus(exam) === "selesai") {
+      notify("Ujian sudah berakhir. Pengawasan langsung tidak dapat dibuka.");
+      return;
+    }
     setDetailExam(exam);
     setDetailKind("monitor");
     setDetailError("");

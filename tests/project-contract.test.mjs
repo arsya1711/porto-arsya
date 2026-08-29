@@ -306,6 +306,8 @@ test('guru dapat mengawasi, menghentikan, dan melanjutkan sesi siswa secara aman
     read('supabase/migrations/034_live_exam_monitoring.sql'),
   ])
   assert.match(assessment, /Awasi ujian/)
+  assert.match(assessment, /currentExamStatus\(exam\) === "selesai"/)
+  assert.match(assessment, /Ujian sudah berakhir\. Pengawasan langsung tidak dapat dibuka\./)
   assert.match(assessment, /get_exam_monitor/)
   assert.match(assessment, /set_student_attempt_paused/)
   assert.match(assessment, /Keluar halaman \{row\.exitCount\}/)
