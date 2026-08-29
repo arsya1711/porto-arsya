@@ -987,3 +987,52 @@
 .exam-detail-modal .modal-content:has(.student-answer-review) {
   padding-bottom: 18px;
 }
+
+.question-usage-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 7px;
+  padding: 7px 8px;
+  border: 1px solid #f0d9a9;
+  border-radius: 7px;
+  background: #fff9eb;
+  color: #8a6417;
+}
+
+.question-usage-note > svg {
+  width: 14px;
+  height: 14px;
+  margin-top: 1px;
+  flex: 0 0 auto;
+}
+
+.question-usage-note > span {
+  min-width: 0;
+  flex: 1;
+}
+
+.question-usage-note strong {
+  display: block;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.question-usage-locations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.question-usage-location {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #f6e8c8;
+  color: #72500d;
+  font-size: 10px;
+  line-height: 1.45;
+  white-space: normal;
+}

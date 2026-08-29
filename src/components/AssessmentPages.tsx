@@ -67,6 +67,13 @@ type QuestionOption = Option & {
   subjectId: string;
 };
 
+type QuestionUsage = {
+  examId: string;
+  examTitle: string;
+  className: string;
+  startsAt: string;
+};
+
 type ExamDraft = {
   id?: string;
   title: string;
@@ -197,6 +204,33 @@ function currentExamStatus(exam: ExamRow) {
   );
 }
 
+function QuestionUsageNotice({
+  usages,
+  currentExamId,
+}: {
+  usages: QuestionUsage[];
+  currentExamId?: string;
+}) {
+  if (!usages.length) return null;
+
+  return (
+    <span className="question-usage-note" role="note">
+      <CheckCircle2 />
+      <span>
+        <strong>Sudah dipakai di {usages.length} ujian</strong>
+        <span className="question-usage-locations">
+          {usages.map((usage) => (
+            <span className="question-usage-location" key={usage.examId}>
+              {usage.examTitle} · {usage.className}
+              {usage.examId === currentExamId ? " · Ujian ini" : ""}
+            </span>
+          ))}
+        </span>
+      </span>
+    </span>
+  );
+}
+
 function initials(name: string) {
   return name
     .split(/\s+/)
@@ -269,6 +303,7 @@ export function RealExamManagement({
   const [classes, setClasses] = useState<Option[]>([]);
   const [assignmentPairs, setAssignmentPairs] = useState<AssignmentPair[]>([]);
   const [questions, setQuestions] = useState<QuestionOption[]>([]);
+  const [questionUsages, setQuestionUsages] = useState<Record<string, QuestionUsage[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -295,7 +330,7 @@ export function RealExamManagement({
     }
     setLoading(true);
     setError("");
-    const [examResult, subjectResult, classResult, assignmentResult, questionResult, settingsResult, attemptResult] = await Promise.all([
+    const [examResult, subjectResult, classResult, assignmentResult, questionResult, questionUsageResult, settingsResult, attemptResult] = await Promise.all([
       fetchAllPages((from, to) =>
         client
           .from("exams")
@@ -314,6 +349,12 @@ export function RealExamManagement({
           .order("created_at", { ascending: false })
           .range(from, to),
       ),
+      fetchAllPages((from, to) =>
+        client
+          .from("exam_questions")
+          .select("question_id,exam_id")
+          .range(from, to),
+      ),
       client.from("school_profile_settings").select("require_fullscreen_default,record_tab_switches,school_timezone").eq("id", 1).maybeSingle(),
       fetchAllPages((from, to) =>
         client
@@ -322,11 +363,12 @@ export function RealExamManagement({
           .range(from, to),
       ),
     ]);
-    const requestError = examResult.error ?? subjectResult.error ?? classResult.error ?? assignmentResult.error ?? questionResult.error ?? attemptResult.error;
+    const requestError = examResult.error ?? subjectResult.error ?? classResult.error ?? assignmentResult.error ?? questionResult.error ?? questionUsageResult.error ?? attemptResult.error;
     if (requestError) {
       setError(requestError.message);
     } else {
-      setExams((examResult.data ?? []) as unknown as ExamRow[]);
+      const loadedExams = (examResult.data ?? []) as unknown as ExamRow[];
+      setExams(loadedExams);
       setSubjects((subjectResult.data ?? []) as Option[]);
       setClasses((classResult.data ?? []) as Option[]);
       setAssignmentPairs((assignmentResult.data ?? []) as AssignmentPair[]);
@@ -343,6 +385,23 @@ export function RealExamManagement({
           };
         }),
       );
+      const examsById = new Map(loadedExams.map((exam) => [exam.id, exam]));
+      const nextQuestionUsages: Record<string, QuestionUsage[]> = {};
+      for (const row of questionUsageResult.data ?? []) {
+        const exam = examsById.get(String(row.exam_id));
+        if (!exam) continue;
+        const questionId = String(row.question_id);
+        (nextQuestionUsages[questionId] ??= []).push({
+          examId: exam.id,
+          examTitle: exam.title,
+          className: relationName(exam.classes),
+          startsAt: exam.starts_at,
+        });
+      }
+      for (const usages of Object.values(nextQuestionUsages)) {
+        usages.sort((left, right) => right.startsAt.localeCompare(left.startsAt));
+      }
+      setQuestionUsages(nextQuestionUsages);
       const nextAttemptSummaries: Record<string, ExamAttemptSummary> = {};
       for (const attempt of attemptResult.data ?? []) {
         const examId = String(attempt.exam_id);
@@ -778,7 +837,11 @@ export function RealExamManagement({
                         if (!question) return null;
                         return <div className="question-order-row" key={questionId}>
                           <i>{index + 1}</i>
-                          <p><b>{question.body}</b><small>{question.type === "essay" ? "Essay" : "Pilihan Ganda"}</small></p>
+                          <p>
+                            <b>{question.body}</b>
+                            <small>{question.type === "essay" ? "Essay" : "Pilihan Ganda"}</small>
+                            <QuestionUsageNotice usages={questionUsages[questionId] ?? []} currentExamId={draft.id} />
+                          </p>
                           <button type="button" title="Naikkan" aria-label={`Naikkan soal ${index + 1}`} disabled={index === 0} onClick={() => moveQuestion(questionId, -1)}><ArrowUp /></button>
                           <button type="button" title="Turunkan" aria-label={`Turunkan soal ${index + 1}`} disabled={index === draft.questionIds.length - 1} onClick={() => moveQuestion(questionId, 1)}><ArrowDown /></button>
                           <button type="button" className="danger" title="Keluarkan" aria-label={`Keluarkan soal ${index + 1}`} onClick={() => toggleQuestion(questionId, false)}><X /></button>
@@ -790,7 +853,11 @@ export function RealExamManagement({
                       {!filteredQuestions.length ? <p>Belum ada soal pada bank soal mata pelajaran ini. Tutup formulir, lalu tambahkan soal terlebih dahulu.</p> : filteredQuestions.filter((question) => !draft.questionIds.includes(question.id)).map((question) => (
                         <label key={question.id}>
                           <input type="checkbox" checked={false} onChange={(event) => toggleQuestion(question.id, event.target.checked)} />
-                          <span><b>{question.body}</b><small>{question.bank} · {question.type === "essay" ? "Essay" : "Pilihan Ganda"}</small></span>
+                          <span>
+                            <b>{question.body}</b>
+                            <small>{question.bank} · {question.type === "essay" ? "Essay" : "Pilihan Ganda"}</small>
+                            <QuestionUsageNotice usages={questionUsages[question.id] ?? []} currentExamId={draft.id} />
+                          </span>
                         </label>
                       ))}
                       {!!filteredQuestions.length && filteredQuestions.every((question) => draft.questionIds.includes(question.id)) && <p>Semua soal pada mata pelajaran ini sudah dimasukkan.</p>}
