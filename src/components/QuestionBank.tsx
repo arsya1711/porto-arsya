@@ -28,7 +28,7 @@ import { useAccessibleDialog } from "../lib/use-accessible-dialog";
 import { supabase } from "../lib/supabase";
 import type { ParsedPdfQuestion } from "../lib/pdf-question-parser";
 import { findSimilarQuestion, normalizeQuestion } from "../lib/question-similarity";
-import { type Question } from "../types";
+import { type Question, type RubricCriterion } from "../types";
 import { PdfQuestionImportModal } from "./PdfQuestionImportModal";
 import { QuestionBulkToolsModal } from "./QuestionBulkToolsModal";
 
@@ -51,6 +51,7 @@ type QuestionDraft = {
   correctOption: number | null;
   answerKey: string;
   weight: number;
+  rubric: RubricCriterion[];
 };
 type BankDraft = {
   id?: string;
@@ -58,6 +59,18 @@ type BankDraft = {
   subjectId: string;
   gradeLevel: string;
 };
+
+function normalizeRubric(value: unknown, fallbackWeight = 1): RubricCriterion[] {
+  if (!Array.isArray(value)) return [{ label: "Ketepatan jawaban", points: fallbackWeight }];
+  const criteria = value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const record = item as Record<string, unknown>;
+    const label = String(record.label ?? "").trim();
+    const points = Number(record.points);
+    return label && Number.isFinite(points) && points > 0 ? [{ label, points }] : [];
+  });
+  return criteria.length ? criteria : [{ label: "Ketepatan jawaban", points: fallbackWeight }];
+}
 
 function relationName(value: unknown): string {
   if (Array.isArray(value)) return String(value[0]?.name ?? "—");
@@ -139,7 +152,7 @@ export function QuestionBank({ notify }: { notify: Notify }) {
         client
           .from("questions")
           .select(
-            "id,bank_id,body,type,options,correct_option,answer_key,difficulty,weight,usage_count,created_at,question_banks(name,subjects(name))",
+            "id,bank_id,body,type,options,correct_option,answer_key,difficulty,weight,rubric,usage_count,created_at,question_banks(name,subjects(name))",
           )
           .eq("archived", false)
           .order("created_at", { ascending: false })
@@ -171,6 +184,9 @@ export function QuestionBank({ notify }: { notify: Notify }) {
         correctOption: row.correct_option,
         answerKey: row.answer_key,
         weight: Number(row.weight ?? 1),
+        rubric: row.type === "essay"
+          ? normalizeRubric(row.rubric, Number(row.weight ?? 1))
+          : [],
         createdAt: row.created_at,
       }),
     );
@@ -214,6 +230,7 @@ export function QuestionBank({ notify }: { notify: Notify }) {
             draft.type === "Pilihan Ganda" ? draft.correctOption : null,
           answer_key: draft.type === "Essay" ? draft.answerKey.trim() : null,
           weight: draft.type === "Essay" ? draft.weight : 1,
+          rubric: draft.type === "Essay" ? draft.rubric : [],
         };
         const result = draft.id
           ? await supabase.from("questions").update(payload).eq("id", draft.id)
@@ -242,6 +259,7 @@ export function QuestionBank({ notify }: { notify: Notify }) {
           correctOption: draft.correctOption,
           answerKey: draft.answerKey,
           weight: draft.type === "Essay" ? draft.weight : 1,
+          rubric: draft.type === "Essay" ? draft.rubric : [],
           createdAt:
             questions.find((question) => question.id === draft.id)?.createdAt ??
             new Date().toISOString(),
@@ -295,6 +313,9 @@ export function QuestionBank({ notify }: { notify: Notify }) {
         answer_key:
           question.type === "Essay" ? question.answerKey.trim() : null,
         weight: question.type === "Essay" ? question.weight : 1,
+        rubric: question.type === "Essay"
+          ? [{ label: "Ketepatan jawaban", points: question.weight }]
+          : [],
         created_by: profile.id,
       }));
       const { error } = await supabase.from("questions").insert(payload);
@@ -344,6 +365,9 @@ export function QuestionBank({ notify }: { notify: Notify }) {
           correct_option: question.type === "Pilihan Ganda" ? question.correctOption : null,
           answer_key: question.type === "Essay" ? question.answerKey : null,
           weight: question.type === "Essay" ? question.weight ?? 1 : 1,
+          rubric: question.type === "Essay"
+            ? question.rubric ?? [{ label: "Ketepatan jawaban", points: question.weight ?? 1 }]
+            : [],
           created_by: profile.id,
         })),
       );
@@ -370,9 +394,12 @@ export function QuestionBank({ notify }: { notify: Notify }) {
       ) {
         throw new Error("Bobot hanya dapat diubah untuk soal essay.");
       }
-      const payload: Record<string, string | number> = {};
+      const payload: Record<string, unknown> = {};
       if (update.bankId) payload.bank_id = update.bankId;
-      if (update.weight !== undefined) payload.weight = update.weight;
+      if (update.weight !== undefined) {
+        payload.weight = update.weight;
+        payload.rubric = [{ label: "Penilaian keseluruhan", points: update.weight }];
+      }
       if (!Object.keys(payload).length) throw new Error("Pilih perubahan yang akan diterapkan.");
       const { error } = await supabase
         .from("questions")
@@ -1026,9 +1053,12 @@ function QuestionModal({
     initial ? (initial.correctOption ?? null) : 0,
   );
   const [answerKey, setAnswerKey] = useState(initial?.answerKey ?? "");
-  const [weight, setWeight] = useState(
-    initial?.type === "Essay" ? initial.weight ?? 1 : 1,
+  const [rubric, setRubric] = useState<RubricCriterion[]>(
+    initial?.type === "Essay"
+      ? normalizeRubric(initial.rubric, initial.weight ?? 1)
+      : [{ label: "Ketepatan jawaban", points: 1 }],
   );
+  const weight = rubric.reduce((total, criterion) => total + Number(criterion.points || 0), 0);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -1054,8 +1084,13 @@ function QuestionModal({
       setError("Kunci atau pedoman jawaban essay wajib diisi.");
       return;
     }
-    if (type === "Essay" && (!Number.isFinite(weight) || weight <= 0)) {
-      setError("Bobot soal harus lebih besar dari 0.");
+    if (type === "Essay" && (
+      !rubric.length
+      || rubric.some((criterion) => !criterion.label.trim() || !Number.isFinite(criterion.points) || criterion.points <= 0)
+      || !Number.isFinite(weight)
+      || weight <= 0
+    )) {
+      setError("Isi minimal satu kriteria rubrik dengan nama dan poin positif.");
       return;
     }
     setError("");
@@ -1069,6 +1104,7 @@ function QuestionModal({
       correctOption: type === "Pilihan Ganda" ? correctOption : null,
       answerKey,
       weight: type === "Essay" ? weight : 1,
+      rubric: type === "Essay" ? rubric.map((criterion) => ({ ...criterion, label: criterion.label.trim() })) : [],
     });
     if (!saved) setSaving(false);
   };
@@ -1214,16 +1250,15 @@ function QuestionModal({
                 required
               />
               </FormField>
-              <FormField label="Bobot nilai">
-              <input
-                type="number"
-                min="0.01"
-                step="0.01"
-                value={weight}
-                onChange={(event) => setWeight(Number(event.target.value))}
-                required
-              />
-              </FormField>
+              <div className="essay-rubric-editor">
+                <div><span>Rubrik penilaian</span><b>Total bobot {weight || 0} poin</b></div>
+                {rubric.map((criterion, index) => <div className="essay-rubric-row" key={index}>
+                  <input value={criterion.label} maxLength={160} placeholder={`Kriteria ${index + 1}`} onChange={(event) => setRubric((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item))} />
+                  <input type="number" min="0.01" step="0.01" value={criterion.points} aria-label={`Poin kriteria ${index + 1}`} onChange={(event) => setRubric((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, points: Number(event.target.value) } : item))} />
+                  <button type="button" aria-label={`Hapus kriteria ${index + 1}`} disabled={rubric.length === 1} onClick={() => setRubric((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X /></button>
+                </div>)}
+                {rubric.length < 20 && <button type="button" className="add-option" onClick={() => setRubric((current) => [...current, { label: "", points: 1 }])}><Plus /> Tambah kriteria</button>}
+              </div>
             </>
           )}
         </div>

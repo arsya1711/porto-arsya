@@ -1605,9 +1605,21 @@ img {
   .exam-collection-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .score-panel {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .score-panel .essay-rubric-scoring {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 680px) {
+  .score-panel {
+    grid-template-columns: 1fr;
+  }
+
   .exam-collection-grid {
     grid-template-columns: minmax(0, 1fr);
   }

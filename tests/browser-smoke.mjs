@@ -13,6 +13,11 @@ const baseUrl = `http://${host}:${previewPort}`;
 function chromeExecutable() {
   const candidates = [
     process.env.CHROME_PATH,
+    process.env.PROGRAMFILES && join(process.env.PROGRAMFILES, "Google", "Chrome", "Application", "chrome.exe"),
+    process.env["PROGRAMFILES(X86)"] && join(process.env["PROGRAMFILES(X86)"], "Google", "Chrome", "Application", "chrome.exe"),
+    process.env.LOCALAPPDATA && join(process.env.LOCALAPPDATA, "Google", "Chrome", "Application", "chrome.exe"),
+    process.env.PROGRAMFILES && join(process.env.PROGRAMFILES, "Microsoft", "Edge", "Application", "msedge.exe"),
+    process.env["PROGRAMFILES(X86)"] && join(process.env["PROGRAMFILES(X86)"], "Microsoft", "Edge", "Application", "msedge.exe"),
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
     "/usr/bin/google-chrome",
     "/usr/bin/chromium",
@@ -93,11 +98,24 @@ class Cdp {
   }
 }
 
+async function stopProcess(child) {
+  if (!child || child.exitCode !== null) return;
+  const exited = new Promise((resolve) => child.once("exit", resolve));
+  child.kill("SIGTERM");
+  await Promise.race([
+    exited,
+    new Promise((resolve) => setTimeout(resolve, 5_000)),
+  ]);
+}
+
 const userDataDir = await mkdtemp(join(tmpdir(), "awexam-browser-"));
 const preview = spawn(
-  process.platform === "win32" ? "npm.cmd" : "npm",
-  ["run", "preview", "--", "--host", host, "--port", String(previewPort)],
-  { stdio: "ignore" },
+  process.execPath,
+  [join(process.cwd(), "node_modules", "vite", "bin", "vite.js"), "preview", "--host", host, "--port", String(previewPort)],
+  {
+    stdio: "ignore",
+    windowsHide: true,
+  },
 );
 let chrome;
 
@@ -189,7 +207,6 @@ try {
   cdp.close();
   console.log("✓ Browser smoke: login 320 px dan SPA deep-link lulus");
 } finally {
-  preview.kill("SIGTERM");
-  chrome?.kill("SIGTERM");
-  await rm(userDataDir, { recursive: true, force: true });
+  await Promise.all([stopProcess(preview), stopProcess(chrome)]);
+  await rm(userDataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 }

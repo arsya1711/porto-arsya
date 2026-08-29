@@ -27,10 +27,12 @@ test('migration keamanan menghapus plaintext dan membatasi kode akses', async ()
 
 test('submit ujian menyinkronkan seluruh jawaban sebelum finalisasi', async () => {
   const app = await read('src/App.tsx')
-  const syncPosition = app.indexOf('const finalSaves = await Promise.all(')
+  const syncPosition = app.indexOf('supabase.rpc("save_exam_answers_batch"')
   const submitPosition = app.indexOf('supabase.rpc("submit_exam_attempt"', syncPosition)
   assert.ok(syncPosition >= 0)
   assert.ok(submitPosition > syncPosition)
+  assert.match(app, /const answerPayload = Object\.entries\(answers\)/)
+  assert.match(app, /answer_payload: answerPayload/)
   assert.match(app, /remaining > 3 \|\| !pendingEssay\.current/)
   assert.match(app, /expiredSaves\.some\(\(\{ error \}\) => Boolean\(error\)\)/)
   assert.match(app, /if \(!expiredSaveFailed\) \{\s*localStorage\.removeItem/)
@@ -310,7 +312,7 @@ test('guru dapat mengawasi, menghentikan, dan melanjutkan sesi siswa secara aman
   assert.match(assessment, /Ujian sudah berakhir\. Pengawasan langsung tidak dapat dibuka\./)
   assert.match(assessment, /get_exam_monitor/)
   assert.match(assessment, /set_student_attempt_paused/)
-  assert.match(assessment, /Keluar halaman \{row\.exitCount\}/)
+  assert.match(assessment, /Indikasi keluar halaman \{row\.exitCount\}/)
   assert.match(app, /get_student_attempt_control/)
   assert.match(app, /Sesi dihentikan sementara oleh guru/)
   assert.match(migration, /add column if not exists paused_at timestamptz/)
@@ -318,6 +320,34 @@ test('guru dapat mengawasi, menghentikan, dan melanjutkan sesi siswa secara aman
   assert.match(migration, /attempt\.paused_at is null/)
   assert.match(migration, /event_type in \('tab_hidden', 'app_backgrounded'\)/)
   assert.match(migration, /alter publication supabase_realtime add table public\.integrity_events/)
+})
+
+test('operasional ujian 1-7 tersedia tanpa analisis butir tambahan', async () => {
+  const [assessment, app, bank, migration] = await Promise.all([
+    read('src/components/AssessmentPages.tsx'),
+    read('src/App.tsx'),
+    read('src/components/QuestionBank.tsx'),
+    read('supabase/migrations/035_exam_operations_and_essay_rubrics.sql'),
+  ])
+
+  assert.match(migration, /finalize_expired_exam_attempts/)
+  assert.match(migration, /finalize-expired-exam-attempts/)
+  assert.match(migration, /save_exam_answers_batch/)
+  assert.match(migration, /touch_exam_attempt/)
+  assert.match(migration, /set_exam_attempts_paused/)
+  assert.match(migration, /grant_attempt_extra_time/)
+  assert.match(migration, /force_submit_exam_attempt/)
+  assert.match(migration, /reset_exam_attempt/)
+  assert.match(migration, /get_attempt_integrity_timeline/)
+  assert.match(migration, /rubric_scores_payload jsonb/)
+
+  assert.match(app, /window\.setInterval\(sendHeartbeat, 15_000\)/)
+  assert.match(assessment, /Hentikan semua/)
+  assert.match(assessment, /Tambahkan waktu untuk/)
+  assert.match(assessment, /Kumpulkan paksa ujian/)
+  assert.match(assessment, /Catatan ini adalah sinyal untuk ditinjau, bukan bukti kecurangan/)
+  assert.match(assessment, /RubricScoreEditor/)
+  assert.match(bank, /Rubrik penilaian/)
 })
 
 test('dashboard siswa tidak mengambil atau menampilkan nilai ujian secara langsung', async () => {

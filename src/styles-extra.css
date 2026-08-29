@@ -695,13 +695,78 @@
 
 .student-essay-grading {
   display: grid;
-  grid-template-columns: 130px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(240px, 1.25fr) minmax(180px, 1fr) auto;
   align-items: end;
   gap: 10px;
 }
 
 .student-essay-grading .form-field {
   margin: 0;
+}
+
+.essay-rubric-scoring {
+  display: grid;
+  gap: 7px;
+  padding: 11px;
+  border: 1px solid #e1e5ec;
+  border-radius: 9px;
+  background: #fafbfe;
+}
+
+.essay-rubric-scoring-head,
+.essay-rubric-scoring > label,
+.essay-rubric-score-input {
+  display: flex;
+  align-items: center;
+}
+
+.essay-rubric-scoring-head,
+.essay-rubric-scoring > label {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.essay-rubric-scoring-head {
+  padding-bottom: 7px;
+  border-bottom: 1px solid #e7eaf0;
+}
+
+.essay-rubric-scoring-head b,
+.essay-rubric-scoring-head span,
+.essay-rubric-scoring > label > span:first-child {
+  font-size: 11px;
+}
+
+.essay-rubric-scoring-head span {
+  color: #315ce8;
+  font-weight: 800;
+}
+
+.essay-rubric-scoring > label > span:first-child {
+  color: #657085;
+}
+
+.essay-rubric-score-input {
+  flex: 0 0 auto;
+  gap: 5px;
+}
+
+.essay-rubric-score-input input {
+  width: 64px;
+  border: 1px solid #dfe3ea;
+  border-radius: 7px;
+  padding: 7px 8px;
+  text-align: right;
+}
+
+.essay-rubric-score-input small {
+  min-width: 30px;
+  color: #8c95a5;
+  font-size: 10px;
+}
+
+.score-panel {
+  grid-template-columns: minmax(260px, 1.1fr) minmax(180px, 1fr) auto;
 }
 
 .student-answer-review-item details {
@@ -1246,5 +1311,255 @@
   .exam-monitor-no-action {
     grid-column: 2 / -1;
     width: 100%;
+  }
+}
+
+.exam-monitor-bulk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.exam-monitor-bulk-actions button,
+.exam-monitor-actions button,
+.integrity-timeline header button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid #d9dfeb;
+  border-radius: 7px;
+  background: white;
+  padding: 6px 8px;
+  color: #526078;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.exam-monitor-bulk-actions button svg,
+.exam-monitor-actions button svg,
+.integrity-timeline header button svg {
+  width: 12px;
+  height: 12px;
+}
+
+.exam-monitor-toolbar {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 180px 170px;
+  gap: 8px;
+}
+
+.exam-monitor-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  border: 1px solid #dfe4ec;
+  border-radius: 8px;
+  padding: 0 10px;
+  background: white;
+}
+
+.exam-monitor-toolbar label svg {
+  width: 14px;
+  color: #8a94a5;
+}
+
+.exam-monitor-toolbar input,
+.exam-monitor-toolbar select {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  border: 1px solid #dfe4ec;
+  border-radius: 8px;
+  background: white;
+  color: #4b586e;
+  font-size: 11px;
+}
+
+.exam-monitor-toolbar input {
+  border: 0;
+  outline: 0;
+}
+
+.exam-monitor-row {
+  grid-template-columns: 38px minmax(150px, .9fr) minmax(190px, 1fr) auto minmax(210px, 1.2fr);
+}
+
+.exam-monitor-student small.online,
+.exam-monitor-student small.offline {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 700;
+}
+
+.exam-monitor-student small.online {
+  color: #16855d;
+}
+
+.exam-monitor-student small.offline {
+  color: #a36b20;
+}
+
+.exam-monitor-student small svg {
+  width: 10px;
+  height: 10px;
+}
+
+.exam-monitor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.exam-monitor-actions button.pause {
+  border-color: #efcaca;
+  background: #fff4f4;
+  color: #b44545;
+}
+
+.exam-monitor-actions button.resume {
+  border-color: #bfe5d4;
+  background: #edfaf4;
+  color: #147b57;
+}
+
+.exam-monitor-actions button.danger {
+  color: #b44545;
+}
+
+.exam-monitor-actions button:disabled,
+.exam-monitor-bulk-actions button:disabled {
+  cursor: wait;
+  opacity: .55;
+}
+
+.integrity-timeline {
+  border: 1px solid #f0d9a9;
+  border-radius: 10px;
+  background: #fffbf2;
+  overflow: hidden;
+}
+
+.integrity-timeline header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #f0dfba;
+}
+
+.integrity-timeline header b,
+.integrity-timeline header span {
+  display: block;
+}
+
+.integrity-timeline header b {
+  color: #624b20;
+  font-size: 12px;
+}
+
+.integrity-timeline header span {
+  margin-top: 3px;
+  color: #8c7955;
+  font-size: 10px;
+}
+
+.integrity-timeline > p {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 70px;
+  margin: 0;
+  color: #8c7955;
+  font-size: 11px;
+}
+
+.integrity-timeline > p svg {
+  width: 14px;
+}
+
+.integrity-timeline ol {
+  max-height: 220px;
+  margin: 0;
+  padding: 8px 14px;
+  list-style: none;
+  overflow: auto;
+}
+
+.integrity-timeline li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f2e6cc;
+}
+
+.integrity-timeline li:last-child {
+  border-bottom: 0;
+}
+
+.integrity-timeline li > svg {
+  width: 14px;
+  color: #ba8129;
+}
+
+.integrity-timeline li p {
+  margin: 0;
+}
+
+.integrity-timeline li b,
+.integrity-timeline li span {
+  display: block;
+  font-size: 10px;
+}
+
+.integrity-timeline li span {
+  margin-top: 2px;
+  color: #9b8967;
+}
+
+@media (max-width: 980px) {
+  .exam-monitor-summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .exam-monitor-toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .exam-monitor-toolbar label {
+    grid-column: 1 / -1;
+  }
+
+  .exam-monitor-row {
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+  }
+
+  .exam-monitor-metrics,
+  .exam-monitor-actions {
+    grid-column: 2 / -1;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 560px) {
+  .exam-monitor-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .exam-monitor-toolbar label {
+    grid-column: auto;
+  }
+
+  .exam-monitor-bulk-actions button,
+  .exam-monitor-actions button {
+    flex: 1 1 calc(50% - 4px);
   }
 }

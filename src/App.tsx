@@ -2768,6 +2768,24 @@ function ExamRunner({
     };
   }, [attemptId]);
   useEffect(() => {
+    const client = supabase;
+    if (!client || !attemptId) return;
+    const sendHeartbeat = () => {
+      if (document.visibilityState === "visible" && navigator.onLine) {
+        void client.rpc("touch_exam_attempt", { target_attempt_id: attemptId });
+      }
+    };
+    sendHeartbeat();
+    const intervalId = window.setInterval(sendHeartbeat, 15_000);
+    window.addEventListener("focus", sendHeartbeat);
+    window.addEventListener("online", sendHeartbeat);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", sendHeartbeat);
+      window.removeEventListener("online", sendHeartbeat);
+    };
+  }, [attemptId]);
+  useEffect(() => {
     const handler = async () => {
       if (
         document.hidden &&
@@ -2936,7 +2954,7 @@ function ExamRunner({
     if (!attemptId || !supabase || finishingRef.current || !submitRetryRef.current) return;
     submitRetryRef.current = false;
     void finishRef.current?.();
-  }, [attemptId, supabase]);
+  }, [attemptId]);
   const finish = useCallback(async () => {
     if (finishingRef.current) return;
     finishingRef.current = true;
@@ -2945,18 +2963,20 @@ function ExamRunner({
       if (!supabase || !attemptId) throw new Error("Attempt belum siap.");
       if (pendingEssay.current) {
         if (essaySaveTimer.current !== null) window.clearTimeout(essaySaveTimer.current);
-        const synced = await persistAnswer(pendingEssay.current.questionId, pendingEssay.current.value);
-        if (!synced) throw new Error("Jawaban essay terakhir belum tersimpan. Periksa koneksi lalu coba kembali.");
         pendingEssay.current = null;
         essaySaveTimer.current = null;
       }
       await Promise.allSettled(Object.values(answerSaveQueue.current));
-      const finalSaves = await Promise.all(
-        Object.entries(answers).map(([questionId, value]) =>
-          persistAnswer(questionId, value),
-        ),
-      );
-      const failedSaveCount = finalSaves.filter((saved) => !saved).length;
+      const answerPayload = Object.entries(answers).map(([questionId, value]) => ({
+        question_id: questionId,
+        selected_option: typeof value === "number" ? value : null,
+        essay_text: typeof value === "string" ? value : null,
+      }));
+      const batchResult = await supabase.rpc("save_exam_answers_batch", {
+        target_attempt_id: attemptId,
+        answer_payload: answerPayload,
+      });
+      const failedSaveCount = batchResult.error ? answerPayload.length : 0;
       const deadline = deadlineRef.current;
       const expired = deadline !== null && remainingSecondsFromDeadline(
         deadline,
@@ -2996,7 +3016,7 @@ function ExamRunner({
         }, 8_000);
       }
     }
-  }, [answers, attemptId, examId, navigate, notify, persistAnswer, remaining, supabase]);
+  }, [answers, attemptId, examId, navigate, notify, remaining]);
   const finishRef = useRef<(() => Promise<void>) | null>(null);
   useEffect(() => {
     finishRef.current = finish;

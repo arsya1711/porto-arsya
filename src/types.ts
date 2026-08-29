@@ -46,5 +46,11 @@ export type Question = {
   correctOption?: number | null;
   answerKey?: string | null;
   weight?: number;
+  rubric?: RubricCriterion[];
   createdAt?: string;
+};
+
+export type RubricCriterion = {
+  label: string;
+  points: number;
 };

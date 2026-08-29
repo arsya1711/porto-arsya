@@ -5,6 +5,7 @@ import {
   ArrowDown,
   ArrowUp,
   CheckCircle2,
+  Clock3,
   ClipboardCheck,
   ClipboardList,
   Download,
@@ -17,14 +18,18 @@ import {
   Plus,
   Radio,
   RefreshCw,
+  RotateCcw,
   Search,
+  Send,
   Trash2,
   Users,
+  Wifi,
+  WifiOff,
   X,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { encodeCsv } from "../lib/csv";
-import type { ExamStatus } from "../types";
+import type { ExamStatus, RubricCriterion } from "../types";
 import { deriveExamStatus } from "../lib/exam-status";
 import {
   addMinutesToSchoolDateTimeInput,
@@ -111,6 +116,8 @@ type GradingItem = {
   weight: number;
   score: number | null;
   comment: string;
+  rubric: RubricCriterion[];
+  rubricScores: number[];
   submittedAt: string | null;
 };
 
@@ -164,8 +171,18 @@ type ExamMonitorRow = {
   startedAt: string | null;
   submittedAt: string | null;
   isPaused: boolean;
+  isOnline: boolean;
+  lastSeenAt: string | null;
+  extraTimeMinutes: number;
   answeredCount: number;
   exitCount: number;
+};
+
+type IntegrityTimelineItem = {
+  id: string;
+  type: string;
+  occurredAt: string;
+  metadata: Record<string, unknown>;
 };
 
 type StudentAnswerReview = {
@@ -182,6 +199,8 @@ type StudentAnswerReview = {
   answerKey: string;
   correctOption: number | null;
   weight: number;
+  rubric: RubricCriterion[];
+  rubricScores: number[];
 };
 
 function relationName(value: unknown, fallback = "—") {
@@ -256,12 +275,86 @@ function initials(name: string) {
     .toUpperCase();
 }
 
+function normalizeRubricCriteria(value: unknown, fallbackWeight: number): RubricCriterion[] {
+  if (!Array.isArray(value)) return [{ label: "Penilaian keseluruhan", points: fallbackWeight }];
+  const criteria = value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const record = item as Record<string, unknown>;
+    const label = String(record.label ?? "").trim();
+    const points = Number(record.points);
+    return label && Number.isFinite(points) && points > 0 ? [{ label, points }] : [];
+  });
+  return criteria.length ? criteria : [{ label: "Penilaian keseluruhan", points: fallbackWeight }];
+}
+
+function normalizeRubricScores(value: unknown, rubric: RubricCriterion[], totalScore: number | null) {
+  if (Array.isArray(value) && value.length === rubric.length) {
+    return value.map((item) => Number((item as Record<string, unknown>)?.score ?? 0));
+  }
+  if (rubric.length === 1 && totalScore !== null) return [totalScore];
+  return rubric.map(() => 0);
+}
+
+function RubricScoreEditor({
+  rubric,
+  scores,
+  onChange,
+}: {
+  rubric: RubricCriterion[];
+  scores: number[];
+  onChange: (scores: number[]) => void;
+}) {
+  const total = rubric.reduce((sum, criterion, index) => sum + Number(scores[index] ?? 0), 0);
+  const maximum = rubric.reduce((sum, criterion) => sum + criterion.points, 0);
+
+  return (
+    <div className="essay-rubric-scoring">
+      <div className="essay-rubric-scoring-head">
+        <b>Rubrik penilaian</b>
+        <span>Total {total}/{maximum}</span>
+      </div>
+      {rubric.map((criterion, index) => (
+        <label key={`${criterion.label}-${index}`}>
+          <span>{criterion.label}</span>
+          <span className="essay-rubric-score-input">
+            <input
+              type="number"
+              min={0}
+              max={criterion.points}
+              step="0.5"
+              value={scores[index] ?? 0}
+              onChange={(event) => {
+                const next = [...scores];
+                next[index] = event.target.value === "" ? 0 : Number(event.target.value);
+                onChange(next);
+              }}
+            />
+            <small>/ {criterion.points}</small>
+          </span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
 function monitorStatus(row: ExamMonitorRow) {
   if (!row.attemptId || row.status === "not_started") return "Belum mulai";
   if (row.status === "in_progress" && row.isPaused) return "Dihentikan";
   if (row.status === "in_progress") return "Mengerjakan";
   if (row.status === "submitted" || row.status === "grading") return "Dikumpulkan";
   return "Selesai";
+}
+
+function integrityEventLabel(eventType: string) {
+  const labels: Record<string, string> = {
+    tab_hidden: "Halaman ujian tidak terlihat",
+    app_backgrounded: "Aplikasi masuk ke latar belakang",
+    fullscreen_exit: "Keluar dari mode layar penuh",
+    copy: "Mencoba menyalin konten",
+    paste: "Mencoba menempelkan konten",
+    reconnect: "Koneksi tersambung kembali",
+  };
+  return labels[eventType] ?? eventType.replace(/_/g, " ");
 }
 
 function PageHeader({
@@ -345,6 +438,12 @@ export function RealExamManagement({
   const [studentResults, setStudentResults] = useState<ExamStudentResult[]>([]);
   const [monitorRows, setMonitorRows] = useState<ExamMonitorRow[]>([]);
   const [controllingAttemptId, setControllingAttemptId] = useState("");
+  const [monitorSearch, setMonitorSearch] = useState("");
+  const [monitorFilter, setMonitorFilter] = useState("all");
+  const [monitorSort, setMonitorSort] = useState("name");
+  const [timelineStudent, setTimelineStudent] = useState("");
+  const [integrityTimeline, setIntegrityTimeline] = useState<IntegrityTimelineItem[]>([]);
+  const [timelineLoading, setTimelineLoading] = useState(false);
 
   const load = useCallback(async () => {
     const client = supabase;
@@ -736,6 +835,9 @@ export function RealExamManagement({
         startedAt: row.started_at ? String(row.started_at) : null,
         submittedAt: row.submitted_at ? String(row.submitted_at) : null,
         isPaused: Boolean(row.is_paused),
+        isOnline: Boolean(row.is_online),
+        lastSeenAt: row.last_seen_at ? String(row.last_seen_at) : null,
+        extraTimeMinutes: Number(row.extra_time_minutes ?? 0),
         answeredCount: Number(row.answered_count ?? 0),
         exitCount: Number(row.exit_count ?? 0),
       })));
@@ -752,6 +854,11 @@ export function RealExamManagement({
     setDetailKind("monitor");
     setDetailError("");
     setMonitorRows([]);
+    setMonitorSearch("");
+    setMonitorFilter("all");
+    setMonitorSort("name");
+    setTimelineStudent("");
+    setIntegrityTimeline([]);
     await loadExamMonitor(exam.id, true);
   };
 
@@ -772,6 +879,96 @@ export function RealExamManagement({
       ? `Sesi ${row.studentName} dihentikan sementara.`
       : `Sesi ${row.studentName} dilanjutkan.`);
     if (detailExam) await loadExamMonitor(detailExam.id);
+  };
+
+  const setAllStudentSessionsPaused = async (shouldPause: boolean) => {
+    if (!supabase || !detailExam) return;
+    setControllingAttemptId("bulk");
+    const { data, error: controlError } = await supabase.rpc("set_exam_attempts_paused", {
+      target_exam_id: detailExam.id,
+      should_pause: shouldPause,
+    });
+    setControllingAttemptId("");
+    if (controlError) {
+      notify(controlError.message, true);
+      return;
+    }
+    notify(`${Number(data ?? 0)} sesi berhasil ${shouldPause ? "dihentikan" : "dilanjutkan"}.`);
+    await loadExamMonitor(detailExam.id);
+  };
+
+  const grantExtraTime = async (row: ExamMonitorRow) => {
+    if (!supabase || !row.attemptId || !detailExam) return;
+    const rawMinutes = window.prompt(`Tambahkan waktu untuk ${row.studentName} (1–240 menit):`, "10");
+    if (rawMinutes === null) return;
+    const minutes = Number(rawMinutes);
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 240) {
+      notify("Waktu tambahan harus berupa menit bulat antara 1 dan 240.", true);
+      return;
+    }
+    setControllingAttemptId(row.attemptId);
+    const { error: controlError } = await supabase.rpc("grant_attempt_extra_time", {
+      target_attempt_id: row.attemptId,
+      extra_minutes: minutes,
+    });
+    setControllingAttemptId("");
+    if (controlError) notify(controlError.message, true);
+    else {
+      notify(`${minutes} menit ditambahkan untuk ${row.studentName}.`);
+      await loadExamMonitor(detailExam.id);
+    }
+  };
+
+  const forceSubmitAttempt = async (row: ExamMonitorRow) => {
+    if (!supabase || !row.attemptId || !detailExam) return;
+    if (!window.confirm(`Kumpulkan paksa ujian ${row.studentName}? Jawaban tidak dapat diubah setelah dikumpulkan.`)) return;
+    setControllingAttemptId(row.attemptId);
+    const { error: controlError } = await supabase.rpc("force_submit_exam_attempt", {
+      target_attempt_id: row.attemptId,
+    });
+    setControllingAttemptId("");
+    if (controlError) notify(controlError.message, true);
+    else {
+      notify(`Ujian ${row.studentName} berhasil dikumpulkan.`);
+      await loadExamMonitor(detailExam.id);
+    }
+  };
+
+  const resetAttempt = async (row: ExamMonitorRow) => {
+    if (!supabase || !row.attemptId || !detailExam) return;
+    if (!window.confirm(`Buka ulang ujian untuk ${row.studentName}? Jawaban, nilai, dan riwayat aktivitas attempt ini akan dihapus.`)) return;
+    setControllingAttemptId(row.attemptId);
+    const { error: controlError } = await supabase.rpc("reset_exam_attempt", {
+      target_attempt_id: row.attemptId,
+    });
+    setControllingAttemptId("");
+    if (controlError) notify(controlError.message, true);
+    else {
+      notify(`Ujian ${row.studentName} dibuka ulang dari awal.`);
+      setTimelineStudent("");
+      setIntegrityTimeline([]);
+      await loadExamMonitor(detailExam.id);
+    }
+  };
+
+  const loadIntegrityTimeline = async (row: ExamMonitorRow) => {
+    if (!supabase || !row.attemptId) return;
+    setTimelineStudent(row.studentName);
+    setTimelineLoading(true);
+    const { data, error: timelineError } = await supabase.rpc("get_attempt_integrity_timeline", {
+      target_attempt_id: row.attemptId,
+    });
+    setTimelineLoading(false);
+    if (timelineError) {
+      notify(timelineError.message, true);
+      return;
+    }
+    setIntegrityTimeline((data ?? []).map((item: Record<string, unknown>) => ({
+      id: String(item.event_id),
+      type: String(item.event_type),
+      occurredAt: String(item.occurred_at),
+      metadata: (item.metadata ?? {}) as Record<string, unknown>,
+    })));
   };
 
   useEffect(() => {
@@ -809,6 +1006,8 @@ export function RealExamManagement({
     setQuestionPreview([]);
     setStudentResults([]);
     setMonitorRows([]);
+    setTimelineStudent("");
+    setIntegrityTimeline([]);
   };
 
   const nextExamStep = () => {
@@ -869,6 +1068,23 @@ export function RealExamManagement({
   const draftDuration = draft
     ? schoolDateTimeRangeMinutes(draft.startsAt, draft.endsAt, schoolTimezone)
     : null;
+  const visibleMonitorRows = useMemo(() => {
+    const query = monitorSearch.trim().toLocaleLowerCase("id-ID");
+    const filtered = monitorRows.filter((row) => {
+      if (query && !row.studentName.toLocaleLowerCase("id-ID").includes(query)) return false;
+      if (monitorFilter === "active") return row.status === "in_progress" && row.isOnline && !row.isPaused;
+      if (monitorFilter === "offline") return row.status === "in_progress" && !row.isOnline;
+      if (monitorFilter === "paused") return row.isPaused;
+      if (monitorFilter === "indications") return row.exitCount > 0;
+      if (monitorFilter === "completed") return ["submitted", "grading", "final"].includes(row.status);
+      return true;
+    });
+    return [...filtered].sort((left, right) => {
+      if (monitorSort === "exits") return right.exitCount - left.exitCount || left.studentName.localeCompare(right.studentName, "id-ID");
+      if (monitorSort === "answers") return right.answeredCount - left.answeredCount || left.studentName.localeCompare(right.studentName, "id-ID");
+      return left.studentName.localeCompare(right.studentName, "id-ID");
+    });
+  }, [monitorFilter, monitorRows, monitorSearch, monitorSort]);
   const examStepTitles = ["Informasi dasar", "Pilih soal", "Keamanan & publikasi"];
 
   return (
@@ -1078,38 +1294,60 @@ export function RealExamManagement({
                 ) : detailKind === "monitor" ? (
                   <div className="exam-monitor">
                     <div className="exam-monitor-summary">
-                      <div><Radio /><p><b>{monitorRows.filter((row) => row.status === "in_progress" && !row.isPaused).length} siswa aktif</b><span>Data diperbarui otomatis setiap 5 detik.</span></p></div>
-                      <button type="button" onClick={() => void loadExamMonitor(detailExam.id)}><RefreshCw /> Perbarui</button>
+                      <div><Radio /><p><b>{monitorRows.filter((row) => row.status === "in_progress" && row.isOnline && !row.isPaused).length} siswa online</b><span>Status online berasal dari heartbeat browser, diperbarui setiap 15 detik.</span></p></div>
+                      <div className="exam-monitor-bulk-actions">
+                        <button type="button" disabled={controllingAttemptId === "bulk"} onClick={() => void setAllStudentSessionsPaused(true)}><Pause /> Hentikan semua</button>
+                        <button type="button" disabled={controllingAttemptId === "bulk"} onClick={() => void setAllStudentSessionsPaused(false)}><Play /> Lanjutkan semua</button>
+                        <button type="button" onClick={() => void loadExamMonitor(detailExam.id)}><RefreshCw /> Perbarui</button>
+                      </div>
+                    </div>
+                    <div className="exam-monitor-toolbar">
+                      <label><Search /><input value={monitorSearch} onChange={(event) => setMonitorSearch(event.target.value)} placeholder="Cari nama siswa…" /></label>
+                      <select value={monitorFilter} onChange={(event) => setMonitorFilter(event.target.value)} aria-label="Filter peserta pengawasan">
+                        <option value="all">Semua peserta</option>
+                        <option value="active">Online & aktif</option>
+                        <option value="offline">Koneksi terputus</option>
+                        <option value="paused">Dihentikan</option>
+                        <option value="indications">Ada indikasi aktivitas</option>
+                        <option value="completed">Sudah dikumpulkan</option>
+                      </select>
+                      <select value={monitorSort} onChange={(event) => setMonitorSort(event.target.value)} aria-label="Urutkan peserta pengawasan">
+                        <option value="name">Urutkan nama</option>
+                        <option value="exits">Indikasi terbanyak</option>
+                        <option value="answers">Jawaban terbanyak</option>
+                      </select>
                     </div>
                     <div className="exam-monitor-list">
-                      {monitorRows.map((row) => {
+                      {visibleMonitorRows.map((row) => {
                         const statusLabel = monitorStatus(row);
                         return <article key={row.studentId} className={`exam-monitor-row${row.isPaused ? " paused" : ""}`}>
                           <span className="exam-monitor-avatar">{initials(row.studentName)}</span>
                           <div className="exam-monitor-student">
                             <b>{row.studentName}</b>
                             <small>{row.startedAt ? `Mulai ${formatDate(row.startedAt, schoolTimezone)}` : "Belum membuka ujian"}</small>
+                            {row.attemptId && <small className={row.isOnline ? "online" : "offline"}>{row.isOnline ? <Wifi /> : <WifiOff />}{row.isOnline ? "Online" : row.lastSeenAt ? `Terakhir online ${formatDate(row.lastSeenAt, schoolTimezone)}` : "Belum ada heartbeat"}</small>}
                           </div>
                           <div className="exam-monitor-metrics">
                             <span><CheckCircle2 /> {row.answeredCount} jawaban</span>
-                            <span className={row.exitCount > 0 ? "warning" : ""}><AlertTriangle /> Keluar halaman {row.exitCount}×</span>
+                            <span className={row.exitCount > 0 ? "warning" : ""}><AlertTriangle /> Indikasi keluar halaman {row.exitCount}×</span>
+                            {row.extraTimeMinutes > 0 && <span><Clock3 /> Tambahan {row.extraTimeMinutes} menit</span>}
                           </div>
                           <em className={`exam-monitor-status ${row.status}${row.isPaused ? " paused" : ""}`}>{statusLabel}</em>
-                          {row.attemptId && row.status === "in_progress" ? (
-                            <button
-                              type="button"
-                              className={row.isPaused ? "resume" : "pause"}
-                              disabled={controllingAttemptId === row.attemptId}
-                              onClick={() => void setStudentSessionPaused(row)}
-                            >
-                              {controllingAttemptId === row.attemptId ? <LoaderCircle className="spin" /> : row.isPaused ? <Play /> : <Pause />}
-                              {row.isPaused ? "Lanjutkan" : "Hentikan"}
-                            </button>
-                          ) : <span className="exam-monitor-no-action">—</span>}
+                          {row.attemptId ? <div className="exam-monitor-actions">
+                            {row.status === "in_progress" && <button type="button" className={row.isPaused ? "resume" : "pause"} disabled={controllingAttemptId === row.attemptId} onClick={() => void setStudentSessionPaused(row)}>{row.isPaused ? <Play /> : <Pause />}{row.isPaused ? "Lanjutkan" : "Hentikan"}</button>}
+                            {row.status === "in_progress" && <button type="button" disabled={controllingAttemptId === row.attemptId} onClick={() => void grantExtraTime(row)}><Clock3 /> + Waktu</button>}
+                            {row.status === "in_progress" && <button type="button" disabled={controllingAttemptId === row.attemptId} onClick={() => void forceSubmitAttempt(row)}><Send /> Kumpulkan</button>}
+                            <button type="button" onClick={() => void loadIntegrityTimeline(row)}><AlertTriangle /> Aktivitas</button>
+                            <button type="button" className="danger" disabled={controllingAttemptId === row.attemptId} onClick={() => void resetAttempt(row)}><RotateCcw /> Buka ulang</button>
+                          </div> : <span className="exam-monitor-no-action">Belum mulai</span>}
                         </article>;
                       })}
-                      {!monitorRows.length && <p className="inline-empty">Belum ada peserta yang ditetapkan pada ujian ini.</p>}
+                      {!visibleMonitorRows.length && <p className="inline-empty">Tidak ada peserta yang sesuai dengan filter.</p>}
                     </div>
+                    {timelineStudent && <section className="integrity-timeline">
+                      <header><div><b>Indikasi aktivitas · {timelineStudent}</b><span>Catatan ini adalah sinyal untuk ditinjau, bukan bukti kecurangan.</span></div><button type="button" onClick={() => { setTimelineStudent(""); setIntegrityTimeline([]); }}><X /></button></header>
+                      {timelineLoading ? <p><LoaderCircle className="spin" /> Memuat aktivitas…</p> : integrityTimeline.length ? <ol>{integrityTimeline.map((item) => <li key={item.id}><AlertTriangle /><p><b>{integrityEventLabel(item.type)}</b><span>{formatDate(item.occurredAt, schoolTimezone)}</span></p></li>)}</ol> : <p>Tidak ada indikasi aktivitas yang tercatat.</p>}
+                    </section>}
                   </div>
                 ) : (
                   <div className="exam-result-list">
@@ -1152,7 +1390,7 @@ export function StudentAnswerReviewPage({ notify }: { notify: Notify }) {
     const [attemptResult, questionResult, answerResult] = await Promise.all([
       supabase.from("attempts").select("id,status,student_id,final_score,submitted_at").eq("id", attemptId).eq("exam_id", examId).single(),
       supabase.from("exam_questions").select("question_id,position").eq("exam_id", examId).order("position"),
-      supabase.from("answers").select("id,attempt_id,question_id,selected_option,essay_text,score,teacher_comment,questions(body,type,options,answer_key,weight,correct_option)").eq("attempt_id", attemptId),
+      supabase.from("answers").select("id,attempt_id,question_id,selected_option,essay_text,score,teacher_comment,rubric_scores,questions(body,type,options,answer_key,weight,rubric,correct_option)").eq("attempt_id", attemptId),
     ]);
     const loadError = attemptResult.error ?? questionResult.error ?? answerResult.error;
     if (loadError || !attemptResult.data) {
@@ -1169,6 +1407,9 @@ export function StudentAnswerReviewPage({ notify }: { notify: Notify }) {
     const positions = new Map((questionResult.data ?? []).map((question) => [question.question_id, question.position]));
     const answers: StudentAnswerReview[] = (answerResult.data ?? []).map((row) => {
       const question = nestedRecord(row.questions);
+      const weight = Number(question.weight ?? 1);
+      const score = row.score === null ? null : Number(row.score);
+      const rubric = normalizeRubricCriteria(question.rubric, weight);
       return {
         id: String(row.id),
         questionId: String(row.question_id),
@@ -1178,11 +1419,13 @@ export function StudentAnswerReviewPage({ notify }: { notify: Notify }) {
         options: Array.isArray(question.options) ? question.options.map(String) : [],
         selectedOption: row.selected_option === null ? null : Number(row.selected_option),
         essayText: String(row.essay_text ?? ""),
-        score: row.score === null ? null : Number(row.score),
+        score,
         comment: String(row.teacher_comment ?? ""),
         answerKey: String(question.answer_key ?? ""),
         correctOption: question.correct_option === null ? null : Number(question.correct_option),
-        weight: Number(question.weight ?? 1),
+        weight,
+        rubric,
+        rubricScores: normalizeRubricScores(row.rubric_scores, rubric, score),
       };
     }).sort((left, right) => left.position - right.position);
     setResult({
@@ -1203,12 +1446,25 @@ export function StudentAnswerReviewPage({ notify }: { notify: Notify }) {
   };
 
   const saveEssay = async (answer: StudentAnswerReview) => {
-    if (!supabase || answer.score === null || answer.score < 0 || answer.score > answer.weight) {
+    const rubricIsValid = answer.rubric.every((criterion, index) => {
+      const score = answer.rubricScores[index];
+      return Number.isFinite(score) && score >= 0 && score <= criterion.points;
+    });
+    if (!supabase || answer.score === null || answer.score < 0 || answer.score > answer.weight || !rubricIsValid) {
       notify(`Skor harus berada di antara 0 dan ${answer.weight}.`, true);
       return;
     }
     setSavingAnswerId(answer.id);
-    const { error: saveError } = await supabase.rpc("grade_essay_answer", { target_answer_id: answer.id, awarded_score: answer.score, feedback: answer.comment.trim() || null });
+    const { error: saveError } = await supabase.rpc("grade_essay_answer", {
+      target_answer_id: answer.id,
+      awarded_score: answer.score,
+      feedback: answer.comment.trim() || null,
+      rubric_scores_payload: answer.rubric.map((criterion, index) => ({
+        label: criterion.label,
+        max_points: criterion.points,
+        score: answer.rubricScores[index] ?? 0,
+      })),
+    });
     setSavingAnswerId("");
     if (saveError) {
       notify(saveError.message, true);
@@ -1227,7 +1483,22 @@ export function StudentAnswerReviewPage({ notify }: { notify: Notify }) {
       <div className="student-answer-page-summary"><span>{result.studentName}</span><strong>{result.score === null ? "Menunggu koreksi" : `Nilai ${result.score}`}</strong><small>{result.answers.length} jawaban</small></div>
       <div className="student-answer-page-list">{result.answers.map((answer) => <article className="student-answer-page-item" key={answer.id}>
         <div className="student-answer-question"><span>{answer.position || "-"}</span><div><small>{answer.type === "essay" ? "ESSAY" : "PILIHAN GANDA"}</small><b>{answer.body}</b></div></div>
-        {answer.type === "essay" ? <><div className="student-answer-text">{answer.essayText || "Siswa tidak memberikan jawaban."}</div><div className="student-essay-grading"><label className="form-field"><span>Skor (maks. {answer.weight})</span><input type="number" min={0} max={answer.weight} step="0.5" value={answer.score ?? ""} onChange={(event) => updateAnswer(answer.id, { score: event.target.value === "" ? null : Number(event.target.value) })} /></label><label className="form-field"><span>Komentar untuk siswa</span><input value={answer.comment} onChange={(event) => updateAnswer(answer.id, { comment: event.target.value })} placeholder="Berikan umpan balik singkat…" /></label><button type="button" className="primary" disabled={savingAnswerId === answer.id || answer.score === null} onClick={() => void saveEssay(answer)}>{savingAnswerId === answer.id ? "Menyimpan…" : "Simpan koreksi"}</button></div><details><summary>Lihat pedoman jawaban</summary><p>{answer.answerKey || "Belum ada pedoman jawaban."}</p></details></> : <div className={`student-choice-answer ${answer.selectedOption === answer.correctOption ? "correct" : "wrong"}`}><span>{answer.selectedOption === null ? "Tidak dijawab" : `Jawaban siswa: ${String.fromCharCode(65 + answer.selectedOption)}. ${answer.options[answer.selectedOption] ?? ""}`}</span><small>{answer.correctOption === null ? "Kunci belum ditentukan" : `Kunci: ${String.fromCharCode(65 + answer.correctOption)}. ${answer.options[answer.correctOption] ?? ""}`}</small></div>}
+        {answer.type === "essay" ? <>
+          <div className="student-answer-text">{answer.essayText || "Siswa tidak memberikan jawaban."}</div>
+          <div className="student-essay-grading">
+            <RubricScoreEditor
+              rubric={answer.rubric}
+              scores={answer.rubricScores}
+              onChange={(rubricScores) => updateAnswer(answer.id, {
+                rubricScores,
+                score: rubricScores.reduce((total, value) => total + Number(value || 0), 0),
+              })}
+            />
+            <label className="form-field"><span>Komentar untuk siswa</span><input value={answer.comment} onChange={(event) => updateAnswer(answer.id, { comment: event.target.value })} placeholder="Berikan umpan balik singkat…" /></label>
+            <button type="button" className="primary" disabled={savingAnswerId === answer.id || answer.score === null} onClick={() => void saveEssay(answer)}>{savingAnswerId === answer.id ? "Menyimpan…" : "Simpan koreksi"}</button>
+          </div>
+          <details><summary>Lihat pedoman jawaban</summary><p>{answer.answerKey || "Belum ada pedoman jawaban."}</p></details>
+        </> : <div className={`student-choice-answer ${answer.selectedOption === answer.correctOption ? "correct" : "wrong"}`}><span>{answer.selectedOption === null ? "Tidak dijawab" : `Jawaban siswa: ${String.fromCharCode(65 + answer.selectedOption)}. ${answer.options[answer.selectedOption] ?? ""}`}</span><small>{answer.correctOption === null ? "Kunci belum ditentukan" : `Kunci: ${String.fromCharCode(65 + answer.correctOption)}. ${answer.options[answer.correctOption] ?? ""}`}</small></div>}
       </article>)}</div>
     </>}
   </div>;
@@ -1238,7 +1509,7 @@ export function RealGrading({ notify }: { notify: Notify }) {
   const [selectedId, setSelectedId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [score, setScore] = useState("");
+  const [rubricScores, setRubricScores] = useState<number[]>([]);
   const [comment, setComment] = useState("");
   const [saving, setSaving] = useState(false);
   const [page, setPage] = useState(1);
@@ -1255,7 +1526,7 @@ export function RealGrading({ notify }: { notify: Notify }) {
     const { data, error: loadError } = await fetchAllPages((from, to) =>
       client
         .from("answers")
-        .select("id,attempt_id,question_id,essay_text,score,teacher_comment,answered_at,questions!inner(id,body,answer_key,weight,type),attempts!inner(id,status,student_id,exam_id,submitted_at)")
+        .select("id,attempt_id,question_id,essay_text,score,teacher_comment,rubric_scores,answered_at,questions!inner(id,body,answer_key,weight,rubric,type),attempts!inner(id,status,student_id,exam_id,submitted_at)")
         .eq("questions.type", "essay")
         .order("answered_at")
         .range(from, to),
@@ -1286,6 +1557,9 @@ export function RealGrading({ notify }: { notify: Notify }) {
     const exams = new Map((examResult.data ?? []).map((row) => [row.id, { title: row.title, className: relationName(row.classes) }]));
     const normalized: GradingItem[] = baseRows.map(({ row, question, attempt }) => {
       const exam = exams.get(String(attempt.exam_id));
+      const weight = Number(question.weight ?? 1);
+      const score = row.score === null ? null : Number(row.score);
+      const rubric = normalizeRubricCriteria(question.rubric, weight);
       return {
         answerId: row.id,
         attemptId: row.attempt_id,
@@ -1298,9 +1572,11 @@ export function RealGrading({ notify }: { notify: Notify }) {
         question: String(question.body ?? ""),
         answerKey: String(question.answer_key ?? "Belum ada kunci jawaban."),
         essayText: row.essay_text ?? "",
-        weight: Number(question.weight ?? 1),
-        score: row.score === null ? null : Number(row.score),
+        weight,
+        score,
         comment: row.teacher_comment ?? "",
+        rubric,
+        rubricScores: normalizeRubricScores(row.rubric_scores, rubric, score),
         submittedAt: String(attempt.submitted_at ?? row.answered_at ?? "") || null,
       };
     });
@@ -1314,14 +1590,18 @@ export function RealGrading({ notify }: { notify: Notify }) {
   useEffect(() => { void load(); }, [load]);
   const selected = items.find((item) => item.answerId === selectedId) ?? null;
   useEffect(() => {
-    setScore(selected?.score === null || selected?.score === undefined ? "" : String(selected.score));
     setComment(selected?.comment ?? "");
+    setRubricScores(selected?.rubricScores ?? []);
   }, [selected]);
 
   const save = async () => {
     if (!supabase || !selected) return;
-    const numericScore = Number(score);
-    if (!Number.isFinite(numericScore) || numericScore < 0 || numericScore > selected.weight) {
+    const rubricIsValid = selected.rubric.every((criterion, index) => {
+      const value = rubricScores[index];
+      return Number.isFinite(value) && value >= 0 && value <= criterion.points;
+    });
+    const numericScore = rubricScores.reduce((total, value) => total + Number(value || 0), 0);
+    if (!rubricIsValid || !Number.isFinite(numericScore) || numericScore < 0 || numericScore > selected.weight) {
       notify(`Skor harus berada di antara 0 dan ${selected.weight}.`, true);
       return;
     }
@@ -1330,6 +1610,11 @@ export function RealGrading({ notify }: { notify: Notify }) {
       target_answer_id: selected.answerId,
       awarded_score: numericScore,
       feedback: comment.trim() || null,
+      rubric_scores_payload: selected.rubric.map((criterion, index) => ({
+        label: criterion.label,
+        max_points: criterion.points,
+        score: rubricScores[index] ?? 0,
+      })),
     });
     if (saveError) {
       setSaving(false);
@@ -1378,7 +1663,7 @@ export function RealGrading({ notify }: { notify: Notify }) {
             <div className="question-reference"><small>{selected.examTitle.toUpperCase()} · BOBOT {selected.weight} POIN</small><h3>{selected.question}</h3><details><summary>Lihat kunci jawaban</summary><p>{selected.answerKey}</p></details></div>
             <div className="answer-paper"><div><span className="avatar sm">{initials(selected.studentName)}</span><p><b>{selected.studentName}</b><small>{selected.className} · Dikumpulkan {formatDate(selected.submittedAt)}</small></p></div><p>{selected.essayText || "Siswa tidak memberikan jawaban."}</p></div>
             <div className="score-panel">
-              <label className="form-field"><span>Skor (maks. {selected.weight})</span><input type="number" min={0} max={selected.weight} step="0.5" value={score} onChange={(event) => setScore(event.target.value)} /></label>
+              <RubricScoreEditor rubric={selected.rubric} scores={rubricScores} onChange={setRubricScores} />
               <label className="form-field"><span>Komentar untuk siswa</span><input value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Berikan umpan balik singkat…" /></label>
               <button type="button" className="primary" disabled={saving} onClick={() => void save()}>{saving ? "Menyimpan…" : "Simpan nilai"}</button>
             </div>
