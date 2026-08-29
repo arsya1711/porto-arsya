@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Laporan Pengujian Beban AWExam — 28 Agustus 2026</title>
+  <style>
+    :root {
+      --navy: #102a43;
+      --blue: #2563eb;
+      --cyan: #0891b2;
+      --green: #15803d;
+      --amber: #b45309;
+      --red: #b91c1c;
+      --ink: #1f2937;
+      --muted: #64748b;
+      --line: #dbe4ee;
+      --soft: #f3f7fb;
+    }
+    * { box-sizing: border-box; }
+    html { font-family: "Segoe UI", Arial, sans-serif; color: var(--ink); font-size: 9.8pt; }
+    body { margin: 0; background: white; line-height: 1.42; }
+    @page { size: A4; margin: 14mm 15mm 15mm; }
+    @media print {
+      .page-break { break-before: page; }
+      tr, .card, .callout, .metric, .decision { break-inside: avoid; }
+      a { color: inherit; text-decoration: none; }
+    }
+    .cover {
+      min-height: 257mm;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+      padding: 12mm 8mm 8mm;
+    }
+    .cover::before {
+      content: "";
+      position: absolute;
+      inset: -35mm -60mm auto auto;
+      width: 150mm;
+      height: 150mm;
+      border-radius: 50%;
+      background: linear-gradient(145deg, rgba(37,99,235,.14), rgba(8,145,178,.03));
+    }
+    .brand { display: flex; align-items: center; gap: 10px; color: var(--navy); }
+    .brand img { width: 42px; height: 42px; object-fit: contain; }
+    .brand strong { display: block; font-size: 16pt; letter-spacing: -.3px; }
+    .brand span { display: block; color: var(--muted); font-size: 8.5pt; letter-spacing: .7px; text-transform: uppercase; }
+    .cover-main { margin-top: 43mm; max-width: 155mm; }
+    .kicker { color: var(--blue); font-weight: 700; letter-spacing: 1.3px; text-transform: uppercase; font-size: 9pt; }
+    h1 { color: var(--navy); margin: 7px 0 12px; font-size: 30pt; line-height: 1.08; letter-spacing: -1.1px; }
+    .cover-lead { font-size: 13pt; color: #40566e; max-width: 145mm; }
+    .cover-status { margin-top: 18mm; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .decision { border: 1px solid var(--line); border-top: 4px solid var(--blue); border-radius: 8px; padding: 12px; background: rgba(255,255,255,.92); }
+    .decision.green { border-top-color: var(--green); }
+    .decision.amber { border-top-color: var(--amber); }
+    .decision.red { border-top-color: var(--red); }
+    .decision small { color: var(--muted); display: block; font-size: 7.8pt; text-transform: uppercase; font-weight: 700; letter-spacing: .6px; }
+    .decision b { color: var(--navy); display: block; margin: 3px 0; font-size: 13pt; }
+    .decision span { color: var(--muted); font-size: 8.5pt; }
+    .cover-footer { margin-top: auto; padding-top: 14mm; border-top: 1px solid var(--line); display: flex; justify-content: space-between; color: var(--muted); font-size: 9pt; }
+    header.report-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--navy); padding-bottom: 7px; margin-bottom: 16px; }
+    header.report-head .brand img { width: 30px; height: 30px; }
+    header.report-head .brand strong { font-size: 12pt; }
+    .doc-meta { text-align: right; color: var(--muted); font-size: 8pt; }
+    h2 { color: var(--navy); font-size: 17pt; letter-spacing: -.35px; margin: 14px 0 7px; }
+    h3 { color: var(--navy); font-size: 12pt; margin: 11px 0 5px; }
+    p { margin: 5px 0 7px; }
+    .lead { font-size: 11.5pt; color: #40566e; }
+    .callout { border-left: 4px solid var(--blue); background: #eff6ff; padding: 8px 11px; border-radius: 0 7px 7px 0; margin: 8px 0; }
+    .callout.warn { border-left-color: var(--amber); background: #fff8eb; }
+    .callout.danger { border-left-color: var(--red); background: #fff1f2; }
+    .callout.good { border-left-color: var(--green); background: #f0fdf4; }
+    .callout strong { color: var(--navy); }
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin: 8px 0 10px; }
+    .metric { background: var(--soft); border: 1px solid var(--line); border-radius: 7px; padding: 8px; }
+    .metric small { display: block; color: var(--muted); font-size: 7.5pt; text-transform: uppercase; font-weight: 700; }
+    .metric b { display: block; color: var(--navy); font-size: 16pt; margin: 1px 0; }
+    .metric span { color: var(--muted); font-size: 8pt; }
+    table { width: 100%; border-collapse: collapse; margin: 7px 0 10px; font-size: 8.8pt; }
+    th { background: var(--navy); color: white; padding: 6px 7px; text-align: left; font-size: 7.8pt; letter-spacing: .25px; }
+    td { border-bottom: 1px solid var(--line); padding: 5px 7px; vertical-align: top; }
+    tbody tr:nth-child(even) { background: #f8fafc; }
+    td.num, th.num { text-align: right; white-space: nowrap; }
+    ul, ol { padding-left: 20px; margin: 5px 0 8px; }
+    li { margin: 3px 0; }
+    .tag { display: inline-block; border-radius: 999px; padding: 2px 8px; font-size: 7.5pt; font-weight: 700; text-transform: uppercase; }
+    .tag.measured { color: #075985; background: #e0f2fe; }
+    .tag.estimate { color: #92400e; background: #fef3c7; }
+    .risk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin: 7px 0; }
+    .card { border: 1px solid var(--line); border-radius: 8px; padding: 8px 11px; }
+    .card h3 { margin-top: 0; }
+    .risk-high { border-top: 4px solid var(--red); }
+    .risk-medium { border-top: 4px solid var(--amber); }
+    .risk-low { border-top: 4px solid var(--green); }
+    .formula { font-family: Consolas, monospace; font-size: 8.7pt; background: #eef2f7; padding: 2px 5px; border-radius: 4px; }
+    .footnote { color: var(--muted); font-size: 8pt; }
+    .signature { margin-top: 16mm; display: grid; grid-template-columns: 1fr 1fr; gap: 24mm; }
+    .signature div { border-top: 1px solid var(--ink); padding-top: 5px; color: var(--muted); font-size: 8.5pt; }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <div class="brand">
+      <img src="../public/logo.png" alt="Logo AWExam" />
+      <div><strong>AWExam</strong><span>Platform ujian digital sekolah</span></div>
+    </div>
+    <div class="cover-main">
+      <div class="kicker">Laporan pengujian sistem</div>
+      <h1>Pengujian Beban dan Kesiapan Presentasi</h1>
+      <p class="cover-lead">Evaluasi skenario 100 soal per guru, 50 ujian, dan 50 siswa per kelas pada aplikasi AWExam berbasis React, TypeScript, dan Supabase.</p>
+      <div class="cover-status">
+        <div class="decision green"><small>Presentasi</small><b>GO</b><span>Aman untuk demo terkontrol.</span></div>
+        <div class="decision amber"><small>1 kelas / 50 siswa</small><b>GO Bersyarat</b><span>Hindari submit serentak.</span></div>
+        <div class="decision red"><small>50 ujian serentak</small><b>NO-GO</b><span>Perlu load test staging.</span></div>
+      </div>
+    </div>
+    <div class="cover-footer">
+      <span>Disusun untuk presentasi sekolah</span>
+      <span>28 Agustus 2026 · Asia/Jakarta</span>
+    </div>
+  </section>
+
+  <section class="page-break">
+    <header class="report-head">
+      <div class="brand"><img src="../public/logo.png" alt="" /><div><strong>AWExam</strong><span>Laporan pengujian</span></div></div>
+      <div class="doc-meta">Dokumen: QA-LOAD-2026-08-28<br />Status: Final</div>
+    </header>
+
+    <h2>1. Ringkasan Eksekutif</h2>
+    <p class="lead">Aplikasi berhasil melewati build production, 51 unit test, pemeriksaan Edge Function, pemeriksaan infrastruktur go-live, serta uji request baca secara bersamaan. Pada volume data yang diminta, kapasitas penyimpanan database bukan risiko utama. Risiko terbesar adalah pola penyimpanan ulang 100 jawaban ketika siswa menekan tombol kumpulkan.</p>
+
+    <div class="callout good"><strong>Kesimpulan utama:</strong> presentasi menggunakan satu layar atau 5–10 perangkat demo dapat dilakukan. Simulasi satu kelas berisi 50 siswa layak dilakukan secara bertahap. Penggunaan 50 ujian secara serentak belum direkomendasikan tanpa staging, data uji autentik, dan perbaikan batch-submit.</div>
+
+    <h3>Tujuan pengujian</h3>
+    <ul>
+      <li>Menilai kemampuan aplikasi menangani 100 soal pada bank setiap guru.</li>
+      <li>Memperkirakan dampak 50 ujian dengan 50 siswa pada setiap kelas.</li>
+      <li>Menghitung jumlah request aplikasi dan volume data yang terbentuk.</li>
+      <li>Mengukur performa hosting dan endpoint baca Supabase secara aman.</li>
+      <li>Mengidentifikasi risiko sebelum presentasi dan penggunaan operasional.</li>
+    </ul>
+
+    <h3>Ruang lingkup dan batasan</h3>
+    <p>Pengujian produksi hanya memakai request GET/RPC baca dan tidak menambah akun, ujian, attempt, atau jawaban pada database. Waktu query soal autentik dan write jawaban merupakan estimasi berbasis struktur kode, ukuran payload sintetis, serta latensi endpoint Supabase yang sama. Uji beban write penuh harus dilakukan pada project staging, bukan database produksi.</p>
+
+    <h2>2. Hasil Verifikasi Teknis</h2>
+    <table>
+      <thead><tr><th>Pemeriksaan</th><th>Hasil</th><th>Keterangan</th></tr></thead>
+      <tbody>
+        <tr><td>Build production</td><td><strong>Lulus</strong></td><td>2.129 modul berhasil ditransformasi dan bundle berhasil dibuat.</td></tr>
+        <tr><td>Unit test</td><td><strong>51/51 lulus</strong></td><td>Tidak ada test gagal, dibatalkan, atau dilewati.</td></tr>
+        <tr><td>Lint</td><td><strong>0 error</strong></td><td>Terdapat 2 warning dependency React Hook; tidak menghambat build.</td></tr>
+        <tr><td>Edge Function</td><td><strong>Lulus</strong></td><td>admin-users, student-login, dan import-questions lolos pemeriksaan Deno.</td></tr>
+        <tr><td>Go-live infrastructure</td><td><strong>Lulus</strong></td><td>Hosting, Supabase Auth/REST, clock server, dan CORS Edge Function dapat dijangkau.</td></tr>
+        <tr><td>Browser smoke otomatis</td><td><strong>Belum terverifikasi</strong></td><td>Harness lokal Windows gagal meluncurkan npm.cmd dengan spawn EINVAL; bukan kegagalan build aplikasi.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="page-break">
+    <header class="report-head">
+      <div class="brand"><img src="../public/logo.png" alt="" /><div><strong>AWExam</strong><span>Hasil pengukuran</span></div></div>
+      <div class="doc-meta">QA-LOAD-2026-08-28</div>
+    </header>
+
+    <h2>3. Hasil Pengukuran Performa</h2>
+    <p><span class="tag measured">Terukur</span> Angka di bagian ini berasal dari pengujian langsung pada 28 Agustus 2026.</p>
+
+    <h3>Hosting production</h3>
+    <p>Simulasi aman dilakukan terhadap 150 request halaman production dengan konkurensi 25.</p>
+    <div class="metrics">
+      <div class="metric"><small>Keberhasilan</small><b>100%</b><span>150 dari 150 request</span></div>
+      <div class="metric"><small>Latensi p50</small><b>58 ms</b><span>Median response</span></div>
+      <div class="metric"><small>Latensi p95</small><b>247 ms</b><span>95% request di bawah ini</span></div>
+      <div class="metric"><small>Latensi p99</small><b>1,7 dtk</b><span>Lonjakan terburuk</span></div>
+    </div>
+
+    <h3>Endpoint baca Supabase</h3>
+    <p>Pengukuran menggunakan RPC baca waktu server: 200 request dengan 50 koneksi bersamaan. Pengujian ini mewakili jaringan dan gateway Supabase, tetapi tidak mencakup biaya join query soal atau write jawaban.</p>
+    <div class="metrics">
+      <div class="metric"><small>Keberhasilan</small><b>200/200</b><span>Tanpa error</span></div>
+      <div class="metric"><small>Throughput</small><b>176,7</b><span>Request per detik</span></div>
+      <div class="metric"><small>Latensi p50</small><b>168 ms</b><span>Median response</span></div>
+      <div class="metric"><small>Latensi p95</small><b>458 ms</b><span>Konkurensi 50</span></div>
+    </div>
+
+    <h3>Payload 100 soal</h3>
+    <table>
+      <thead><tr><th>Parameter</th><th class="num">Hasil</th><th>Interpretasi</th></tr></thead>
+      <tbody>
+        <tr><td>Jumlah soal sintetis</td><td class="num">100</td><td>Pilihan ganda dengan empat opsi.</td></tr>
+        <tr><td>Ukuran JSON</td><td class="num">46,8 KiB</td><td>Relatif kecil untuk koneksi sekolah yang stabil.</td></tr>
+        <tr><td>Parsing dan mapping</td><td class="num">0,08 ms</td><td>CPU/browser bukan bottleneck utama.</td></tr>
+        <tr><td>Transfer untuk 50 siswa</td><td class="num">±2,3 MiB</td><td>Belum termasuk bundle aplikasi dan metadata lain.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout"><strong>Interpretasi:</strong> pemuatan soal dibatasi oleh round-trip jaringan dan database, bukan ukuran payload atau proses JavaScript di browser.</div>
+
+    <h2>4. Volume Data Skenario</h2>
+    <p>Jumlah guru tidak ditentukan. Jika jumlah guru dinyatakan sebagai <span class="formula">T</span>, total soal aktif adalah <span class="formula">100 × T</span>.</p>
+    <table>
+      <thead><tr><th>Entitas</th><th class="num">Perhitungan</th><th class="num">Jumlah</th></tr></thead>
+      <tbody>
+        <tr><td>Soal bank seluruh guru</td><td class="num">100 × T</td><td class="num">100T</td></tr>
+        <tr><td>Relasi soal ke ujian</td><td class="num">50 × 100</td><td class="num">5.000</td></tr>
+        <tr><td>Penugasan peserta</td><td class="num">50 × 50</td><td class="num">2.500</td></tr>
+        <tr><td>Attempt jika seluruh peserta mulai</td><td class="num">50 × 50</td><td class="num">2.500</td></tr>
+        <tr><td>Jawaban jika seluruh ujian selesai</td><td class="num">50 × 50 × 100</td><td class="num">250.000</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="page-break">
+    <header class="report-head">
+      <div class="brand"><img src="../public/logo.png" alt="" /><div><strong>AWExam</strong><span>Analisis request</span></div></div>
+      <div class="doc-meta">QA-LOAD-2026-08-28</div>
+    </header>
+
+    <h2>5. Estimasi Query dan Request</h2>
+    <p><span class="tag estimate">Estimasi kode</span> Perhitungan berikut didasarkan pada alur frontend dan RPC database yang aktif.</p>
+    <table>
+      <thead><tr><th>Aktivitas</th><th class="num">Request API</th><th>Keterangan</th></tr></thead>
+      <tbody>
+        <tr><td>Guru membuka bank berisi 100 soal</td><td class="num">3</td><td>Subjects, question banks, dan questions.</td></tr>
+        <tr><td>Siswa membuka dashboard</td><td class="num">4</td><td>Keanggotaan kelas, katalog ujian, attempt, dan waktu server.</td></tr>
+        <tr><td>Siswa membuka ruang ujian</td><td class="num">5</td><td>User, katalog, waktu server, start attempt, dan seluruh soal.</td></tr>
+        <tr><td>Siswa menjawab 100 soal sekali</td><td class="num">100</td><td>Satu RPC write per jawaban/perubahan.</td></tr>
+        <tr><td>Siswa menekan kumpulkan</td><td class="num">101</td><td>100 jawaban disimpan ulang, lalu satu RPC submit.</td></tr>
+        <tr><td><strong>Total satu siswa di ruang ujian</strong></td><td class="num"><strong>±206</strong></td><td>Belum termasuk login, tab switch, perubahan jawaban berulang, dan retry.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Dampak konkurensi</h3>
+    <table>
+      <thead><tr><th>Skenario</th><th class="num">Startup</th><th class="num">Selama menjawab</th><th class="num">Saat submit</th><th class="num">Total</th></tr></thead>
+      <tbody>
+        <tr><td>1 siswa</td><td class="num">5</td><td class="num">100</td><td class="num">101</td><td class="num">206</td></tr>
+        <tr><td>1 kelas / 50 siswa</td><td class="num">250</td><td class="num">5.000</td><td class="num">5.050</td><td class="num">10.300</td></tr>
+        <tr><td>50 ujian / 2.500 siswa</td><td class="num">12.500</td><td class="num">250.000</td><td class="num">252.500</td><td class="num">515.000</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout danger"><strong>Risiko submit serentak:</strong> 50 siswa dapat mengirim sekitar 5.050 request dalam satu lonjakan. Dengan pola sekarang, setiap siswa mengirim 100 write paralel yang mengunci baris attempt yang sama, sehingga transaksi akhirnya mengantre. Dampaknya dapat berupa tombol submit menunggu lama, pesan jawaban belum tersinkron, timeout, atau rate limit.</div>
+
+    <h3>Query halaman staf pada data besar</h3>
+    <table>
+      <thead><tr><th>Halaman</th><th class="num">Request pada skenario</th><th>Perkiraan waktu</th></tr></thead>
+      <tbody>
+        <tr><td>Bank soal guru, 100 soal</td><td class="num">3</td><td>0,3–1,5 detik</td></tr>
+        <tr><td>Kelola ujian, termasuk 2.500 attempt</td><td class="num">±17</td><td>2–6 detik</td></tr>
+        <tr><td>Laporan: 2.500 attempt + 5.000 jawaban</td><td class="num">±33</td><td>5–15 detik</td></tr>
+      </tbody>
+    </table>
+    <p class="footnote">Rentang waktu adalah estimasi pada internet stabil. Wi-Fi sekolah, paket Supabase, panjang teks soal, serta aktivitas pengguna lain dapat mengubah hasil.</p>
+  </section>
+
+  <section class="page-break">
+    <header class="report-head">
+      <div class="brand"><img src="../public/logo.png" alt="" /><div><strong>AWExam</strong><span>Risiko dan keputusan</span></div></div>
+      <div class="doc-meta">QA-LOAD-2026-08-28</div>
+    </header>
+
+    <h2>6. Risiko yang Mungkin Terjadi</h2>
+    <div class="risk-grid">
+      <div class="card risk-high">
+        <h3>Submit massal</h3>
+        <p>Seluruh jawaban dikirim ulang secara paralel sebelum finalisasi. Ini adalah risiko performa tertinggi.</p>
+      </div>
+      <div class="card risk-high">
+        <h3>50 ujian serentak</h3>
+        <p>Potensi 2.500 siswa dan 252.500 request pada fase submit belum tervalidasi dan tidak direkomendasikan.</p>
+      </div>
+      <div class="card risk-medium">
+        <h3>Laporan melambat</h3>
+        <p>Attempt dan jawaban dimuat per 250 baris. Laporan satu ujian dengan 5.000 jawaban memerlukan sekitar 21 halaman data.</p>
+      </div>
+      <div class="card risk-medium">
+        <h3>Batas koreksi essay</h3>
+        <p>Paginator membatasi maksimal 10.000 baris. Guru dengan ≥10.000 jawaban essay dapat gagal membuka halaman koreksi.</p>
+      </div>
+      <div class="card risk-low">
+        <h3>Bank soal 100 item</h3>
+        <p>Volume ini kecil dan berada jauh di bawah batas 10.000 baris per pengambilan data.</p>
+      </div>
+      <div class="card risk-low">
+        <h3>Load soal siswa</h3>
+        <p>Seluruh 100 soal dikirim melalui satu RPC dan ukuran payload sintetis hanya sekitar 46,8 KiB.</p>
+      </div>
+    </div>
+
+    <h2>7. Keputusan Go/No-Go</h2>
+    <table>
+      <thead><tr><th>Penggunaan</th><th>Status</th><th>Keputusan</th></tr></thead>
+      <tbody>
+        <tr><td>Presentasi satu layar</td><td><strong style="color:#15803d">GO</strong></td><td>Layak dilakukan. Siapkan koneksi cadangan dan buka halaman lebih awal.</td></tr>
+        <tr><td>Demo 5–10 perangkat</td><td><strong style="color:#15803d">GO</strong></td><td>Risiko rendah dengan data demo dan alur terkontrol.</td></tr>
+        <tr><td>Simulasi satu kelas / 50 siswa</td><td><strong style="color:#b45309">GO Bersyarat</strong></td><td>Hindari submit serentak; bagi menjadi beberapa gelombang.</td></tr>
+        <tr><td>Ujian operasional 50 siswa</td><td><strong style="color:#b45309">GO Bersyarat</strong></td><td>Lakukan staging load test dan pantau log/error sebelum dipakai resmi.</td></tr>
+        <tr><td>50 ujian / 2.500 siswa serentak</td><td><strong style="color:#b91c1c">NO-GO</strong></td><td>Perlu batch RPC, optimasi query, dan uji beban write khusus.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>8. Rekomendasi Sebelum Presentasi</h2>
+    <ol>
+      <li>Gunakan 5–10 akun/perangkat demo dan data yang sudah disiapkan.</li>
+      <li>Login serta buka dashboard, bank soal, dan daftar ujian sebelum sesi dimulai.</li>
+      <li>Untuk demo langsung gunakan 20–40 soal; 100 soal tetap dapat diperlihatkan pada bank soal.</li>
+      <li>Jangan meminta seluruh peserta menekan tombol kumpulkan pada detik yang sama.</li>
+      <li>Siapkan hotspot cadangan dan satu rekaman/screenshot alur utama.</li>
+      <li>Pastikan zona waktu sekolah, jadwal, kode akses, dan status ujian sudah benar.</li>
+    </ol>
+  </section>
+
+  <section class="page-break">
+    <header class="report-head">
+      <div class="brand"><img src="../public/logo.png" alt="" /><div><strong>AWExam</strong><span>Rencana tindak lanjut</span></div></div>
+      <div class="doc-meta">QA-LOAD-2026-08-28</div>
+    </header>
+
+    <h2>9. Rekomendasi Teknis Lanjutan</h2>
+    <table>
+      <thead><tr><th>Prioritas</th><th>Perbaikan</th><th>Dampak</th></tr></thead>
+      <tbody>
+        <tr><td><strong>P0</strong></td><td>Buat RPC batch untuk menyimpan seluruh jawaban dalam satu request/transaksi.</td><td>Mengurangi submit 101 request menjadi sekitar 1–2 request per siswa.</td></tr>
+        <tr><td><strong>P0</strong></td><td>Saat submit, kirim ulang hanya jawaban yang belum sinkron.</td><td>Menghilangkan duplikasi 100 write yang sudah berhasil.</td></tr>
+        <tr><td><strong>P1</strong></td><td>Lakukan load test autentik pada staging dengan 50 akun siswa.</td><td>Mendapatkan p95 write, tingkat error, dan durasi submit yang sebenarnya.</td></tr>
+        <tr><td><strong>P1</strong></td><td>Pindahkan ringkasan attempt dan analisis laporan ke RPC agregasi server.</td><td>Mengurangi 17–33 request paginasi dan beban memori browser.</td></tr>
+        <tr><td><strong>P1</strong></td><td>Tambahkan pagination/filter server pada koreksi essay.</td><td>Mencegah kegagalan ketika data mencapai batas 10.000 baris.</td></tr>
+        <tr><td><strong>P2</strong></td><td>Perbaiki browser smoke harness agar kompatibel dengan Windows.</td><td>Mengaktifkan pemeriksaan UI otomatis sebelum deployment.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>10. Kesimpulan</h2>
+    <p>AWExam telah menunjukkan stabilitas yang baik pada build, unit test, infrastruktur production, hosting statis, dan endpoint baca dengan 50 koneksi bersamaan. Data 100 soal per guru dan 50 ujian tidak menimbulkan masalah penyimpanan yang berarti.</p>
+    <p>Penggunaan satu kelas berisi 50 siswa diperkirakan dapat berjalan selama siswa tidak mengumpulkan jawaban secara serentak dan koneksi sekolah stabil. Sebelum penggunaan operasional skala besar, mekanisme submit perlu diubah menjadi batch dan diverifikasi menggunakan project staging dengan data autentik.</p>
+
+    <div class="callout warn"><strong>Pernyataan akhir:</strong> laporan ini mendukung keputusan presentasi dan perencanaan pengujian. Dokumen ini bukan sertifikasi kapasitas 2.500 pengguna serentak karena pengujian write production sengaja tidak dilakukan untuk menjaga keamanan data.</div>
+
+    <h3>Lampiran: dasar angka</h3>
+    <ul>
+      <li>Tanggal pengujian: 28 Agustus 2026, zona waktu Asia/Jakarta.</li>
+      <li>Target production: porto-arsya.pages.dev.</li>
+      <li>Request produksi yang dilakukan bersifat baca-only dan tidak mengubah database.</li>
+      <li>Estimasi API dihitung dari implementasi frontend dan RPC pada branch main commit 7706dea.</li>
+    </ul>
+
+    <div class="signature">
+      <div>Disiapkan oleh<br /><strong>Tim Pengembangan AWExam</strong></div>
+      <div>Ditinjau oleh<br /><strong>____________________________</strong></div>
+    </div>
+  </section>
+</body>
+</html>

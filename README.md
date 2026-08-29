@@ -71,7 +71,8 @@ npm run dev
    - `supabase/migrations/029_fix_student_integrity_policy.sql`
    - `supabase/migrations/030_class_subjects.sql`
    - `supabase/migrations/031_frontend_error_log_retention.sql`
-  - `supabase/migrations/032_restore_teacher_ownership_execution.sql`
+   - `supabase/migrations/032_restore_teacher_ownership_execution.sql`
+   - `supabase/migrations/033_question_weight_by_type.sql`
 3. Isi `.env.local`:
 
 ```env
@@ -131,14 +132,11 @@ B. 5
 C. 6
 D. 7
 KUNCI: B
-KESULITAN: Mudah
-BOBOT: 1
 
 SOAL 2
 TIPE: ESSAY
 PERTANYAAN: Jelaskan proses fotosintesis.
 JAWABAN: Tumbuhan mengubah air dan karbon dioksida menjadi glukosa dengan bantuan cahaya.
-KESULITAN: Sedang
 BOBOT: 2
 ```
 
@@ -147,9 +145,10 @@ Deteksi duplikat juga mengenali pertanyaan dengan perubahan teks kecil. Hanya
 soal valid yang dipilih pengguna yang dikirim ke Supabase.
 
 Gunakan checkbox pada tabel untuk memilih banyak soal. Tombol **Kelola** dapat
-menyalin soal ke bank lain atau mengubah bank, kesulitan, dan bobot secara
-massal. Soal pada ujian terjadwal atau yang sudah dikerjakan tetap dilindungi
-oleh trigger database dan tidak dapat diubah.
+menyalin soal ke bank lain, memindahkan bank, atau mengubah bobot kumpulan soal
+essay. Bobot pilihan ganda selalu bernilai 1. Soal pada ujian terjadwal atau
+yang sudah dikerjakan tetap dilindungi oleh trigger database dan tidak dapat
+diubah.
 
 ## Verifikasi
 
@@ -164,7 +163,7 @@ npm run test:e2e
 
 - Ikuti [`docs/GO_LIVE_RUNBOOK.md`](docs/GO_LIVE_RUNBOOK.md) dan jangan membuka
   akses sebelum seluruh kriteria go/no-go lulus.
-- Jalankan seluruh migration `001` sampai `032` secara berurutan pada project Supabase tujuan.
+- Jalankan seluruh migration `001` sampai `033` secara berurutan pada project Supabase tujuan.
 - Deploy Edge Function `admin-users` dan `student-login`, lalu pastikan secret service role hanya berada di Supabase.
 - Isi secret `APP_ORIGIN` dengan origin web production. Pisahkan beberapa origin menggunakan koma, misalnya origin production dan staging.
 - Isi `.env` deployment dengan URL dan anon key project production; jangan pernah memakai service-role key di Vite.

@@ -436,14 +436,11 @@ B. 5
 C. 6
 D. 7
 KUNCI: B
-KESULITAN: Mudah
-BOBOT: 1
 
 SOAL 2
 TIPE: ESSAY
 PERTANYAAN: Jelaskan proses fotosintesis.
 JAWABAN: Tumbuhan mengubah air dan karbon dioksida menjadi glukosa dengan bantuan cahaya.
-KESULITAN: Sedang
 BOBOT: 2`}</pre>
             </details>}
 
@@ -512,8 +509,8 @@ BOBOT: 2`}</pre>
                           </span>
                           <div>
                             <small>
-                              SOAL {question.sourceNumber} · {question.type} ·{" "}
-                              {question.difficulty} · bobot {question.weight}
+                              SOAL {question.sourceNumber} · {question.type}
+                              {question.type === "Essay" ? ` · bobot ${question.weight}` : ""}
                               {needsAnswerKey(question) && (
                                 <b className="needs-key"> · kunci belum diisi</b>
                               )}

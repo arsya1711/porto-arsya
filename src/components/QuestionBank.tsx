@@ -47,7 +47,6 @@ type QuestionDraft = {
   bankId: string;
   type: Question["type"];
   text: string;
-  difficulty: Question["difficulty"];
   options: string[];
   correctOption: number | null;
   answerKey: string;
@@ -116,9 +115,6 @@ export function QuestionBank({ notify }: { notify: Notify }) {
   const [selectedBank, setSelectedBank] = useState("all");
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | Question["type"]>("all");
-  const [difficultyFilter, setDifficultyFilter] = useState<
-    "all" | Question["difficulty"]
-  >("all");
   const [keyFilter, setKeyFilter] = useState<"all" | "missing" | "ready">(
     "all",
   );
@@ -217,8 +213,7 @@ export function QuestionBank({ notify }: { notify: Notify }) {
           correct_option:
             draft.type === "Pilihan Ganda" ? draft.correctOption : null,
           answer_key: draft.type === "Essay" ? draft.answerKey.trim() : null,
-          difficulty: draft.difficulty.toLowerCase(),
-          weight: draft.weight,
+          weight: draft.type === "Essay" ? draft.weight : 1,
         };
         const result = draft.id
           ? await supabase.from("questions").update(payload).eq("id", draft.id)
@@ -236,7 +231,9 @@ export function QuestionBank({ notify }: { notify: Notify }) {
           subject: bank.subject,
           type: draft.type,
           text: draft.text.trim(),
-          difficulty: draft.difficulty,
+          difficulty:
+            questions.find((question) => question.id === draft.id)?.difficulty ??
+            "Sedang",
           used: draft.id
             ? (questions.find((question) => question.id === draft.id)?.used ??
               0)
@@ -244,7 +241,7 @@ export function QuestionBank({ notify }: { notify: Notify }) {
           options: draft.options,
           correctOption: draft.correctOption,
           answerKey: draft.answerKey,
-          weight: draft.weight,
+          weight: draft.type === "Essay" ? draft.weight : 1,
           createdAt:
             questions.find((question) => question.id === draft.id)?.createdAt ??
             new Date().toISOString(),
@@ -297,8 +294,7 @@ export function QuestionBank({ notify }: { notify: Notify }) {
           question.type === "Pilihan Ganda" ? question.correctOption : null,
         answer_key:
           question.type === "Essay" ? question.answerKey.trim() : null,
-        difficulty: question.difficulty.toLowerCase(),
-        weight: question.weight,
+        weight: question.type === "Essay" ? question.weight : 1,
         created_by: profile.id,
       }));
       const { error } = await supabase.from("questions").insert(payload);
@@ -347,8 +343,7 @@ export function QuestionBank({ notify }: { notify: Notify }) {
           options: question.type === "Pilihan Ganda" ? question.options : null,
           correct_option: question.type === "Pilihan Ganda" ? question.correctOption : null,
           answer_key: question.type === "Essay" ? question.answerKey : null,
-          difficulty: question.difficulty.toLowerCase(),
-          weight: question.weight ?? 1,
+          weight: question.type === "Essay" ? question.weight ?? 1 : 1,
           created_by: profile.id,
         })),
       );
@@ -365,14 +360,18 @@ export function QuestionBank({ notify }: { notify: Notify }) {
 
   const updateSelectedQuestions = async (update: {
     bankId?: string;
-    difficulty?: Question["difficulty"];
     weight?: number;
   }) => {
     try {
       if (!supabase || !selectedQuestions.length) throw new Error("Tidak ada soal yang dipilih.");
+      if (
+        update.weight !== undefined &&
+        selectedQuestions.some((question) => question.type !== "Essay")
+      ) {
+        throw new Error("Bobot hanya dapat diubah untuk soal essay.");
+      }
       const payload: Record<string, string | number> = {};
       if (update.bankId) payload.bank_id = update.bankId;
-      if (update.difficulty) payload.difficulty = update.difficulty.toLowerCase();
       if (update.weight !== undefined) payload.weight = update.weight;
       if (!Object.keys(payload).length) throw new Error("Pilih perubahan yang akan diterapkan.");
       const { error } = await supabase
@@ -541,8 +540,6 @@ export function QuestionBank({ notify }: { notify: Notify }) {
       (question) =>
         (selectedBank === "all" || question.bankId === selectedBank) &&
         (typeFilter === "all" || question.type === typeFilter) &&
-        (difficultyFilter === "all" ||
-          question.difficulty === difficultyFilter) &&
         (keyFilter === "all" ||
           (keyFilter === "missing"
             ? needsAnswerKey(question)
@@ -553,7 +550,6 @@ export function QuestionBank({ notify }: { notify: Notify }) {
           question.subject.toLowerCase().includes(keyword)),
     );
   }, [
-    difficultyFilter,
     keyFilter,
     questions,
     search,
@@ -579,7 +575,7 @@ export function QuestionBank({ notify }: { notify: Notify }) {
 
   useEffect(() => {
     setPage(1);
-  }, [difficultyFilter, keyFilter, search, selectedBank, typeFilter]);
+  }, [keyFilter, search, selectedBank, typeFilter]);
 
   return (
     <div className="portal-page">
@@ -673,18 +669,6 @@ export function QuestionBank({ notify }: { notify: Notify }) {
             <option value="all">Semua tipe</option>
             <option value="Pilihan Ganda">Pilihan Ganda</option>
             <option value="Essay">Essay</option>
-          </select>
-          <select
-            aria-label="Filter tingkat kesulitan"
-            value={difficultyFilter}
-            onChange={(event) =>
-              setDifficultyFilter(event.target.value as typeof difficultyFilter)
-            }
-          >
-            <option value="all">Semua tingkat</option>
-            <option value="Mudah">Mudah</option>
-            <option value="Sedang">Sedang</option>
-            <option value="Sulit">Sulit</option>
           </select>
           <select
             aria-label="Filter kelengkapan kunci jawaban"
@@ -789,7 +773,6 @@ export function QuestionBank({ notify }: { notify: Notify }) {
                 </th>
                 <th>SOAL</th>
                 <th>TIPE</th>
-                <th>TINGKAT</th>
                 <th>BOBOT</th>
                 <th>STATUS</th>
                 <th />
@@ -838,14 +821,9 @@ export function QuestionBank({ notify }: { notify: Notify }) {
                     <td data-label="Tipe">
                       <span className="type-badge">{question.type}</span>
                     </td>
-                    <td data-label="Tingkat">
-                      <span
-                        className={`difficulty ${question.difficulty.toLowerCase()}`}
-                      >
-                        {question.difficulty}
-                      </span>
+                    <td data-label="Bobot">
+                      {question.type === "Essay" ? question.weight ?? 1 : "—"}
                     </td>
-                    <td data-label="Bobot">{question.weight ?? 1}</td>
                     <td data-label="Status">
                       <div className="question-status-list">
                         {missingKey && (
@@ -973,7 +951,7 @@ export function QuestionBank({ notify }: { notify: Notify }) {
 function EmptyRow({ text }: { text: string }) {
   return (
     <tr>
-      <td colSpan={7} className="question-empty">
+      <td colSpan={6} className="question-empty">
         {text}
       </td>
     </tr>
@@ -1041,9 +1019,6 @@ function QuestionModal({
     initial?.type ?? "Pilihan Ganda",
   );
   const [text, setText] = useState(initial?.text ?? "");
-  const [difficulty, setDifficulty] = useState<Question["difficulty"]>(
-    initial?.difficulty ?? "Sedang",
-  );
   const [options, setOptions] = useState<string[]>(
     initial?.options?.length ? initial.options : ["", "", "", ""],
   );
@@ -1051,7 +1026,9 @@ function QuestionModal({
     initial ? (initial.correctOption ?? null) : 0,
   );
   const [answerKey, setAnswerKey] = useState(initial?.answerKey ?? "");
-  const [weight, setWeight] = useState(initial?.weight ?? 1);
+  const [weight, setWeight] = useState(
+    initial?.type === "Essay" ? initial.weight ?? 1 : 1,
+  );
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -1077,7 +1054,7 @@ function QuestionModal({
       setError("Kunci atau pedoman jawaban essay wajib diisi.");
       return;
     }
-    if (!Number.isFinite(weight) || weight <= 0) {
+    if (type === "Essay" && (!Number.isFinite(weight) || weight <= 0)) {
       setError("Bobot soal harus lebih besar dari 0.");
       return;
     }
@@ -1088,11 +1065,10 @@ function QuestionModal({
       bankId,
       type,
       text,
-      difficulty,
       options: cleanOptions,
       correctOption: type === "Pilihan Ganda" ? correctOption : null,
       answerKey,
-      weight,
+      weight: type === "Essay" ? weight : 1,
     });
     if (!saved) setSaving(false);
   };
@@ -1228,7 +1204,8 @@ function QuestionModal({
               )}
             </div>
           ) : (
-            <FormField label="Kunci / pedoman jawaban">
+            <>
+              <FormField label="Kunci / pedoman jawaban">
               <textarea
                 rows={3}
                 value={answerKey}
@@ -1236,41 +1213,19 @@ function QuestionModal({
                 placeholder="Tuliskan poin-poin jawaban yang diharapkan…"
                 required
               />
-            </FormField>
-          )}
-          <details className="question-advanced-settings">
-            <summary>
-              Pengaturan nilai
-              <span>
-                {difficulty} · bobot {weight}
-              </span>
-              <ChevronDown />
-            </summary>
-            <div className="form-grid question-form-grid">
-              <FormField label="Tingkat kesulitan">
-                <select
-                  value={difficulty}
-                  onChange={(event) =>
-                    setDifficulty(event.target.value as Question["difficulty"])
-                  }
-                >
-                  <option>Mudah</option>
-                  <option>Sedang</option>
-                  <option>Sulit</option>
-                </select>
               </FormField>
               <FormField label="Bobot nilai">
-                <input
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  value={weight}
-                  onChange={(event) => setWeight(Number(event.target.value))}
-                  required
-                />
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={weight}
+                onChange={(event) => setWeight(Number(event.target.value))}
+                required
+              />
               </FormField>
-            </div>
-          </details>
+            </>
+          )}
         </div>
         <footer>
           <button type="button" onClick={close}>

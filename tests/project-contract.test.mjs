@@ -273,6 +273,27 @@ test('kumpulan ujian mempertahankan urutan asli dan memuat hasil per ujian', asy
   assert.match(migration, /else exam_question\.position::bigint/)
 })
 
+test('bank soal menyembunyikan kesulitan dan membatasi bobot untuk essay', async () => {
+  const [bank, bulkTools, importer, migration] = await Promise.all([
+    read('src/components/QuestionBank.tsx'),
+    read('src/components/QuestionBulkToolsModal.tsx'),
+    read('src/components/PdfQuestionImportModal.tsx'),
+    read('supabase/migrations/033_question_weight_by_type.sql'),
+  ])
+  assert.doesNotMatch(bank, /Filter tingkat kesulitan/)
+  assert.doesNotMatch(bank, /<th>TINGKAT<\/th>/)
+  assert.doesNotMatch(bank, /label="Tingkat kesulitan"/)
+  assert.match(bank, /question\.type === "Essay" \? question\.weight \?\? 1 : "—"/)
+  assert.match(bank, /weight: draft\.type === "Essay" \? draft\.weight : 1/)
+  assert.doesNotMatch(bulkTools, /<span>Kesulitan<\/span>/)
+  assert.match(bulkTools, /Bobot hanya dapat diubah jika semua soal yang dipilih berupa essay/)
+  assert.doesNotMatch(importer, /KESULITAN:/)
+  assert.match(importer, /question\.type === "Essay" \? ` · bobot/)
+  assert.match(migration, /new\.type = 'multiple_choice'/)
+  assert.match(migration, /new\.weight := 1/)
+  assert.match(migration, /questions_multiple_choice_static_weight/)
+})
+
 test('dashboard siswa tidak mengambil atau menampilkan nilai ujian secara langsung', async () => {
   const dashboard = await read('src/components/Dashboards.tsx')
   assert.doesNotMatch(dashboard, /finalScore/)

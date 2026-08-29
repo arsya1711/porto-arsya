@@ -6,7 +6,6 @@ import { useAccessibleDialog } from "../lib/use-accessible-dialog";
 type BankOption = { id: string; name: string; subject: string };
 type BulkUpdate = {
   bankId?: string;
-  difficulty?: Question["difficulty"];
   weight?: number;
 };
 
@@ -25,10 +24,10 @@ export function QuestionBulkToolsModal({
 }) {
   const [mode, setMode] = useState<"copy" | "edit">("copy");
   const [bankId, setBankId] = useState(banks[0]?.id ?? "");
-  const [difficulty, setDifficulty] = useState<"keep" | Question["difficulty"]>("keep");
   const [weight, setWeight] = useState("");
   const [saving, setSaving] = useState(false);
   const usedCount = questions.filter((question) => question.used > 0).length;
+  const onlyEssays = questions.every((question) => question.type === "Essay");
 
   const submit = async () => {
     if (saving) return;
@@ -37,14 +36,13 @@ export function QuestionBulkToolsModal({
       ? await copyQuestions(bankId)
       : await updateQuestions({
           bankId: bankId || undefined,
-          difficulty: difficulty === "keep" ? undefined : difficulty,
-          weight: weight ? Number(weight) : undefined,
+          weight: onlyEssays && weight ? Number(weight) : undefined,
         });
     if (!saved) setSaving(false);
   };
 
-  const hasEdit = Boolean(bankId || difficulty !== "keep" || weight);
-  const invalidWeight = Boolean(weight) && (!Number.isFinite(Number(weight)) || Number(weight) <= 0);
+  const hasEdit = Boolean(bankId || (onlyEssays && weight));
+  const invalidWeight = onlyEssays && Boolean(weight) && (!Number.isFinite(Number(weight)) || Number(weight) <= 0);
   const dialogRef = useAccessibleDialog(close, saving);
 
   return (
@@ -72,10 +70,11 @@ export function QuestionBulkToolsModal({
               <>
                 {usedCount > 0 && <p className="bulk-warning">{usedCount} soal sudah dipakai pada ujian. Server akan menolak perubahan soal yang sudah terjadwal atau dikerjakan.</p>}
                 <label className="form-field"><span>Pindahkan ke bank</span><select value={bankId} onChange={(event) => setBankId(event.target.value)}><option value="">Tidak diubah</option>{banks.map((bank) => <option value={bank.id} key={bank.id}>{bank.name} — {bank.subject}</option>)}</select></label>
-                <div className="form-grid">
-                  <label className="form-field"><span>Kesulitan</span><select value={difficulty} onChange={(event) => setDifficulty(event.target.value as typeof difficulty)}><option value="keep">Tidak diubah</option><option>Mudah</option><option>Sedang</option><option>Sulit</option></select></label>
-                  <label className="form-field"><span>Bobot</span><input type="number" min="0.01" step="0.01" value={weight} onChange={(event) => setWeight(event.target.value)} placeholder="Tidak diubah" /></label>
-                </div>
+                {onlyEssays ? (
+                  <label className="form-field"><span>Bobot essay</span><input type="number" min="0.01" step="0.01" value={weight} onChange={(event) => setWeight(event.target.value)} placeholder="Tidak diubah" /></label>
+                ) : (
+                  <p className="bulk-warning">Bobot hanya dapat diubah jika semua soal yang dipilih berupa essay.</p>
+                )}
               </>
             )}
           </div>
