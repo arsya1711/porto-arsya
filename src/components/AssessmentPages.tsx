@@ -11,8 +11,11 @@ import {
   Eye,
   FileQuestion,
   LoaderCircle,
+  Pause,
   Pencil,
+  Play,
   Plus,
+  Radio,
   RefreshCw,
   Search,
   Trash2,
@@ -153,6 +156,18 @@ type ExamStudentResult = {
   answers: StudentAnswerReview[];
 };
 
+type ExamMonitorRow = {
+  studentId: string;
+  studentName: string;
+  attemptId: string | null;
+  status: string;
+  startedAt: string | null;
+  submittedAt: string | null;
+  isPaused: boolean;
+  answeredCount: number;
+  exitCount: number;
+};
+
 type StudentAnswerReview = {
   id: string;
   questionId: string;
@@ -241,6 +256,14 @@ function initials(name: string) {
     .toUpperCase();
 }
 
+function monitorStatus(row: ExamMonitorRow) {
+  if (!row.attemptId || row.status === "not_started") return "Belum mulai";
+  if (row.status === "in_progress" && row.isPaused) return "Dihentikan";
+  if (row.status === "in_progress") return "Mengerjakan";
+  if (row.status === "submitted" || row.status === "grading") return "Dikumpulkan";
+  return "Selesai";
+}
+
 function PageHeader({
   eyebrow,
   title,
@@ -315,11 +338,13 @@ export function RealExamManagement({
   const [page, setPage] = useState(1);
   const [attemptSummaries, setAttemptSummaries] = useState<Record<string, ExamAttemptSummary>>({});
   const [detailExam, setDetailExam] = useState<ExamRow | null>(null);
-  const [detailKind, setDetailKind] = useState<"questions" | "results">("questions");
+  const [detailKind, setDetailKind] = useState<"questions" | "results" | "monitor">("questions");
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
   const [questionPreview, setQuestionPreview] = useState<ExamQuestionPreview[]>([]);
   const [studentResults, setStudentResults] = useState<ExamStudentResult[]>([]);
+  const [monitorRows, setMonitorRows] = useState<ExamMonitorRow[]>([]);
+  const [controllingAttemptId, setControllingAttemptId] = useState("");
 
   const load = useCallback(async () => {
     const client = supabase;
@@ -692,11 +717,94 @@ export function RealExamManagement({
     setDetailLoading(false);
   };
 
+  const loadExamMonitor = useCallback(async (examId: string, showLoading = false) => {
+    const client = supabase;
+    if (!client) return;
+    if (showLoading) setDetailLoading(true);
+    const { data, error: monitorError } = await client.rpc("get_exam_monitor", {
+      target_exam_id: examId,
+    });
+    if (monitorError) {
+      setDetailError(monitorError.message);
+    } else {
+      setDetailError("");
+      setMonitorRows((data ?? []).map((row: Record<string, unknown>) => ({
+        studentId: String(row.student_id),
+        studentName: String(row.student_name ?? "Siswa"),
+        attemptId: row.attempt_id ? String(row.attempt_id) : null,
+        status: String(row.attempt_status ?? "not_started"),
+        startedAt: row.started_at ? String(row.started_at) : null,
+        submittedAt: row.submitted_at ? String(row.submitted_at) : null,
+        isPaused: Boolean(row.is_paused),
+        answeredCount: Number(row.answered_count ?? 0),
+        exitCount: Number(row.exit_count ?? 0),
+      })));
+    }
+    if (showLoading) setDetailLoading(false);
+  }, []);
+
+  const openExamMonitor = async (exam: ExamRow) => {
+    setDetailExam(exam);
+    setDetailKind("monitor");
+    setDetailError("");
+    setMonitorRows([]);
+    await loadExamMonitor(exam.id, true);
+  };
+
+  const setStudentSessionPaused = async (row: ExamMonitorRow) => {
+    if (!supabase || !row.attemptId) return;
+    setControllingAttemptId(row.attemptId);
+    const shouldPause = !row.isPaused;
+    const { error: controlError } = await supabase.rpc("set_student_attempt_paused", {
+      target_attempt_id: row.attemptId,
+      should_pause: shouldPause,
+    });
+    setControllingAttemptId("");
+    if (controlError) {
+      notify(controlError.message, true);
+      return;
+    }
+    notify(shouldPause
+      ? `Sesi ${row.studentName} dihentikan sementara.`
+      : `Sesi ${row.studentName} dilanjutkan.`);
+    if (detailExam) await loadExamMonitor(detailExam.id);
+  };
+
+  useEffect(() => {
+    const client = supabase;
+    if (!client || detailKind !== "monitor" || !detailExam) return;
+    const refresh = () => void loadExamMonitor(detailExam.id);
+    const channel = client
+      .channel(`exam-monitor:${detailExam.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "attempts",
+          filter: `exam_id=eq.${detailExam.id}`,
+        },
+        refresh,
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "integrity_events" },
+        refresh,
+      )
+      .subscribe();
+    const intervalId = window.setInterval(refresh, 5_000);
+    return () => {
+      window.clearInterval(intervalId);
+      void client.removeChannel(channel);
+    };
+  }, [detailExam, detailKind, loadExamMonitor]);
+
   const closeDetail = () => {
     setDetailExam(null);
     setDetailError("");
     setQuestionPreview([]);
     setStudentResults([]);
+    setMonitorRows([]);
   };
 
   const nextExamStep = () => {
@@ -817,6 +925,7 @@ export function RealExamManagement({
                   </div>
                   <div className="exam-card-actions">
                     <button type="button" onClick={() => void openQuestionPreview(exam)}><Eye /> Lihat soal</button>
+                    <button type="button" onClick={() => void openExamMonitor(exam)}><Radio /> Awasi ujian</button>
                     <button type="button" className="primary" onClick={() => void openStudentResults(exam)}><ClipboardCheck /> Hasil siswa</button>
                     <button type="button" className="icon" title="Edit ujian" aria-label={`Edit ${exam.title}`} onClick={() => void openEdit(exam)}><Pencil /></button>
                   </div>
@@ -945,7 +1054,7 @@ export function RealExamManagement({
             <div className="simple-modal exam-detail-modal">
               <header>
                 <div>
-                  <p>{detailKind === "questions" ? "SUSUNAN SOAL" : "HASIL SISWA"}</p>
+                  <p>{detailKind === "questions" ? "SUSUNAN SOAL" : detailKind === "monitor" ? "PENGAWASAN LANGSUNG" : "HASIL SISWA"}</p>
                   <h2>{detailExam.title}</h2>
                 </div>
                 <button type="button" aria-label="Tutup detail ujian" onClick={closeDetail}><X /></button>
@@ -962,6 +1071,42 @@ export function RealExamManagement({
                       {!questionPreview.length && <p className="inline-empty">Belum ada soal pada ujian ini.</p>}
                     </div>
                   </>
+                ) : detailKind === "monitor" ? (
+                  <div className="exam-monitor">
+                    <div className="exam-monitor-summary">
+                      <div><Radio /><p><b>{monitorRows.filter((row) => row.status === "in_progress" && !row.isPaused).length} siswa aktif</b><span>Data diperbarui otomatis setiap 5 detik.</span></p></div>
+                      <button type="button" onClick={() => void loadExamMonitor(detailExam.id)}><RefreshCw /> Perbarui</button>
+                    </div>
+                    <div className="exam-monitor-list">
+                      {monitorRows.map((row) => {
+                        const statusLabel = monitorStatus(row);
+                        return <article key={row.studentId} className={`exam-monitor-row${row.isPaused ? " paused" : ""}`}>
+                          <span className="exam-monitor-avatar">{initials(row.studentName)}</span>
+                          <div className="exam-monitor-student">
+                            <b>{row.studentName}</b>
+                            <small>{row.startedAt ? `Mulai ${formatDate(row.startedAt, schoolTimezone)}` : "Belum membuka ujian"}</small>
+                          </div>
+                          <div className="exam-monitor-metrics">
+                            <span><CheckCircle2 /> {row.answeredCount} jawaban</span>
+                            <span className={row.exitCount > 0 ? "warning" : ""}><AlertTriangle /> Keluar halaman {row.exitCount}×</span>
+                          </div>
+                          <em className={`exam-monitor-status ${row.status}${row.isPaused ? " paused" : ""}`}>{statusLabel}</em>
+                          {row.attemptId && row.status === "in_progress" ? (
+                            <button
+                              type="button"
+                              className={row.isPaused ? "resume" : "pause"}
+                              disabled={controllingAttemptId === row.attemptId}
+                              onClick={() => void setStudentSessionPaused(row)}
+                            >
+                              {controllingAttemptId === row.attemptId ? <LoaderCircle className="spin" /> : row.isPaused ? <Play /> : <Pause />}
+                              {row.isPaused ? "Lanjutkan" : "Hentikan"}
+                            </button>
+                          ) : <span className="exam-monitor-no-action">—</span>}
+                        </article>;
+                      })}
+                      {!monitorRows.length && <p className="inline-empty">Belum ada peserta yang ditetapkan pada ujian ini.</p>}
+                    </div>
+                  </div>
                 ) : (
                   <div className="exam-result-list">
                     <div className="exam-result-summary"><CheckCircle2 /><p><b>{studentResults.length} siswa sudah mengerjakan</b><span>Nilai hanya terlihat oleh guru pada halaman ini.</span></p></div>

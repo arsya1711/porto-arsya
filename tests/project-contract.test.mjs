@@ -299,6 +299,25 @@ test('bank soal menyembunyikan kesulitan dan membatasi bobot untuk essay', async
   assert.match(migration, /questions_multiple_choice_static_weight/)
 })
 
+test('guru dapat mengawasi, menghentikan, dan melanjutkan sesi siswa secara aman', async () => {
+  const [assessment, app, migration] = await Promise.all([
+    read('src/components/AssessmentPages.tsx'),
+    read('src/App.tsx'),
+    read('supabase/migrations/034_live_exam_monitoring.sql'),
+  ])
+  assert.match(assessment, /Awasi ujian/)
+  assert.match(assessment, /get_exam_monitor/)
+  assert.match(assessment, /set_student_attempt_paused/)
+  assert.match(assessment, /Keluar halaman \{row\.exitCount\}/)
+  assert.match(app, /get_student_attempt_control/)
+  assert.match(app, /Sesi dihentikan sementara oleh guru/)
+  assert.match(migration, /add column if not exists paused_at timestamptz/)
+  assert.match(migration, /not public\.teacher_owns_exam\(target_exam_id\)/)
+  assert.match(migration, /attempt\.paused_at is null/)
+  assert.match(migration, /event_type in \('tab_hidden', 'app_backgrounded'\)/)
+  assert.match(migration, /alter publication supabase_realtime add table public\.integrity_events/)
+})
+
 test('dashboard siswa tidak mengambil atau menampilkan nilai ujian secara langsung', async () => {
   const dashboard = await read('src/components/Dashboards.tsx')
   assert.doesNotMatch(dashboard, /finalScore/)

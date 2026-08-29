@@ -2477,12 +2477,16 @@ function ExamRunner({
   const submitRetryRef = useRef(false);
   const finishRetryTimer = useRef<number | null>(null);
   const deadlineRef = useRef<number | null>(null);
+  const examEndRef = useRef<number | null>(null);
+  const pausedRemainingRef = useRef(0);
+  const sessionPausedRef = useRef(false);
   const serverClockOffsetRef = useRef(0);
   const [pendingSaves, setPendingSaves] = useState(0);
   const unsyncedAnswersRef = useRef(new Set<string>());
   const [unsyncedCount, setUnsyncedCount] = useState(0);
   const [submittingExam, setSubmittingExam] = useState(false);
   const [studentId, setStudentId] = useState<string | null>(null);
+  const [sessionPaused, setSessionPaused] = useState(false);
   const question = questions[current];
   useEffect(() => {
     const client = supabase;
@@ -2494,6 +2498,10 @@ function ExamRunner({
       // tersebut menutupi soal setelah percobaan berikutnya berhasil.
       setExamError("");
       deadlineRef.current = null;
+      examEndRef.current = null;
+      pausedRemainingRef.current = 0;
+      sessionPausedRef.current = false;
+      setSessionPaused(false);
       setRemaining(0);
       const clockRequestStartedAt = Date.now();
       const [{ data: authData }, catalogResult, clockResult] = await Promise.all([
@@ -2522,6 +2530,7 @@ function ExamRunner({
         return;
       }
       setStudentId(authData.user.id);
+      examEndRef.current = parseExamDeadline(examRow.ends_at);
       const startResult = await client.rpc("start_exam_attempt", {
         requested_exam_id: examId,
         provided_access_code: submittedAccessCode.trim() || null,
@@ -2551,7 +2560,14 @@ function ExamRunner({
       }
       setAttemptId(startedAttempt.attempt_id);
       setNeedsAccessCode(false);
-      const deadlineTime = parseExamDeadline(startedAttempt.deadline);
+      const controlResult = await client.rpc("get_student_attempt_control", {
+        target_attempt_id: startedAttempt.attempt_id,
+      });
+      const controlRow = controlResult.error ? null : controlResult.data?.[0];
+      const isPaused = Boolean(controlRow?.is_paused);
+      const deadlineTime = parseExamDeadline(
+        controlRow?.deadline ?? startedAttempt.deadline,
+      );
       if (deadlineTime === null) {
         setExamError("Batas waktu ujian dari server tidak valid. Hubungi pengawas.");
         setLoadingExam(false);
@@ -2559,6 +2575,14 @@ function ExamRunner({
       }
       deadlineRef.current = deadlineTime;
       const currentServerTime = serverAdjustedNow(serverClockOffsetRef.current);
+      sessionPausedRef.current = isPaused;
+      setSessionPaused(isPaused);
+      if (isPaused) {
+        pausedRemainingRef.current = remainingSecondsFromDeadline(
+          deadlineTime,
+          currentServerTime,
+        );
+      }
       if (deadlineTime <= currentServerTime) {
         const localAnswers = normalizeStoredAnswers(
           loadLocal<unknown>(`answers:${examId}`, {}),
@@ -2660,12 +2684,14 @@ function ExamRunner({
   useEffect(() => {
     const updateRemaining = () => {
       if (deadlineRef.current === null) return;
-      setRemaining(
-        remainingSecondsFromDeadline(
-          deadlineRef.current,
-          serverAdjustedNow(serverClockOffsetRef.current),
-        ),
-      );
+      const adjustedNow = serverAdjustedNow(serverClockOffsetRef.current);
+      const personalRemaining = sessionPausedRef.current
+        ? pausedRemainingRef.current
+        : remainingSecondsFromDeadline(deadlineRef.current, adjustedNow);
+      const scheduledRemaining = examEndRef.current === null
+        ? personalRemaining
+        : remainingSecondsFromDeadline(examEndRef.current, adjustedNow);
+      setRemaining(Math.min(personalRemaining, scheduledRemaining));
     };
     const refreshServerClock = async () => {
       const client = supabase;
@@ -2698,10 +2724,55 @@ function ExamRunner({
     };
   }, []);
   useEffect(() => {
+    const client = supabase;
+    if (!client || !attemptId) return;
+    let active = true;
+    const refreshControl = async () => {
+      const result = await client.rpc("get_student_attempt_control", {
+        target_attempt_id: attemptId,
+      });
+      if (!active || result.error || !result.data?.[0]) return;
+      const control = result.data[0];
+      const deadline = parseExamDeadline(control.deadline);
+      if (deadline === null) return;
+      const adjustedNow = serverAdjustedNow(serverClockOffsetRef.current);
+      const isPaused = Boolean(control.is_paused);
+      deadlineRef.current = deadline;
+      if (isPaused) {
+        pausedRemainingRef.current = remainingSecondsFromDeadline(
+          deadline,
+          adjustedNow,
+        );
+      }
+      sessionPausedRef.current = isPaused;
+      setSessionPaused(isPaused);
+    };
+    const channel = client
+      .channel(`student-attempt-control:${attemptId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "attempts",
+          filter: `id=eq.${attemptId}`,
+        },
+        () => void refreshControl(),
+      )
+      .subscribe();
+    const intervalId = window.setInterval(() => void refreshControl(), 5_000);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      void client.removeChannel(channel);
+    };
+  }, [attemptId]);
+  useEffect(() => {
     const handler = async () => {
       if (
         document.hidden &&
         examMeta.recordTabSwitches &&
+        !sessionPausedRef.current &&
         supabase &&
         attemptId
       ) {
@@ -2744,7 +2815,7 @@ function ExamRunner({
       once: true,
     });
     const recordExit = () => {
-      if (!document.fullscreenElement && supabase && !finishingRef.current) {
+      if (!document.fullscreenElement && supabase && !finishingRef.current && !sessionPausedRef.current) {
         void supabase.from("integrity_events").insert({
           attempt_id: attemptId,
           student_id: studentId,
@@ -2771,7 +2842,7 @@ function ExamRunner({
       setUnsyncedCount(unsyncedAnswersRef.current.size);
     };
     const save = async () => {
-      if (!supabase || !attemptId) {
+      if (!supabase || !attemptId || sessionPausedRef.current) {
         markUnsynced(true);
         return false;
       }
@@ -3014,6 +3085,16 @@ function ExamRunner({
           <button onClick={() => setSubmit(true)}>Kumpulkan</button>
         </div>
       </header>
+      {sessionPaused && (
+        <div className="runner-paused-overlay" role="status" aria-live="assertive">
+          <div>
+            <span><LockKeyhole /></span>
+            <h2>Sesi dihentikan sementara oleh guru</h2>
+            <p>Jawaban dan navigasi soal dikunci. Waktu personal berhenti sementara, tetapi ujian tetap mengikuti jam selesai yang ditetapkan.</p>
+            <small>Halaman akan terbuka otomatis setelah guru melanjutkan sesi.</small>
+          </div>
+        </div>
+      )}
       <main>
         <aside className="question-nav">
           <div>

@@ -100,3 +100,74 @@
     font-size: 12px;
   }
 }
+
+.runner-paused-overlay {
+  position: fixed;
+  inset: 68px 0 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: #101a2edb;
+  backdrop-filter: blur(5px);
+}
+
+.runner-paused-overlay > div {
+  width: min(430px, 100%);
+  padding: 30px;
+  border: 1px solid #ffffff24;
+  border-radius: 16px;
+  background: #17233c;
+  color: white;
+  text-align: center;
+  box-shadow: 0 24px 70px #0006;
+}
+
+.runner-paused-overlay > div > span {
+  width: 54px;
+  height: 54px;
+  margin: 0 auto 15px;
+  border-radius: 15px;
+  display: grid;
+  place-items: center;
+  background: #fff0d41a;
+  color: #f4be55;
+}
+
+.runner-paused-overlay > div > span svg {
+  width: 25px;
+}
+
+.runner-paused-overlay h2 {
+  margin: 0 0 8px;
+  font: 800 20px 'Manrope';
+}
+
+.runner-paused-overlay p {
+  margin: 0;
+  color: #b7c0d0;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.runner-paused-overlay small {
+  display: block;
+  margin-top: 15px;
+  color: #f4be55;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .runner-paused-overlay {
+    inset: 62px 0 0;
+  }
+
+  .runner-paused-overlay > div {
+    padding: 24px 20px;
+  }
+
+  .runner-paused-overlay h2 {
+    font-size: 17px;
+  }
+}
