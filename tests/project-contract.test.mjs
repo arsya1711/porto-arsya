@@ -253,11 +253,16 @@ test('Audit & Keamanan memprioritaskan log error dengan retensi tujuh hari', asy
   assert.match(migration, /20 17 \* \* \*/)
 })
 
-test('form ujian mengizinkan durasi kosong saat diedit lalu memvalidasinya', async () => {
-  const assessment = await read('src/components/AssessmentPages.tsx')
-  assert.match(assessment, /parseExamDurationInput\(event\.target\.value\)/)
-  assert.match(assessment, /isValidExamDuration\(draft\.duration\)/)
-  assert.doesNotMatch(assessment, /duration: Math\.max\(1, Number\(event\.target\.value\)\)/)
+test('form ujian meminta jadwal mulai dan selesai lalu server membatasi deadline', async () => {
+  const [assessment, migration] = await Promise.all([
+    read('src/components/AssessmentPages.tsx'),
+    read('supabase/migrations/014_student_exam_contract.sql'),
+  ])
+  assert.match(assessment, /Tanggal & jam mulai/)
+  assert.match(assessment, /Tanggal & jam selesai/)
+  assert.match(assessment, /schoolDateTimeRangeMinutes\(draft\.startsAt, draft\.endsAt/)
+  assert.match(assessment, /duration_in_minutes: duration/)
+  assert.match(migration, /least\([\s\S]*target_attempt\.started_at \+ make_interval\(mins => target_exam\.duration_minutes\)[\s\S]*target_exam\.ends_at/)
 })
 
 test('kumpulan ujian mempertahankan urutan asli dan memuat hasil per ujian', async () => {

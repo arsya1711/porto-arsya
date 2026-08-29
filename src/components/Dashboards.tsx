@@ -134,6 +134,12 @@ function shortDate(value: string) {
   }).format(new Date(value));
 }
 
+function examScheduleLabel(exam: Pick<StaffExam, "startsAt" | "endsAt">) {
+  const start = `${shortDate(exam.startsAt)}, ${timeLabel(exam.startsAt)}`;
+  if (!exam.endsAt) return `Mulai ${start}`;
+  return `Mulai ${start} · selesai ${shortDate(exam.endsAt)}, ${timeLabel(exam.endsAt)}`;
+}
+
 function relativeTime(value: string) {
   const delta = Date.now() - new Date(value).getTime();
   const minutes = Math.max(0, Math.floor(delta / 60_000));
@@ -842,9 +848,7 @@ export function StudentDashboard({
                 <p>
                   <Clock3 /> {featured.duration} menit <i />
                   <FileQuestion /> {featured.questionCount} soal <i />
-                  {featured.endsAt
-                    ? `Berakhir ${timeLabel(featured.endsAt)}`
-                    : "Sesuai durasi ujian"}
+                  {examScheduleLabel(featured)}
                 </p>
               </div>
               <Link to={`/siswa/ujian/${featured.id}`} className="start-button">
@@ -886,6 +890,9 @@ export function StudentDashboard({
                     <small>
                       {exam.subject} · {exam.questionCount} soal ·{" "}
                       {exam.duration} menit
+                    </small>
+                    <small>
+                      {examScheduleLabel(exam)}
                     </small>
                   </p>
                   <div>

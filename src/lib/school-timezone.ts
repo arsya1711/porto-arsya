@@ -56,3 +56,28 @@ export function isoToSchoolDateTimeInput(
   const part = partsInTimeZone(date, timeZone);
   return `${part.year}-${part.month}-${part.day}T${part.hour}:${part.minute}`;
 }
+
+export function addMinutesToSchoolDateTimeInput(
+  value: string,
+  minutes: number,
+  timeZone = DEFAULT_TIME_ZONE,
+) {
+  const isoValue = schoolDateTimeToIso(value, timeZone);
+  if (!isoValue || !Number.isFinite(minutes)) return "";
+  return isoToSchoolDateTimeInput(
+    new Date(Date.parse(isoValue) + minutes * 60_000).toISOString(),
+    timeZone,
+  );
+}
+
+export function schoolDateTimeRangeMinutes(
+  startsAt: string,
+  endsAt: string,
+  timeZone = DEFAULT_TIME_ZONE,
+) {
+  const startIso = schoolDateTimeToIso(startsAt, timeZone);
+  const endIso = schoolDateTimeToIso(endsAt, timeZone);
+  if (!startIso || !endIso) return null;
+  const duration = (Date.parse(endIso) - Date.parse(startIso)) / 60_000;
+  return Number.isInteger(duration) ? duration : null;
+}
