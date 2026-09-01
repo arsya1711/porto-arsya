@@ -667,7 +667,7 @@ export function RealExamManagement({
       schoolTimezone,
     );
     if (!isValidExamDuration(duration ?? "")) {
-      notify("Waktu selesai harus setelah waktu mulai, dengan rentang maksimal 8 jam.", true);
+      notify("Waktu selesai harus setelah waktu mulai.", true);
       return;
     }
     if (draft.accessCode.trim() && draft.accessCode.trim().length < 4) {
@@ -1023,7 +1023,7 @@ export function RealExamManagement({
         schoolTimezone,
       );
       if (!draft.startsAt || !draft.endsAt || !isValidExamDuration(duration ?? "")) {
-        notify("Periksa jadwal mulai dan selesai. Rentang ujian harus 1 menit sampai 8 jam.", true);
+        notify("Periksa jadwal mulai dan selesai. Waktu selesai harus setelah waktu mulai.", true);
         return;
       }
     }
@@ -1194,7 +1194,7 @@ export function RealExamManagement({
                       <label className="form-field"><span>Kelas peserta</span><select value={draft.classId} onChange={(event) => { const classId = event.target.value; setDraft({ ...draft, classId, subjectId: subjectsForClass(classId)[0]?.id ?? "", questionIds: [] }); }}>{assignedClasses.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
                       <label className="form-field"><span>Mata pelajaran</span><select value={draft.subjectId} onChange={(event) => setDraft({ ...draft, subjectId: event.target.value, questionIds: [] })}>{availableDraftSubjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
                       <label className="form-field"><span>Tanggal & jam mulai <small>({schoolTimezone})</small></span><input type="datetime-local" value={draft.startsAt} onChange={(event) => updateExamStart(event.target.value)} /></label>
-                      <label className="form-field"><span>Tanggal & jam selesai <small>({schoolTimezone})</small></span><input type="datetime-local" value={draft.endsAt} min={addMinutesToSchoolDateTimeInput(draft.startsAt, 1, schoolTimezone) || undefined} max={addMinutesToSchoolDateTimeInput(draft.startsAt, 480, schoolTimezone) || undefined} onChange={(event) => setDraft({ ...draft, endsAt: event.target.value })} /></label>
+                      <label className="form-field"><span>Tanggal & jam selesai <small>({schoolTimezone})</small></span><input type="datetime-local" value={draft.endsAt} min={addMinutesToSchoolDateTimeInput(draft.startsAt, 1, schoolTimezone) || undefined} onChange={(event) => setDraft({ ...draft, endsAt: event.target.value })} /></label>
                       <label className="form-field"><span>Batas waktu pengerjaan</span><input readOnly value={isValidExamDuration(draftDuration ?? "") ? `${draftDuration} menit` : "Periksa waktu selesai"} aria-invalid={!isValidExamDuration(draftDuration ?? "")} /></label>
                       <label className="form-field"><span>Status awal</span><select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as ExamDraft["status"] })}><option value="draft">Simpan sebagai draft</option><option value="terjadwal">Jadwalkan untuk peserta</option></select></label>
                     </div>

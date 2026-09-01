@@ -12,8 +12,6 @@ export function isValidExamDuration(
   return (
     typeof value === "number" &&
     Number.isInteger(value) &&
-    value >= 1 &&
-    value <= 480
+    value >= 1
   );
 }
-

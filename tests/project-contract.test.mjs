@@ -267,6 +267,20 @@ test('form ujian meminta jadwal mulai dan selesai lalu server membatasi deadline
   assert.match(migration, /least\([\s\S]*target_attempt\.started_at \+ make_interval\(mins => target_exam\.duration_minutes\)[\s\S]*target_exam\.ends_at/)
 })
 
+test('waktu selesai ujian fleksibel selama berada setelah waktu mulai', async () => {
+  const [assessment, duration, migration] = await Promise.all([
+    read('src/components/AssessmentPages.tsx'),
+    read('src/lib/exam-duration.ts'),
+    read('supabase/migrations/036_flexible_exam_schedule.sql'),
+  ])
+  assert.match(assessment, /Waktu selesai harus setelah waktu mulai/)
+  assert.match(assessment, /min=\{addMinutesToSchoolDateTimeInput\(draft\.startsAt, 1/)
+  assert.doesNotMatch(assessment, /max=\{addMinutesToSchoolDateTimeInput\(draft\.startsAt, 480/)
+  assert.doesNotMatch(duration, /value <= 480/)
+  assert.match(migration, /duration_in_minutes is null or duration_in_minutes < 1/)
+  assert.doesNotMatch(migration, /duration_in_minutes > 480/)
+})
+
 test('kumpulan ujian mempertahankan urutan asli dan memuat hasil per ujian', async () => {
   const [assessment, migration] = await Promise.all([
     read('src/components/AssessmentPages.tsx'),
