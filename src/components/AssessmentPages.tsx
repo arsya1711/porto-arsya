@@ -40,7 +40,9 @@ import {
 import { fetchAllPages } from "../lib/supabase-pagination";
 import { useAccessibleDialog } from "../lib/use-accessible-dialog";
 import {
+  type ExamDurationValue,
   isValidExamDuration,
+  parseExamDurationInput,
 } from "../lib/exam-duration";
 
 type Notify = (text: string, error?: boolean) => void;
@@ -90,6 +92,7 @@ type ExamDraft = {
   classId: string;
   startsAt: string;
   endsAt: string;
+  durationMinutes: ExamDurationValue;
   accessCode: string;
   hadAccessCode: boolean;
   removeAccessCode: boolean;
@@ -605,6 +608,7 @@ export function RealExamManagement({
       classId: initialClassId,
       startsAt,
       endsAt: addMinutesToSchoolDateTimeInput(startsAt, 90, schoolTimezone),
+      durationMinutes: 90,
       accessCode: "",
       hadAccessCode: false,
       removeAccessCode: false,
@@ -643,6 +647,7 @@ export function RealExamManagement({
             exam.duration_minutes,
             schoolTimezone,
           ),
+      durationMinutes: exam.duration_minutes,
       accessCode: "",
       hadAccessCode: exam.has_access_code,
       removeAccessCode: false,
@@ -661,13 +666,17 @@ export function RealExamManagement({
       notify("Lengkapi judul, mata pelajaran, kelas, dan pilih minimal satu soal.", true);
       return;
     }
-    const duration = schoolDateTimeRangeMinutes(
+    const scheduleMinutes = schoolDateTimeRangeMinutes(
       draft.startsAt,
       draft.endsAt,
       schoolTimezone,
     );
-    if (!isValidExamDuration(duration ?? "")) {
+    if (!isValidExamDuration(scheduleMinutes ?? "")) {
       notify("Waktu selesai harus setelah waktu mulai.", true);
+      return;
+    }
+    if (!isValidExamDuration(draft.durationMinutes)) {
+      notify("Batas waktu pengerjaan harus berupa menit bulat dan minimal 1 menit.", true);
       return;
     }
     if (draft.accessCode.trim() && draft.accessCode.trim().length < 4) {
@@ -689,7 +698,8 @@ export function RealExamManagement({
       target_subject_id: draft.subjectId,
       target_class_id: draft.classId,
       start_time: startsAt,
-      duration_in_minutes: duration,
+      end_time: endsAt,
+      duration_in_minutes: draft.durationMinutes,
       target_status: draft.status,
       question_ids: draft.questionIds,
       access_code_value: draft.removeAccessCode
@@ -1017,13 +1027,17 @@ export function RealExamManagement({
         notify("Lengkapi judul, mata pelajaran, dan kelas peserta.", true);
         return;
       }
-      const duration = schoolDateTimeRangeMinutes(
+      const scheduleMinutes = schoolDateTimeRangeMinutes(
         draft.startsAt,
         draft.endsAt,
         schoolTimezone,
       );
-      if (!draft.startsAt || !draft.endsAt || !isValidExamDuration(duration ?? "")) {
+      if (!draft.startsAt || !draft.endsAt || !isValidExamDuration(scheduleMinutes ?? "")) {
         notify("Periksa jadwal mulai dan selesai. Waktu selesai harus setelah waktu mulai.", true);
+        return;
+      }
+      if (!isValidExamDuration(draft.durationMinutes)) {
+        notify("Batas waktu pengerjaan harus berupa menit bulat dan minimal 1 menit.", true);
         return;
       }
     }
@@ -1065,9 +1079,6 @@ export function RealExamManagement({
   const selectedSubjectName = subjects.find((item) => item.id === draft?.subjectId)?.name ?? "Belum dipilih";
   const selectedClassName = classes.find((item) => item.id === draft?.classId)?.name ?? "Belum dipilih";
   const availableDraftSubjects = subjectsForClass(draft?.classId ?? "");
-  const draftDuration = draft
-    ? schoolDateTimeRangeMinutes(draft.startsAt, draft.endsAt, schoolTimezone)
-    : null;
   const visibleMonitorRows = useMemo(() => {
     const query = monitorSearch.trim().toLocaleLowerCase("id-ID");
     const filtered = monitorRows.filter((row) => {
@@ -1195,7 +1206,7 @@ export function RealExamManagement({
                       <label className="form-field"><span>Mata pelajaran</span><select value={draft.subjectId} onChange={(event) => setDraft({ ...draft, subjectId: event.target.value, questionIds: [] })}>{availableDraftSubjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
                       <label className="form-field"><span>Tanggal & jam mulai <small>({schoolTimezone})</small></span><input type="datetime-local" value={draft.startsAt} onChange={(event) => updateExamStart(event.target.value)} /></label>
                       <label className="form-field"><span>Tanggal & jam selesai <small>({schoolTimezone})</small></span><input type="datetime-local" value={draft.endsAt} min={addMinutesToSchoolDateTimeInput(draft.startsAt, 1, schoolTimezone) || undefined} onChange={(event) => setDraft({ ...draft, endsAt: event.target.value })} /></label>
-                      <label className="form-field"><span>Batas waktu pengerjaan</span><input readOnly value={isValidExamDuration(draftDuration ?? "") ? `${draftDuration} menit` : "Periksa waktu selesai"} aria-invalid={!isValidExamDuration(draftDuration ?? "")} /></label>
+                      <label className="form-field"><span>Batas waktu pengerjaan (menit)</span><input type="number" min={1} step={1} value={draft.durationMinutes} onChange={(event) => setDraft({ ...draft, durationMinutes: parseExamDurationInput(event.target.value) })} aria-invalid={!isValidExamDuration(draft.durationMinutes)} /><small>Siswa mendapat waktu ini sejak mulai, tetapi sesi tetap ditutup saat jadwal ujian selesai.</small></label>
                       <label className="form-field"><span>Status awal</span><select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as ExamDraft["status"] })}><option value="draft">Simpan sebagai draft</option><option value="terjadwal">Jadwalkan untuk peserta</option></select></label>
                     </div>
                   </div>
@@ -1242,7 +1253,7 @@ export function RealExamManagement({
                     <div className="exam-review" aria-label="Ringkasan ujian">
                       <div><small>Mata pelajaran</small><b>{selectedSubjectName}</b></div>
                       <div><small>Kelas</small><b>{selectedClassName}</b></div>
-                      <div><small>Isi ujian</small><b>{draft.questionIds.length} soal · {isValidExamDuration(draftDuration ?? "") ? `${draftDuration} menit` : "jadwal belum valid"}</b></div>
+                      <div><small>Isi ujian</small><b>{draft.questionIds.length} soal · {isValidExamDuration(draft.durationMinutes) ? `${draft.durationMinutes} menit pengerjaan` : "durasi belum valid"}</b></div>
                       <div><small>Jadwal</small><b>{draft.startsAt.replace("T", " ")} – {draft.endsAt.replace("T", " ")}</b></div>
                     </div>
                     <label className="form-field"><span>{draft.hadAccessCode ? "Kode akses baru (kosong = pertahankan)" : "Kode akses (opsional)"}</span><input value={draft.accessCode} disabled={draft.removeAccessCode} minLength={4} maxLength={64} autoComplete="off" placeholder="Minimal 4 karakter" onChange={(event) => setDraft({ ...draft, accessCode: event.target.value.toUpperCase(), removeAccessCode: false })} /></label>

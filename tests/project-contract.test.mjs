@@ -262,8 +262,9 @@ test('form ujian meminta jadwal mulai dan selesai lalu server membatasi deadline
   ])
   assert.match(assessment, /Tanggal & jam mulai/)
   assert.match(assessment, /Tanggal & jam selesai/)
-  assert.match(assessment, /schoolDateTimeRangeMinutes\(draft\.startsAt, draft\.endsAt/)
-  assert.match(assessment, /duration_in_minutes: duration/)
+  assert.match(assessment, /schoolDateTimeRangeMinutes\(\s*draft\.startsAt,\s*draft\.endsAt/)
+  assert.match(assessment, /end_time: endsAt/)
+  assert.match(assessment, /duration_in_minutes: draft\.durationMinutes/)
   assert.match(migration, /least\([\s\S]*target_attempt\.started_at \+ make_interval\(mins => target_exam\.duration_minutes\)[\s\S]*target_exam\.ends_at/)
 })
 
@@ -279,6 +280,22 @@ test('waktu selesai ujian fleksibel selama berada setelah waktu mulai', async ()
   assert.doesNotMatch(duration, /value <= 480/)
   assert.match(migration, /duration_in_minutes is null or duration_in_minutes < 1/)
   assert.doesNotMatch(migration, /duration_in_minutes > 480/)
+})
+
+test('periode ujian dan durasi siswa disimpan sebagai dua aturan berbeda', async () => {
+  const [assessment, migration, deadlineMigration] = await Promise.all([
+    read('src/components/AssessmentPages.tsx'),
+    read('supabase/migrations/037_separate_exam_window_and_duration.sql'),
+    read('supabase/migrations/035_exam_operations_and_essay_rubrics.sql'),
+  ])
+  assert.match(assessment, /Batas waktu pengerjaan \(menit\)/)
+  assert.match(assessment, /parseExamDurationInput\(event\.target\.value\)/)
+  assert.match(assessment, /end_time: endsAt/)
+  assert.match(migration, /end_time timestamptz/)
+  assert.match(migration, /end_time is null or end_time <= start_time/)
+  assert.match(migration, /ends_at = end_time/)
+  assert.match(migration, /duration_minutes = duration_in_minutes/)
+  assert.match(deadlineMigration, /least\([\s\S]*make_interval\(mins => exam\.duration_minutes\)[\s\S]*exam\.ends_at/)
 })
 
 test('kumpulan ujian mempertahankan urutan asli dan memuat hasil per ujian', async () => {
